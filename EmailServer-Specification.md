@@ -73,6 +73,7 @@ CREATE TABLE Users (
     PasswordHash TEXT NOT NULL,                              -- BCrypt hashed password
     Salt TEXT NOT NULL,                                      -- Salt used for password hashing
     FullName TEXT,                                           -- User's display name
+    Role TEXT NOT NULL DEFAULT 'User',                       -- User role: 'User', 'DomainAdmin', 'HostAdmin'
     CanReceive BOOLEAN DEFAULT 1,                            -- Whether user can receive emails
     CanLogin BOOLEAN DEFAULT 1,                              -- Whether user can log in to services
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Account creation timestamp
@@ -82,13 +83,20 @@ CREATE TABLE Users (
 );
 ```
 
+**Role Enum Values:**
+- `"User"` - Regular email user with access to their own emails and folders
+- `"DomainAdmin"` - Can manage users within their domain only
+- `"HostAdmin"` - Can manage all domains, users, and server settings
+
 #### Domains
 ```sql
 CREATE TABLE Domains (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique domain identifier
     Name TEXT NOT NULL UNIQUE,                               -- Domain name (e.g., example.com)
     IsActive BOOLEAN DEFAULT 1,                              -- Whether domain accepts mail
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP             -- Domain creation timestamp
+    CatchAllUserId INTEGER DEFAULT NULL,                     -- Optional catch-all user for unmatched addresses
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Domain creation timestamp
+    FOREIGN KEY (CatchAllUserId) REFERENCES Users(Id)
 );
 ```
 
@@ -98,15 +106,62 @@ CREATE TABLE Messages (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique message identifier
     HeaderMessageId TEXT NOT NULL UNIQUE,                    -- RFC 2822 Message-ID header
     FromAddress TEXT NOT NULL,                               -- Sender's email address
+    ToAddress TEXT,                                          -- Primary recipient address
+    CcAddress TEXT,                                          -- CC recipients (comma-separated)
+    BccAddress TEXT,                                         -- BCC recipients (comma-separated)
     Subject TEXT,                                            -- Message subject line
-    Headers TEXT,                                            -- Raw email headers (To/Cc/Bcc/etc)
+    Headers TEXT NOT NULL,                                   -- Complete raw email headers
     Body TEXT,                                               -- Plain text message body
     BodyHtml TEXT,                                           -- HTML message body
-    MessageSize INTEGER,                                     -- Message size in bytes
-    ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,           -- When message was received
-    Flags TEXT,                                              -- IMAP flags (JSON or delimited)
-    FolderId INTEGER,                                        -- Default folder for message
-    FOREIGN KEY (FolderId) REFERENCES Folders(Id)
+    MessageSize INTEGER NOT NULL,                            -- Message size in bytes (RFC2822 format)
+    ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,           -- When message was received (INTERNALDATE)
+    SentDate DATETIME,                                       -- Date from Date: header
+    InReplyTo TEXT,                                          -- In-Reply-To header value
+    References TEXT,                                         -- References header value
+    BodyStructure TEXT,                                      -- MIME body structure (JSON)
+    Envelope TEXT,                                           -- IMAP envelope structure (JSON)
+    Uid INTEGER NOT NULL UNIQUE,                             -- IMAP UID (strictly ascending)
+    UidValidity INTEGER DEFAULT 1,                           -- IMAP UIDVALIDITY value
+    FOREIGN KEY (UidValidity) REFERENCES UidValiditySequence(Value)
+);
+```
+
+#### MessageSearchIndex (FTS5)
+```sql
+CREATE VIRTUAL TABLE MessageSearchIndex USING fts5(
+    MessageId UNINDEXED,                                     -- Reference to Messages.Id (not searchable)
+    FromAddress,                                             -- Searchable sender address
+    Subject,                                                 -- Searchable subject line
+    Body,                                                    -- Searchable plain text body
+    content='Messages',                                      -- Points to Messages table
+    content_rowid='Id'                                       -- Uses Messages.Id as rowid
+);
+```
+
+#### UidValiditySequence
+```sql
+CREATE TABLE UidValiditySequence (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Sequence identifier
+    DomainId INTEGER NOT NULL,                               -- Domain this sequence belongs to
+    Value INTEGER NOT NULL DEFAULT 1,                        -- Current UIDVALIDITY value
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- When this UIDVALIDITY was created
+    FOREIGN KEY (DomainId) REFERENCES Domains(Id),
+    UNIQUE(DomainId, Value)                                  -- One UIDVALIDITY per domain
+);
+```
+
+#### MessageFlags
+```sql
+CREATE TABLE MessageFlags (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique flag assignment identifier
+    MessageId INTEGER NOT NULL,                              -- Message this flag applies to
+    UserId INTEGER NOT NULL,                                 -- User who owns this flag state
+    FlagName TEXT NOT NULL,                                  -- Flag name (\Seen, \Answered, etc.)
+    IsSet BOOLEAN DEFAULT 1,                                 -- Whether flag is set or cleared
+    ModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP,           -- When flag was last modified
+    FOREIGN KEY (MessageId) REFERENCES Messages(Id),
+    FOREIGN KEY (UserId) REFERENCES Users(Id),
+    UNIQUE(MessageId, UserId, FlagName)                      -- One flag state per message per user
 );
 ```
 
@@ -116,7 +171,14 @@ CREATE TABLE Folders (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique folder identifier
     UserId INTEGER NOT NULL,                                 -- Owner of this folder
     Name TEXT NOT NULL,                                      -- Full folder path (e.g., INBOX/Work)
+    Delimiter TEXT DEFAULT '/',                              -- Hierarchy delimiter character
     SystemFolderType TEXT DEFAULT NULL,                      -- System folder type or NULL for user folders
+    Attributes TEXT,                                         -- Folder attributes (\Marked, \Unmarked, etc.)
+    UidNext INTEGER DEFAULT 1,                               -- Next UID to be assigned in this folder
+    UidValidity INTEGER DEFAULT 1,                           -- UIDVALIDITY for this folder
+    Exists INTEGER DEFAULT 0,                                -- Number of messages in folder
+    Recent INTEGER DEFAULT 0,                                -- Number of messages with \Recent flag
+    Unseen INTEGER DEFAULT 0,                                -- Number of messages without \Seen flag
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Folder creation timestamp
     FOREIGN KEY (UserId) REFERENCES Users(Id),
     UNIQUE(UserId, Name),                                    -- Unique folder name per user
@@ -140,13 +202,14 @@ CREATE TABLE UserMessages (
     UserId INTEGER NOT NULL,                                 -- User who owns this message instance
     MessageId INTEGER NOT NULL,                              -- Reference to the actual message
     FolderId INTEGER NOT NULL,                               -- Which folder this message is in for this user
-    IsRead BOOLEAN DEFAULT 0,                                -- Whether this user has read the message
-    IsStarred BOOLEAN DEFAULT 0,                             -- Whether this user has starred the message
-    IsDeleted BOOLEAN DEFAULT 0,                             -- Whether this user has deleted the message
+    Uid INTEGER NOT NULL,                                    -- IMAP UID for this message in this folder
+    SequenceNumber INTEGER,                                  -- Current sequence number (dynamic)
     ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,           -- When this user received the message
     FOREIGN KEY (UserId) REFERENCES Users(Id),
     FOREIGN KEY (MessageId) REFERENCES Messages(Id),
-    FOREIGN KEY (FolderId) REFERENCES Folders(Id)
+    FOREIGN KEY (FolderId) REFERENCES Folders(Id),
+    UNIQUE(FolderId, Uid),                                   -- UIDs must be unique within folder
+    UNIQUE(UserId, MessageId, FolderId)                      -- Prevent duplicate message in same folder
 );
 ```
 
@@ -159,9 +222,25 @@ CREATE TABLE Attachments (
     ContentType TEXT,                                        -- MIME type (e.g., image/jpeg)
     Size INTEGER,                                            -- File size in bytes
     FileGuid TEXT NOT NULL UNIQUE,                           -- GUID used as filename on disk
-    FilePath TEXT,                                           -- Full path to stored file (includes /attachments/guid)
+    FileExtension TEXT,                                      -- Original file extension (e.g., '.pdf', '.jpg')
+    FilePath TEXT,                                           -- Full path to stored file (includes /attachments/guid.ext)
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- When attachment was stored
     FOREIGN KEY (MessageId) REFERENCES Messages(Id)
+);
+```
+
+#### DKIMKeys
+```sql
+CREATE TABLE DKIMKeys (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique DKIM key identifier
+    DomainId INTEGER NOT NULL,                               -- Domain this key belongs to
+    Selector TEXT NOT NULL,                                  -- DKIM selector (e.g., 'default', 'mail')
+    PrivateKey TEXT NOT NULL,                                -- RSA private key for signing (PEM format)
+    PublicKey TEXT NOT NULL,                                 -- RSA public key for DNS TXT record
+    IsActive BOOLEAN DEFAULT 1,                              -- Whether this key is active for signing
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Key creation timestamp
+    FOREIGN KEY (DomainId) REFERENCES Domains(Id),
+    UNIQUE(DomainId, Selector)                               -- One selector per domain
 );
 ```
 
@@ -173,22 +252,30 @@ CREATE TABLE Attachments (
 - **Port 465**: SMTP over SSL/TLS
 - **Features**:
   - Message routing and delivery
-  - Authentication (AUTH LOGIN, AUTH PLAIN)
+  - Authentication (AUTH LOGIN, AUTH PLAIN, OAUTH2)
   - STARTTLS support
   - Message size limits
   - Rate limiting
+  - DKIM signing for outbound mail
+  - SPF checking for inbound mail
   - Basic spam filtering
 
 ### IMAP (Internet Message Access Protocol)
 - **Port 143**: Standard IMAP (unencrypted)
 - **Port 993**: IMAP over SSL/TLS
 - **Features**:
-  - Folder hierarchy support
-  - Message flags and status
-  - Server-side search
-  - Partial message fetching
-  - IDLE command for real-time updates
-  - Multi-folder synchronization
+  - **Folder hierarchy support**: Full support for nested folders with configurable delimiters
+  - **Message flags and status**: Complete IMAP flag system (\Seen, \Answered, \Flagged, \Deleted, \Draft, \Recent)
+  - **Server-side search**: Support for all IMAP SEARCH criteria including text, headers, dates, flags
+  - **Partial message fetching**: BODY[section] and BODY.PEEK[section] with partial ranges
+  - **UID support**: Proper UID management with UIDVALIDITY and UIDNEXT
+  - **IDLE command**: Real-time push notifications for mailbox changes
+  - **Multi-folder synchronization**: Concurrent folder access and status updates  
+  - **Message sequence numbers**: Dynamic sequence number management
+  - **Envelope and body structure**: Parsed MIME structure and RFC2822 envelope
+  - **Quota support**: Mailbox size and message count limits (future)
+  - **Access Control Lists**: Shared folder permissions (future)
+  - **IMAP Extensions**: SORT, THREAD, CONDSTORE (future enhancements)
 
 ### POP3 (Post Office Protocol)
 - **Port 110**: Standard POP3 (unencrypted)
@@ -199,13 +286,18 @@ CREATE TABLE Attachments (
   - APOP authentication
   - Basic message retrieval
 
+### Future Protocol Support (Phase 6)
+- **JMAP**: Modern JSON-based email protocol for web/mobile clients
+- **LMTP**: Local Mail Transfer Protocol for efficient local delivery
+- **ManageSieve**: Server-side mail filtering management
+
 ## Attachment Storage Strategy
 
 ### File Storage Design
 - **Storage Location**: `/attachments` directory (configurable)
-- **File Naming**: GUID-based filenames to prevent conflicts and directory traversal
+- **File Naming**: GUID-based filenames with original extension to enable content-type detection
 - **Static Serving**: Files served directly by web server for performance
-- **URL Format**: `/attachments/{guid}` (relative path)
+- **URL Format**: `/attachments/{guid}.{extension}` (relative path with extension)
 
 ### Security Considerations
 - **Initial Implementation**: Static file serving for simplicity
@@ -213,9 +305,11 @@ CREATE TABLE Attachments (
 - **File Access**: Attachment path included in message response for client-side URL construction
 - **GUID Benefits**: 
   - Prevents filename conflicts
-  - Obscures original filenames
+  - Obscures original filenames while preserving extensions
   - Makes file enumeration difficult
   - Enables easy cleanup of orphaned files
+- **Extension Preservation**: Original file extensions preserved for proper MIME type detection
+- **Content-Type Headers**: Web server automatically sets correct Content-Type based on file extension
 
 ### Example Attachment Response
 ```json
@@ -228,7 +322,14 @@ CREATE TABLE Attachments (
       "fileName": "document.pdf",
       "contentType": "application/pdf",
       "size": 1024000,
-      "path": "/attachments/550e8400-e29b-41d4-a716-446655440000"
+      "path": "/attachments/550e8400-e29b-41d4-a716-446655440000.pdf"
+    },
+    {
+      "id": 2,
+      "fileName": "photo.jpg",
+      "contentType": "image/jpeg", 
+      "size": 2048000,
+      "path": "/attachments/6ba7b810-9dad-11d1-80b4-00c04fd430c8.jpg"
     }
   ]
 }
@@ -245,56 +346,83 @@ GET    /api/session             - Get current session/user info (auto-refreshes 
 
 ### User Management
 ```
-GET    /api/users                    - List all users (admin)
-POST   /api/users                    - Create new user (admin)
-GET    /api/users/{email}            - Get user details
-PUT    /api/users/{email}            - Update user (full replacement)
-PATCH  /api/users/{email}            - Partial update user (including password)
-DELETE /api/users/{email}            - Delete user (admin)
+GET    /api/users                    - List all users (HostAdmin) or domain users (DomainAdmin)
+POST   /api/users                    - Create new user (HostAdmin/DomainAdmin)
+GET    /api/users/{email}            - Get user details (own account or admin)
+PUT    /api/users/{email}            - Update user (own account or admin)
+PATCH  /api/users/{email}            - Partial update user including password (own account or admin)
+DELETE /api/users/{email}            - Delete user (HostAdmin/DomainAdmin)
 ```
 
 ### Message Management
 ```
-GET    /api/messages            - List messages with pagination/filtering
-GET    /api/messages/{id}       - Get specific message (includes attachment metadata with paths)
-POST   /api/messages            - Send new message
-PUT    /api/messages/{id}       - Update message (flags, folder)
-DELETE /api/messages/{id}       - Delete message
+GET    /api/messages                     - List messages with pagination/filtering
+GET    /api/messages/search              - Full-text search messages (?q=search+terms)
+GET    /api/messages/{id}                - Get specific message (includes attachment metadata with paths)
+GET    /api/messages/{id}/envelope       - Get IMAP envelope structure
+GET    /api/messages/{id}/bodystructure  - Get MIME body structure
+GET    /api/messages/{id}/flags          - Get message flags for current user
+POST   /api/messages                     - Send new message
+PUT    /api/messages/{id}/flags          - Update message flags
+PATCH  /api/messages/{id}                - Partial update message (folder move, etc.)
+DELETE /api/messages/{id}                - Delete message (move to trash)
 ```
 
 ### Folder Management
 ```
-GET    /api/folders             - List user folders
-POST   /api/folders             - Create new folder
-PUT    /api/folders/{id}        - Update folder
-DELETE /api/folders/{id}        - Delete folder
+GET    /api/folders                      - List user folders with hierarchy
+GET    /api/folders/{id}                 - Get folder details (EXISTS, RECENT, UNSEEN, UIDNEXT, UIDVALIDITY)
+GET    /api/folders/{id}/status          - Get folder status (like IMAP STATUS command)
+POST   /api/folders                      - Create new folder
+PUT    /api/folders/{id}                 - Update folder (rename)
+DELETE /api/folders/{id}                 - Delete folder
 POST   /api/folders/{id}/messages/{messageId} - Move message to folder
+POST   /api/folders/{id}/subscribe       - Subscribe to folder
+DELETE /api/folders/{id}/subscribe       - Unsubscribe from folder
+GET    /api/folders/subscribed           - List subscribed folders
 ```
 
 ### Domain Management (Admin)
 ```
-GET    /api/domains             - List domains
-POST   /api/domains             - Add new domain
-PUT    /api/domains/{domainname} - Update domain
-DELETE /api/domains/{domainname} - Delete domain
+GET    /api/domains             - List domains (HostAdmin sees all, DomainAdmin sees own)
+POST   /api/domains             - Add new domain (HostAdmin only)
+PUT    /api/domains/{domainname} - Update domain (HostAdmin only)
+DELETE /api/domains/{domainname} - Delete domain (HostAdmin only)
+GET    /api/domains/{domainname}/dkim - Get DKIM public key for DNS setup
+POST   /api/domains/{domainname}/dkim - Generate new DKIM key pair
 ```
 
-### Server Management (Admin)
+### Server Management (HostAdmin)
 ```
-GET    /api/server/status       - Server status and statistics
-GET    /api/server/logs         - Server logs
-PUT    /api/server/settings     - Update server settings
-POST   /api/server/backup       - Create backup
-POST   /api/server/restore      - Restore from backup
+GET    /api/server/status       - Server status and statistics (HostAdmin only)
+GET    /api/server/health       - Health check endpoint (HostAdmin only)
+GET    /api/server/metrics      - Performance metrics (HostAdmin only)
+GET    /api/server/logs         - Server logs (HostAdmin only)
+PUT    /api/server/settings     - Update server settings (HostAdmin only)
+POST   /api/server/backup       - Create backup (HostAdmin only)
+POST   /api/server/restore      - Restore from backup (HostAdmin only)
+```
+
+### Mail Processing (Future Enhancement)
+```
+GET    /api/mail-rules          - List user mail filtering rules
+POST   /api/mail-rules          - Create mail filtering rule
+PUT    /api/mail-rules/{id}     - Update mail filtering rule
+DELETE /api/mail-rules/{id}     - Delete mail filtering rule
+GET    /api/mail-queue          - View mail queue status (HostAdmin only)
+POST   /api/mail-queue/retry    - Retry failed messages (HostAdmin only)
 ```
 
 ### Real-time Endpoints (SignalR)
 ```
-/hubs/email                     - Real-time email notifications
-  - NewMessage(messageInfo)
-  - MessageRead(messageId)
-  - MessageDeleted(messageId)
-  - FolderUpdated(folderInfo)
+/hubs/email                              - Real-time email notifications
+  - NewMessage(folderId, messageInfo)    - New message arrived
+  - MessageFlags(messageId, flags)       - Message flags changed
+  - MessageExpunged(folderId, uid)       - Message permanently deleted
+  - FolderUpdated(folderId, exists, recent, unseen) - Folder status changed
+  - FolderCreated(folderInfo)            - New folder created
+  - FolderDeleted(folderId)              - Folder deleted
+  - FolderRenamed(folderId, newName)     - Folder renamed
 ```
 
 ## Security Features
@@ -311,7 +439,10 @@ POST   /api/server/restore      - Restore from backup
 - **Multi-factor Authentication**: TOTP support (future enhancement)
 
 ### Authorization
-- **Role-based Access**: Admin, User roles
+- **Role-based Access**: User, DomainAdmin, HostAdmin roles
+- **User Permissions**: Access to own emails, folders, and account settings
+- **Domain Admin Permissions**: Manage users within their own domain
+- **Host Admin Permissions**: Full access to all domains, users, and server settings
 - **Resource-based Permissions**: Users can only access their own emails
 - **API Rate Limiting**: Prevent abuse
 
@@ -383,8 +514,172 @@ POST   /api/server/restore      - Restore from backup
 - **BouncyCastle**: Cryptographic operations
 
 ### Database
-- **SQLite**: Embedded database
+- **SQLite**: Embedded database with FTS5 full-text search
 - **SQLite.Interop**: Native SQLite library
+
+#### Sequence Number Management
+```sql
+-- Trigger to maintain sequence numbers when messages are expunged
+CREATE TRIGGER update_sequence_numbers 
+AFTER DELETE ON UserMessages
+FOR EACH ROW
+BEGIN
+    UPDATE UserMessages 
+    SET SequenceNumber = SequenceNumber - 1 
+    WHERE FolderId = OLD.FolderId 
+    AND SequenceNumber > OLD.SequenceNumber;
+END;
+
+-- Trigger to assign sequence numbers to new messages  
+CREATE TRIGGER assign_sequence_number
+AFTER INSERT ON UserMessages
+FOR EACH ROW
+BEGIN
+    UPDATE UserMessages 
+    SET SequenceNumber = (
+        SELECT COALESCE(MAX(SequenceNumber), 0) + 1 
+        FROM UserMessages 
+        WHERE FolderId = NEW.FolderId
+    )
+    WHERE rowid = NEW.rowid;
+END;
+```
+
+## IMAP Protocol Compliance
+
+### Core IMAP4rev1 Support
+
+The server implementation ensures full compliance with RFC 3501 (IMAP4rev1):
+
+#### Connection States
+- **Not Authenticated**: Initial connection state requiring authentication
+- **Authenticated**: User authenticated but no mailbox selected  
+- **Selected**: Mailbox selected for message operations
+- **Logout**: Connection termination state
+
+#### Required Commands
+**Any State:**
+- `CAPABILITY` - List server capabilities
+- `NOOP` - No operation (keepalive)  
+- `LOGOUT` - Close connection
+
+**Not Authenticated State:**
+- `STARTTLS` - Upgrade to TLS encryption
+- `AUTHENTICATE` - SASL authentication (PLAIN, GSSAPI, etc.)
+- `LOGIN` - Plain text authentication (requires TLS)
+
+**Authenticated State:**
+- `SELECT` - Select mailbox for read-write access
+- `EXAMINE` - Select mailbox for read-only access
+- `CREATE` - Create new mailbox
+- `DELETE` - Delete mailbox
+- `RENAME` - Rename mailbox  
+- `SUBSCRIBE/UNSUBSCRIBE` - Manage folder subscriptions
+- `LIST` - List mailboxes with attributes
+- `LSUB` - List subscribed mailboxes
+- `STATUS` - Get mailbox status without selecting
+- `APPEND` - Add message to mailbox
+
+**Selected State:**
+- `CHECK` - Checkpoint mailbox
+- `CLOSE` - Close current mailbox
+- `EXPUNGE` - Permanently remove deleted messages
+- `SEARCH` - Search messages by criteria
+- `FETCH` - Retrieve message data
+- `STORE` - Update message flags
+- `COPY` - Copy messages to another mailbox
+- `UID` - Execute commands using UIDs instead of sequence numbers
+
+#### Message Attributes Support
+- **Sequence Numbers**: Dynamic 1-based numbering
+- **Unique Identifiers (UIDs)**: Persistent, strictly ascending 32-bit values
+- **UIDVALIDITY**: Detects UID reuse scenarios
+- **Flags**: System flags (\Seen, \Answered, \Flagged, \Deleted, \Draft, \Recent) and custom keywords
+- **Internal Date**: Server-assigned receive timestamp
+- **RFC2822 Size**: Message size in standard format
+- **Envelope**: Parsed header structure
+- **Body Structure**: MIME structure parsing
+
+#### Search Capabilities
+Support for all IMAP SEARCH criteria:
+- Text searches: BODY, TEXT, HEADER, SUBJECT, FROM, TO, CC, BCC
+- Date searches: BEFORE, ON, SINCE, SENTBEFORE, SENTON, SENTSINCE  
+- Size searches: LARGER, SMALLER
+- Flag searches: ANSWERED, DELETED, DRAFT, FLAGGED, SEEN, RECENT, etc.
+- Logical operators: AND, OR, NOT
+- Sequence sets and UID ranges
+
+#### Folder Features
+- **Hierarchy**: Nested folder structure with configurable delimiters
+- **Attributes**: \Noinferiors, \Noselect, \Marked, \Unmarked
+- **Special Folders**: INBOX (case-insensitive), system folders
+- **Subscriptions**: Server-side subscription list management
+
+#### Extensions (Future)
+- **IDLE**: Real-time notifications for mailbox changes
+- **SORT**: Server-side message sorting
+- **THREAD**: Message threading by conversation
+- **QUOTA**: Storage quota management
+- **ACL**: Access control lists for shared folders
+- **CONDSTORE**: Conditional STORE and quick flag sync
+
+### IMAP Response Format Compliance
+
+#### Status Responses
+```
+* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN LOGINDISABLED] Server ready
+* OK [ALERT] System message
+* OK [BADCHARSET (UTF-8)] Charset not supported  
+* OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Flags permitted
+* OK [READ-ONLY] Mailbox selected read-only
+* OK [READ-WRITE] Mailbox selected read-write
+* OK [TRYCREATE] Create mailbox first
+* OK [UIDNEXT 4392] Predicted next UID
+* OK [UIDVALIDITY 3857529045] UIDs valid
+* OK [UNSEEN 17] First unseen message
+```
+
+#### Data Responses
+```
+* 172 EXISTS                             -- Message count
+* 1 RECENT                               -- Recent message count  
+* FLAGS (\Answered \Flagged \Deleted \Seen \Draft)  -- Available flags
+* SEARCH 2 84 882                        -- Search results
+* LIST () "/" INBOX                      -- Folder listing
+* STATUS INBOX (MESSAGES 231 UIDNEXT 44292) -- Folder status
+```
+
+#### Fetch Response Examples
+```
+* 12 FETCH (FLAGS (\Seen) UID 4827313 INTERNALDATE "17-Jul-1996 02:44:25 -0700" 
+  RFC822.SIZE 4286 ENVELOPE ("Wed, 17 Jul 1996 02:23:25 -0700 (PDT)" 
+  "IMAP4rev1 WG mtg summary" (("Terry Gray" NIL "gray" "example.com")) ...))
+```
+
+### Implementation Priority
+
+#### Phase 1: Core IMAP (Essential)
+- Basic authentication and connection management
+- SELECT/EXAMINE with proper folder selection
+- FETCH with FLAGS, UID, INTERNALDATE, RFC822.SIZE
+- STORE for flag updates
+- SEARCH with basic text and flag criteria
+- Proper sequence number and UID management
+
+#### Phase 2: Standard Compliance (Important)  
+- Full SEARCH criteria support
+- Complete FETCH response types (ENVELOPE, BODYSTRUCTURE)
+- Folder operations (CREATE, DELETE, RENAME, LIST, LSUB)
+- APPEND command for message upload
+- COPY command for message copying
+- Proper EXPUNGE handling
+
+#### Phase 3: Advanced Features (Enhancement)
+- IDLE for real-time notifications  
+- Partial FETCH with BODY[section] syntax
+- Advanced folder hierarchy management
+- Subscription management
+- STATUS command optimization
 
 ## Deployment Requirements
 
@@ -405,6 +700,7 @@ A     mail.example.com      → server_ip
 MX    example.com          → mail.example.com (priority 10)
 TXT   example.com          → "v=spf1 ip4:server_ip ~all"
 TXT   _dmarc.example.com   → "v=DMARC1; p=quarantine;"
+TXT   default._domainkey.example.com → "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA..."
 ```
 
 ## Development Phases
@@ -429,15 +725,31 @@ TXT   _dmarc.example.com   → "v=DMARC1; p=quarantine;"
 
 ### Phase 4: Security & Features
 1. SSL/TLS implementation
-2. Rate limiting and spam filtering
-3. Admin management interface
-4. Backup and restore functionality
+2. DKIM signing and verification
+3. Rate limiting and spam filtering
+4. Admin management interface
+5. Backup and restore functionality
 
 ### Phase 5: Frontend Applications
 1. User email interface (SPA)
 2. Admin management interface
 3. Mobile-responsive design
 4. Progressive Web App features
+
+### Phase 6: Advanced Email Features
+1. JMAP protocol implementation
+2. Mail processing pipeline (Mailet-style)
+3. Server-side mail filtering rules
+4. Advanced spam and virus filtering
+5. Mail aliases and forwarding
+6. Auto-responders and vacation messages
+
+### Phase 7: Enterprise Features
+1. Advanced monitoring and metrics
+2. Mail archiving capabilities
+3. Distribution lists
+4. Multi-tenancy enhancements
+5. Command-line administration tools
 
 ## Testing Strategy
 
