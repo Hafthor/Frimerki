@@ -1,8 +1,8 @@
-# Email Server Specification
+# Frímerki Email Server Specification
 
 ## Overview
 
-This document outlines the specification for a lightweight, self-contained email server built in C#. The server is designed to run on minimal hardware with few dependencies, using SQLite as the primary data store.
+This document outlines the specification for Frímerki, a lightweight, self-contained email server built in C#. The server is designed to run on minimal hardware with few dependencies, using SQLite as the primary data store.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ This document outlines the specification for a lightweight, self-contained email
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Email Clients │    │   Web Interface │    │  Admin Interface│
+│  Email Clients  │    │  Web Interface  │    │ Admin Interface │
 │   (POP3/IMAP)   │    │      (SPA)      │    │      (SPA)      │
 └─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
           │                      │                      │
@@ -18,13 +18,13 @@ This document outlines the specification for a lightweight, self-contained email
           │              │           Web API Layer              │
           │              └───────┬──────────────────────────────┘
           │                      │
-    ┌─────┴──────────────────────┴─────┐
-    │        Email Server Core         │
-    │  ┌─────────┐ ┌─────────┐ ┌──────┐│
-    │  │  SMTP   │ │  IMAP   │ │ POP3 ││
-    │  │ Service │ │ Service │ │Service││
-    │  └─────────┘ └─────────┘ └──────┘│
-    └─────┬────────────────────────────┘
+    ┌─────┴──────────────────────┴───────┐
+    │        Frímerki Server Core        │
+    │  ┌─────────┐ ┌─────────┐ ┌───────┐ │
+    │  │  SMTP   │ │  IMAP   │ │ POP3  │ │
+    │  │ Service │ │ Service │ │Service│ │
+    │  └─────────┘ └─────────┘ └───────┘ │
+    └─────┬──────────────────────────────┘
           │
     ┌─────┴─────┐
     │  SQLite   │
@@ -549,7 +549,7 @@ END;
 
 ### Core IMAP4rev1 Support
 
-The server implementation ensures full compliance with RFC 3501 (IMAP4rev1):
+The Frímerki server implementation ensures full compliance with RFC 3501 (IMAP4rev1):
 
 #### Connection States
 - **Not Authenticated**: Initial connection state requiring authentication
@@ -627,7 +627,7 @@ Support for all IMAP SEARCH criteria:
 
 #### Status Responses
 ```
-* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN LOGINDISABLED] Server ready
+* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN LOGINDISABLED] Frímerki ready
 * OK [ALERT] System message
 * OK [BADCHARSET (UTF-8)] Charset not supported  
 * OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Flags permitted
@@ -809,4 +809,4 @@ TXT   default._domainkey.example.com → "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEB
 
 ---
 
-This specification provides a comprehensive foundation for building a modern, lightweight email server in C# with minimal dependencies and hardware requirements.
+This specification provides a comprehensive foundation for building Frímerki, a modern, lightweight email server in C# with minimal dependencies and hardware requirements.
