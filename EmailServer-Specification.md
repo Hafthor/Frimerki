@@ -67,48 +67,45 @@ This document outlines the specification for a lightweight, self-contained email
 #### Users
 ```sql
 CREATE TABLE Users (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    Username TEXT NOT NULL UNIQUE,
-    Email TEXT NOT NULL UNIQUE,
-    PasswordHash TEXT NOT NULL,
-    Salt TEXT NOT NULL,
-    FirstName TEXT,
-    LastName TEXT,
-    IsActive BOOLEAN DEFAULT 1,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    LastLogin DATETIME,
-    StorageQuotaMB INTEGER DEFAULT 1000
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique user identifier
+    Username TEXT NOT NULL,                                  -- Username part of email address (before @)
+    DomainId INTEGER NOT NULL,                               -- Foreign key to Domains table
+    PasswordHash TEXT NOT NULL,                              -- BCrypt hashed password
+    Salt TEXT NOT NULL,                                      -- Salt used for password hashing
+    FullName TEXT,                                           -- User's display name
+    CanReceive BOOLEAN DEFAULT 1,                            -- Whether user can receive emails
+    CanLogin BOOLEAN DEFAULT 1,                              -- Whether user can log in to services
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Account creation timestamp
+    LastLogin DATETIME,                                      -- Last successful login timestamp
+    FOREIGN KEY (DomainId) REFERENCES Domains(Id),
+    UNIQUE(Username, DomainId)                               -- Unique username per domain
 );
 ```
 
 #### Domains
 ```sql
 CREATE TABLE Domains (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    Name TEXT NOT NULL UNIQUE,
-    IsActive BOOLEAN DEFAULT 1,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique domain identifier
+    Name TEXT NOT NULL UNIQUE,                               -- Domain name (e.g., example.com)
+    IsActive BOOLEAN DEFAULT 1,                              -- Whether domain accepts mail
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP             -- Domain creation timestamp
 );
 ```
 
 #### Messages
 ```sql
 CREATE TABLE Messages (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    MessageId TEXT NOT NULL UNIQUE,
-    FromAddress TEXT NOT NULL,
-    ToAddresses TEXT NOT NULL,
-    CcAddresses TEXT,
-    BccAddresses TEXT,
-    Subject TEXT,
-    Body TEXT,
-    BodyHtml TEXT,
-    MessageSize INTEGER,
-    ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    Flags TEXT,
-    IsRead BOOLEAN DEFAULT 0,
-    IsDeleted BOOLEAN DEFAULT 0,
-    FolderId INTEGER,
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique message identifier
+    HeaderMessageId TEXT NOT NULL UNIQUE,                    -- RFC 2822 Message-ID header
+    FromAddress TEXT NOT NULL,                               -- Sender's email address
+    Subject TEXT,                                            -- Message subject line
+    Headers TEXT,                                            -- Raw email headers (To/Cc/Bcc/etc)
+    Body TEXT,                                               -- Plain text message body
+    BodyHtml TEXT,                                           -- HTML message body
+    MessageSize INTEGER,                                     -- Message size in bytes
+    ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,           -- When message was received
+    Flags TEXT,                                              -- IMAP flags (JSON or delimited)
+    FolderId INTEGER,                                        -- Default folder for message
     FOREIGN KEY (FolderId) REFERENCES Folders(Id)
 );
 ```
@@ -116,28 +113,37 @@ CREATE TABLE Messages (
 #### Folders
 ```sql
 CREATE TABLE Folders (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId INTEGER NOT NULL,
-    Name TEXT NOT NULL,
-    ParentFolderId INTEGER,
-    IsSystemFolder BOOLEAN DEFAULT 0,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique folder identifier
+    UserId INTEGER NOT NULL,                                 -- Owner of this folder
+    Name TEXT NOT NULL,                                      -- Full folder path (e.g., INBOX/Work)
+    SystemFolderType TEXT DEFAULT NULL,                      -- System folder type or NULL for user folders
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Folder creation timestamp
     FOREIGN KEY (UserId) REFERENCES Users(Id),
-    FOREIGN KEY (ParentFolderId) REFERENCES Folders(Id)
+    UNIQUE(UserId, Name),                                    -- Unique folder name per user
+    UNIQUE(UserId, SystemFolderType) WHERE SystemFolderType IS NOT NULL  -- One system folder per type per user
 );
 ```
+
+**SystemFolderType Enum Values:**
+- `NULL` - User-created folder
+- `"INBOX"` - Primary inbox for incoming messages
+- `"SENT"` - Sent messages folder
+- `"DRAFTS"` - Draft messages folder
+- `"TRASH"` - Deleted messages folder
+- `"SPAM"` - Spam/Junk messages folder
+- `"OUTBOX"` - Messages queued for sending
 
 #### UserMessages
 ```sql
 CREATE TABLE UserMessages (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId INTEGER NOT NULL,
-    MessageId INTEGER NOT NULL,
-    FolderId INTEGER NOT NULL,
-    IsRead BOOLEAN DEFAULT 0,
-    IsStarred BOOLEAN DEFAULT 0,
-    IsDeleted BOOLEAN DEFAULT 0,
-    ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique user-message relationship identifier
+    UserId INTEGER NOT NULL,                                 -- User who owns this message instance
+    MessageId INTEGER NOT NULL,                              -- Reference to the actual message
+    FolderId INTEGER NOT NULL,                               -- Which folder this message is in for this user
+    IsRead BOOLEAN DEFAULT 0,                                -- Whether this user has read the message
+    IsStarred BOOLEAN DEFAULT 0,                             -- Whether this user has starred the message
+    IsDeleted BOOLEAN DEFAULT 0,                             -- Whether this user has deleted the message
+    ReceivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,           -- When this user received the message
     FOREIGN KEY (UserId) REFERENCES Users(Id),
     FOREIGN KEY (MessageId) REFERENCES Messages(Id),
     FOREIGN KEY (FolderId) REFERENCES Folders(Id)
@@ -147,13 +153,14 @@ CREATE TABLE UserMessages (
 #### Attachments
 ```sql
 CREATE TABLE Attachments (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    MessageId INTEGER NOT NULL,
-    FileName TEXT NOT NULL,
-    ContentType TEXT,
-    Size INTEGER,
-    FilePath TEXT,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique attachment identifier
+    MessageId INTEGER NOT NULL,                              -- Message this attachment belongs to
+    FileName TEXT NOT NULL,                                  -- Original filename of attachment
+    ContentType TEXT,                                        -- MIME type (e.g., image/jpeg)
+    Size INTEGER,                                            -- File size in bytes
+    FileGuid TEXT NOT NULL UNIQUE,                           -- GUID used as filename on disk
+    FilePath TEXT,                                           -- Full path to stored file (includes /attachments/guid)
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- When attachment was stored
     FOREIGN KEY (MessageId) REFERENCES Messages(Id)
 );
 ```
@@ -192,34 +199,67 @@ CREATE TABLE Attachments (
   - APOP authentication
   - Basic message retrieval
 
+## Attachment Storage Strategy
+
+### File Storage Design
+- **Storage Location**: `/attachments` directory (configurable)
+- **File Naming**: GUID-based filenames to prevent conflicts and directory traversal
+- **Static Serving**: Files served directly by web server for performance
+- **URL Format**: `/attachments/{guid}` (relative path)
+
+### Security Considerations
+- **Initial Implementation**: Static file serving for simplicity
+- **Future Enhancement**: Authentication-protected streaming via API endpoint
+- **File Access**: Attachment path included in message response for client-side URL construction
+- **GUID Benefits**: 
+  - Prevents filename conflicts
+  - Obscures original filenames
+  - Makes file enumeration difficult
+  - Enables easy cleanup of orphaned files
+
+### Example Attachment Response
+```json
+{
+  "id": 123,
+  "subject": "Document with attachments",
+  "attachments": [
+    {
+      "id": 1,
+      "fileName": "document.pdf",
+      "contentType": "application/pdf",
+      "size": 1024000,
+      "path": "/attachments/550e8400-e29b-41d4-a716-446655440000"
+    }
+  ]
+}
+```
+
 ## Web API Endpoints
 
 ### Authentication Endpoints
 ```
-POST   /api/auth/login          - User login
-POST   /api/auth/logout         - User logout
-POST   /api/auth/refresh        - Refresh access token
-GET    /api/auth/me             - Get current user info
+POST   /api/session             - Create session (login)
+DELETE /api/session             - Delete session (logout)
+GET    /api/session             - Get current session/user info (auto-refreshes token)
 ```
 
 ### User Management
 ```
-GET    /api/users               - List all users (admin)
-POST   /api/users               - Create new user (admin)
-GET    /api/users/{id}          - Get user details
-PUT    /api/users/{id}          - Update user
-DELETE /api/users/{id}          - Delete user (admin)
-PUT    /api/users/{id}/password - Change password
+GET    /api/users                    - List all users (admin)
+POST   /api/users                    - Create new user (admin)
+GET    /api/users/{email}            - Get user details
+PUT    /api/users/{email}            - Update user (full replacement)
+PATCH  /api/users/{email}            - Partial update user (including password)
+DELETE /api/users/{email}            - Delete user (admin)
 ```
 
 ### Message Management
 ```
 GET    /api/messages            - List messages with pagination/filtering
-GET    /api/messages/{id}       - Get specific message
+GET    /api/messages/{id}       - Get specific message (includes attachment metadata with paths)
 POST   /api/messages            - Send new message
 PUT    /api/messages/{id}       - Update message (flags, folder)
 DELETE /api/messages/{id}       - Delete message
-GET    /api/messages/{id}/attachments - Get message attachments
 ```
 
 ### Folder Management
@@ -235,8 +275,8 @@ POST   /api/folders/{id}/messages/{messageId} - Move message to folder
 ```
 GET    /api/domains             - List domains
 POST   /api/domains             - Add new domain
-PUT    /api/domains/{id}        - Update domain
-DELETE /api/domains/{id}        - Delete domain
+PUT    /api/domains/{domainname} - Update domain
+DELETE /api/domains/{domainname} - Delete domain
 ```
 
 ### Server Management (Admin)
@@ -288,9 +328,9 @@ POST   /api/server/restore      - Restore from backup
 ```json
 {
   "Server": {
-    "DomainName": "mail.example.com",
     "MaxMessageSize": "25MB",
     "StorageQuotaPerUser": "1GB",
+    "AttachmentsPath": "/attachments",
     "EnableSMTP": true,
     "EnableIMAP": true,
     "EnablePOP3": true,
