@@ -1,6 +1,8 @@
 using Frimerki.Services.Server;
 using Frimerki.Services.Domain;
 using Frimerki.Services.User;
+using Frimerki.Services.Authentication;
+using Frimerki.Services.Session;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Frimerki.Services;
@@ -16,9 +18,12 @@ public static class ServiceCollectionExtensions {
         // User management services
         services.AddScoped<IUserService, UserService>();
 
+        // Authentication services
+        services.AddScoped<IJwtService, JwtService>();
+        services.AddScoped<ISessionService, SessionService>();
+
         // Add your other services here as they are implemented
         // services.AddScoped<IEmailService, EmailService>();
-        // services.AddScoped<IAuthenticationService, AuthenticationService>();
 
         return services;
     }
