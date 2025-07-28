@@ -1,6 +1,6 @@
 using Frimerki.Data;
-using Frimerki.Services;
 using Frimerki.Server;
+using Frimerki.Services;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -34,8 +34,7 @@ builder.Services.AddSignalR();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
+if (app.Environment.IsDevelopment()) {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
@@ -54,25 +53,19 @@ app.MapHub<EmailHub>("/hubs/email");
 // Fallback to serve the hello world page at root
 app.MapFallbackToFile("index.html");
 
-try
-{
+try {
     Log.Information("Starting Frímerki Email Server");
-    
+
     // Ensure database is created
-    using (var scope = app.Services.CreateScope())
-    {
+    using (var scope = app.Services.CreateScope()) {
         var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
         context.Database.EnsureCreated();
         Log.Information("Database initialized successfully");
     }
-    
+
     app.Run();
-}
-catch (Exception ex)
-{
+} catch (Exception ex) {
     Log.Fatal(ex, "Frímerki Email Server terminated unexpectedly");
-}
-finally
-{
+} finally {
     Log.CloseAndFlush();
 }

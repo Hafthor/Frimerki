@@ -4,20 +4,16 @@ namespace Frimerki.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class HealthController : ControllerBase
-{
+public class HealthController : ControllerBase {
     private readonly ILogger<HealthController> _logger;
 
-    public HealthController(ILogger<HealthController> logger)
-    {
+    public HealthController(ILogger<HealthController> logger) {
         _logger = logger;
     }
 
     [HttpGet]
-    public IActionResult GetHealth()
-    {
-        var response = new
-        {
+    public IActionResult GetHealth() {
+        var response = new {
             Status = "Healthy",
             Server = "Frímerki Email Server",
             Version = "1.0.0-alpha",
@@ -30,23 +26,19 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("info")]
-    public IActionResult GetServerInfo()
-    {
-        var response = new
-        {
+    public IActionResult GetServerInfo() {
+        var response = new {
             Name = "Frímerki",
             Description = "Lightweight Email Server",
             Version = "1.0.0-alpha",
             Framework = ".NET 8",
             Database = "SQLite",
-            Protocols = new
-            {
+            Protocols = new {
                 SMTP = new { Enabled = true, Ports = new[] { 25, 587, 465 } },
                 IMAP = new { Enabled = true, Ports = new[] { 143, 993 } },
                 POP3 = new { Enabled = true, Ports = new[] { 110, 995 } }
             },
-            Features = new[]
-            {
+            Features = new[] {
                 "Email Routing",
                 "IMAP4rev1 Support",
                 "Real-time Notifications",
