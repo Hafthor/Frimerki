@@ -422,6 +422,65 @@ POST   /api/mail-queue/retry    - Retry failed messages (HostAdmin only)
   - FolderRenamed(folderId, newName)     - Folder renamed
 ```
 
+## API Response Formats
+
+### Pagination
+
+All list endpoints use skip/take pagination with next URLs for efficient navigation:
+
+**Query Parameters:**
+- `skip` - Number of items to skip (default: 0)
+- `take` - Number of items to take (default: 50, max: 100)
+
+**Response Structure:**
+```json
+{
+  "items": [...],
+  "pagination": {
+    "skip": 0,
+    "take": 50,
+    "totalCount": 156,
+    "nextUrl": "/api/messages?skip=50&take=50&folder=INBOX&flags=unread"
+  }
+}
+```
+
+**Notes:**
+- The presence of `nextUrl` indicates more items are available
+- The absence of `nextUrl` indicates this is the last page
+- The `nextUrl` preserves all applied filters and sorting parameters
+- Clients can simply follow the `nextUrl` without constructing URLs
+
+### Message List Response Example
+
+```json
+{
+  "messages": [
+    {
+      "id": 123,
+      "subject": "Meeting tomorrow",
+      "from": "john@example.com",
+      "to": "me@example.com",
+      "sentDate": "2025-01-27T10:30:00Z",
+      "flags": { "seen": false, "flagged": true },
+      "folder": "INBOX",
+      "hasAttachments": true,
+      "size": 4286
+    }
+  ],
+  "pagination": {
+    "skip": 0,
+    "take": 50,
+    "totalCount": 156,
+    "nextUrl": "/api/messages?skip=50&take=50&folder=INBOX&flags=unread"
+  },
+  "appliedFilters": {
+    "folder": "INBOX",
+    "flags": "unread"
+  }
+}
+```
+
 ## Security Features
 
 ### Encryption

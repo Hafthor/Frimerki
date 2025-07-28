@@ -2,6 +2,7 @@ using Frimerki.Services.Server;
 using Frimerki.Services.Domain;
 using Frimerki.Services.User;
 using Frimerki.Services.Folder;
+using Frimerki.Services.Message;
 using Frimerki.Services.Authentication;
 using Frimerki.Services.Session;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,9 @@ public static class ServiceCollectionExtensions {
 
         // Folder management services
         services.AddScoped<IFolderService, FolderService>();
+
+        // Message management services
+        services.AddScoped<IMessageService, MessageService>();
 
         // Authentication services
         services.AddScoped<IJwtService, JwtService>();
