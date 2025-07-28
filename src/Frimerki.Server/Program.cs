@@ -69,3 +69,6 @@ try {
 } finally {
     Log.CloseAndFlush();
 }
+
+// Make Program accessible for testing
+public partial class Program { }
