@@ -15,9 +15,11 @@ namespace Frimerki.Tests.Integration;
 public class SessionControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly EmailDbContext _context;
+    private readonly string _databaseName;
 
     public SessionControllerTests(WebApplicationFactory<Program> factory) {
+        _databaseName = "TestDatabase_" + Guid.NewGuid();
+
         _factory = factory.WithWebHostBuilder(builder => {
             builder.ConfigureServices(services => {
                 var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
@@ -26,20 +28,20 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
                 }
 
                 services.AddDbContext<EmailDbContext>(options => {
-                    options.UseInMemoryDatabase("TestDatabase_" + Guid.NewGuid());
+                    options.UseInMemoryDatabase(_databaseName);
                 });
             });
         });
 
         _client = _factory.CreateClient();
 
-        using var scope = _factory.Services.CreateScope();
-        _context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
-
         SeedTestData();
     }
 
     private void SeedTestData() {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+
         var domain = new Domain {
             Id = 1,
             Name = "example.com",
@@ -47,12 +49,8 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
             CreatedAt = DateTime.UtcNow
         };
 
-        // Generate a proper salt
-        var saltBytes = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(saltBytes);
-        var salt = Convert.ToBase64String(saltBytes);
-
-        // Hash the password correctly - match the service implementation exactly
+        // Create password hash that matches the service implementation
+        var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         string passwordHash;
         using (var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes("password123", Convert.FromBase64String(salt), 10000, System.Security.Cryptography.HashAlgorithmName.SHA256)) {
             var hash = pbkdf2.GetBytes(32);
@@ -73,9 +71,9 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
             Domain = domain
         };
 
-        _context.Domains.Add(domain);
-        _context.Users.Add(user);
-        _context.SaveChanges();
+        context.Domains.Add(domain);
+        context.Users.Add(user);
+        context.SaveChanges();
     }
 
     [Fact]
@@ -372,7 +370,7 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     public void Dispose() {
-        _context?.Dispose();
         _client?.Dispose();
+        _factory?.Dispose();
     }
 }

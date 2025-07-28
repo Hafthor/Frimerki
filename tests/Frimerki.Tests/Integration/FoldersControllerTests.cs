@@ -16,10 +16,12 @@ namespace Frimerki.Tests.Integration;
 public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly EmailDbContext _context;
     private readonly string _jwtToken;
+    private readonly string _databaseName;
 
     public FoldersControllerTests(WebApplicationFactory<Program> factory) {
+        _databaseName = "TestDatabase_" + Guid.NewGuid();
+
         _factory = factory.WithWebHostBuilder(builder => {
             builder.ConfigureServices(services => {
                 var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
@@ -28,15 +30,12 @@ public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Progra
                 }
 
                 services.AddDbContext<EmailDbContext>(options => {
-                    options.UseInMemoryDatabase("TestDatabase_" + Guid.NewGuid());
+                    options.UseInMemoryDatabase(_databaseName);
                 });
             });
         });
 
         _client = _factory.CreateClient();
-
-        using var scope = _factory.Services.CreateScope();
-        _context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
 
         SeedTestData();
         _jwtToken = GetValidJwtTokenAsync().Result;
@@ -46,6 +45,9 @@ public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     private void SeedTestData() {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+
         var domain = new Domain {
             Id = 1,
             Name = "example.com",
@@ -114,10 +116,10 @@ public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Progra
             }
         };
 
-        _context.Domains.Add(domain);
-        _context.Users.Add(user);
-        _context.Folders.AddRange(folders);
-        _context.SaveChanges();
+        context.Domains.Add(domain);
+        context.Users.Add(user);
+        context.Folders.AddRange(folders);
+        context.SaveChanges();
     }
 
     private async Task<string> GetValidJwtTokenAsync() {
@@ -369,7 +371,7 @@ public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     public void Dispose() {
-        _context?.Dispose();
         _client?.Dispose();
+        _factory?.Dispose();
     }
 }

@@ -37,8 +37,11 @@ public class FolderService : IFolderService {
     public async Task<FolderResponse?> GetFolderAsync(int userId, string folderName) {
         _logger.LogInformation("Getting folder {FolderName} for user {UserId}", folderName, userId);
 
+        // URL decode the folder name to handle encoded paths like INBOX%2FWork
+        var decodedFolderName = Uri.UnescapeDataString(folderName);
+
         return await _context.Folders
-            .Where(f => f.UserId == userId && f.Name == folderName)
+            .Where(f => f.UserId == userId && f.Name == decodedFolderName)
             .Select(f => new FolderResponse {
                 Id = f.Id,
                 Name = f.Name,

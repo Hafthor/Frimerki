@@ -16,10 +16,12 @@ namespace Frimerki.Tests.Integration;
 public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly EmailDbContext _context;
     private readonly string _jwtToken;
+    private readonly string _databaseName;
 
     public MessagesControllerTests(WebApplicationFactory<Program> factory) {
+        _databaseName = "TestDatabase_" + Guid.NewGuid();
+
         _factory = factory.WithWebHostBuilder(builder => {
             builder.ConfigureServices(services => {
                 // Remove the existing DbContext registration
@@ -30,16 +32,12 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
 
                 // Add in-memory database for testing
                 services.AddDbContext<EmailDbContext>(options => {
-                    options.UseInMemoryDatabase("TestDatabase_" + Guid.NewGuid());
+                    options.UseInMemoryDatabase(_databaseName);
                 });
             });
         });
 
         _client = _factory.CreateClient();
-
-        // Get the test database context
-        using var scope = _factory.Services.CreateScope();
-        _context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
 
         // Seed test data and get JWT token
         SeedTestData();
@@ -51,6 +49,9 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
     }
 
     private void SeedTestData() {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+
         var domain = new Domain {
             Id = 1,
             Name = "example.com",
@@ -147,13 +148,13 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
             IsSet = false
         };
 
-        _context.Domains.Add(domain);
-        _context.Users.Add(user);
-        _context.Folders.AddRange(folders);
-        _context.Messages.Add(message);
-        _context.UserMessages.Add(userMessage);
-        _context.MessageFlags.Add(messageFlag);
-        _context.SaveChanges();
+        context.Domains.Add(domain);
+        context.Users.Add(user);
+        context.Folders.AddRange(folders);
+        context.Messages.Add(message);
+        context.UserMessages.Add(userMessage);
+        context.MessageFlags.Add(messageFlag);
+        context.SaveChanges();
     }
 
     private async Task<string> GetValidJwtTokenAsync() {
@@ -395,7 +396,7 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
     }
 
     public void Dispose() {
-        _context?.Dispose();
         _client?.Dispose();
+        _factory?.Dispose();
     }
 }
