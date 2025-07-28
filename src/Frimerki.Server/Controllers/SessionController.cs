@@ -166,9 +166,9 @@ public class SessionController : ControllerBase {
             // Clear refresh token cookie
             Response.Cookies.Delete("refreshToken");
 
-            return Ok(new { 
+            return Ok(new {
                 message = success ? "Token revoked successfully" : "Token revocation completed",
-                success = success 
+                success = success
             });
         } catch (Exception ex) {
             _logger.LogError(ex, "Error during token revocation");

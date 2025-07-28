@@ -1,6 +1,7 @@
 using Frimerki.Services.Server;
 using Frimerki.Services.Domain;
 using Frimerki.Services.User;
+using Frimerki.Services.Folder;
 using Frimerki.Services.Authentication;
 using Frimerki.Services.Session;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,9 @@ public static class ServiceCollectionExtensions {
 
         // User management services
         services.AddScoped<IUserService, UserService>();
+
+        // Folder management services
+        services.AddScoped<IFolderService, FolderService>();
 
         // Authentication services
         services.AddScoped<IJwtService, JwtService>();

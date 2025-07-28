@@ -270,7 +270,7 @@ CREATE TABLE DKIMKeys (
   - **Partial message fetching**: BODY[section] and BODY.PEEK[section] with partial ranges
   - **UID support**: Proper UID management with UIDVALIDITY and UIDNEXT
   - **IDLE command**: Real-time push notifications for mailbox changes
-  - **Multi-folder synchronization**: Concurrent folder access and status updates  
+  - **Multi-folder synchronization**: Concurrent folder access and status updates
   - **Message sequence numbers**: Dynamic sequence number management
   - **Envelope and body structure**: Parsed MIME structure and RFC2822 envelope
   - **Quota support**: Mailbox size and message count limits (future)
@@ -303,7 +303,7 @@ CREATE TABLE DKIMKeys (
 - **Initial Implementation**: Static file serving for simplicity
 - **Future Enhancement**: Authentication-protected streaming via API endpoint
 - **File Access**: Attachment path included in message response for client-side URL construction
-- **GUID Benefits**: 
+- **GUID Benefits**:
   - Prevents filename conflicts
   - Obscures original filenames while preserving extensions
   - Makes file enumeration difficult
@@ -327,7 +327,7 @@ CREATE TABLE DKIMKeys (
     {
       "id": 2,
       "fileName": "photo.jpg",
-      "contentType": "image/jpeg", 
+      "contentType": "image/jpeg",
       "size": 2048000,
       "path": "/attachments/6ba7b810-9dad-11d1-80b4-00c04fd430c8.jpg"
     }
@@ -356,40 +356,37 @@ DELETE /api/users/{email}            - Delete user (HostAdmin/DomainAdmin)
 
 ### Message Management
 ```
-GET    /api/messages                     - List messages with pagination/filtering
-GET    /api/messages/search              - Full-text search messages (?q=search+terms)
-GET    /api/messages/{id}                - Get specific message (includes attachment metadata with paths)
-GET    /api/messages/{id}/envelope       - Get IMAP envelope structure
-GET    /api/messages/{id}/bodystructure  - Get MIME body structure
-GET    /api/messages/{id}/flags          - Get message flags for current user
+GET    /api/messages                     - List messages with filtering (?q=search+terms&folder=INBOX&flags=unread&skip=0&take=50)
+GET    /api/messages/{id}                - Get complete message (includes envelope, bodystructure, flags, attachments)
 POST   /api/messages                     - Send new message
-PUT    /api/messages/{id}/flags          - Update message flags
-PATCH  /api/messages/{id}                - Partial update message (folder move, etc.)
+PUT    /api/messages/{id}                - Update message (flags, folder move, etc.)
 DELETE /api/messages/{id}                - Delete message (move to trash)
 ```
 
 ### Folder Management
 ```
-GET    /api/folders                      - List user folders with hierarchy
-GET    /api/folders/{id}                 - Get folder details (EXISTS, RECENT, UNSEEN, UIDNEXT, UIDVALIDITY)
-GET    /api/folders/{id}/status          - Get folder status (like IMAP STATUS command)
-POST   /api/folders                      - Create new folder
-PUT    /api/folders/{id}                 - Update folder (rename)
-DELETE /api/folders/{id}                 - Delete folder
-POST   /api/folders/{id}/messages/{messageId} - Move message to folder
-POST   /api/folders/{id}/subscribe       - Subscribe to folder
-DELETE /api/folders/{id}/subscribe       - Unsubscribe from folder
-GET    /api/folders/subscribed           - List subscribed folders
+GET    /api/folders                           - List user folders with hierarchy (includes subscribed flag)
+GET    /api/folders/{name}                    - Get folder details and status (EXISTS, RECENT, UNSEEN, UIDNEXT, UIDVALIDITY, subscribed)
+POST   /api/folders                           - Create new folder
+PUT    /api/folders/{name}                    - Update folder (rename, subscription status, etc.)
+DELETE /api/folders/{name}                    - Delete folder
 ```
+
+**Note on Folder Names in URLs:**
+- Folder names containing forward slashes (/) must be URL-encoded as `%2F`
+- Examples:
+  - `INBOX` → `/api/folders/INBOX`
+  - `INBOX/Work` → `/api/folders/INBOX%2FWork`
+  - `INBOX/Projects/2024` → `/api/folders/INBOX%2FProjects%2F2024`
 
 ### Domain Management (Admin)
 ```
-GET    /api/domains             - List domains (HostAdmin sees all, DomainAdmin sees own)
-POST   /api/domains             - Add new domain (HostAdmin only)
-PUT    /api/domains/{domainname} - Update domain (HostAdmin only)
-DELETE /api/domains/{domainname} - Delete domain (HostAdmin only)
-GET    /api/domains/{domainname}/dkim - Get DKIM public key for DNS setup
-POST   /api/domains/{domainname}/dkim - Generate new DKIM key pair
+GET    /api/domains                    - List domains (HostAdmin sees all, DomainAdmin sees own)
+POST   /api/domains                    - Add new domain (HostAdmin only)
+GET    /api/domains/{domainname}       - Get domain details (includes DKIM public key, stats, users)
+PUT    /api/domains/{domainname}       - Update domain (HostAdmin only)
+DELETE /api/domains/{domainname}       - Delete domain (HostAdmin only)
+POST   /api/domains/{domainname}/dkim  - Generate new DKIM key pair
 ```
 
 ### Server Management (HostAdmin)
@@ -520,25 +517,25 @@ POST   /api/mail-queue/retry    - Retry failed messages (HostAdmin only)
 #### Sequence Number Management
 ```sql
 -- Trigger to maintain sequence numbers when messages are expunged
-CREATE TRIGGER update_sequence_numbers 
+CREATE TRIGGER update_sequence_numbers
 AFTER DELETE ON UserMessages
 FOR EACH ROW
 BEGIN
-    UPDATE UserMessages 
-    SET SequenceNumber = SequenceNumber - 1 
-    WHERE FolderId = OLD.FolderId 
+    UPDATE UserMessages
+    SET SequenceNumber = SequenceNumber - 1
+    WHERE FolderId = OLD.FolderId
     AND SequenceNumber > OLD.SequenceNumber;
 END;
 
--- Trigger to assign sequence numbers to new messages  
+-- Trigger to assign sequence numbers to new messages
 CREATE TRIGGER assign_sequence_number
 AFTER INSERT ON UserMessages
 FOR EACH ROW
 BEGIN
-    UPDATE UserMessages 
+    UPDATE UserMessages
     SET SequenceNumber = (
-        SELECT COALESCE(MAX(SequenceNumber), 0) + 1 
-        FROM UserMessages 
+        SELECT COALESCE(MAX(SequenceNumber), 0) + 1
+        FROM UserMessages
         WHERE FolderId = NEW.FolderId
     )
     WHERE rowid = NEW.rowid;
@@ -553,14 +550,14 @@ The Frímerki server implementation ensures full compliance with RFC 3501 (IMAP4
 
 #### Connection States
 - **Not Authenticated**: Initial connection state requiring authentication
-- **Authenticated**: User authenticated but no mailbox selected  
+- **Authenticated**: User authenticated but no mailbox selected
 - **Selected**: Mailbox selected for message operations
 - **Logout**: Connection termination state
 
 #### Required Commands
 **Any State:**
 - `CAPABILITY` - List server capabilities
-- `NOOP` - No operation (keepalive)  
+- `NOOP` - No operation (keepalive)
 - `LOGOUT` - Close connection
 
 **Not Authenticated State:**
@@ -573,7 +570,7 @@ The Frímerki server implementation ensures full compliance with RFC 3501 (IMAP4
 - `EXAMINE` - Select mailbox for read-only access
 - `CREATE` - Create new mailbox
 - `DELETE` - Delete mailbox
-- `RENAME` - Rename mailbox  
+- `RENAME` - Rename mailbox
 - `SUBSCRIBE/UNSUBSCRIBE` - Manage folder subscriptions
 - `LIST` - List mailboxes with attributes
 - `LSUB` - List subscribed mailboxes
@@ -603,7 +600,7 @@ The Frímerki server implementation ensures full compliance with RFC 3501 (IMAP4
 #### Search Capabilities
 Support for all IMAP SEARCH criteria:
 - Text searches: BODY, TEXT, HEADER, SUBJECT, FROM, TO, CC, BCC
-- Date searches: BEFORE, ON, SINCE, SENTBEFORE, SENTON, SENTSINCE  
+- Date searches: BEFORE, ON, SINCE, SENTBEFORE, SENTON, SENTSINCE
 - Size searches: LARGER, SMALLER
 - Flag searches: ANSWERED, DELETED, DRAFT, FLAGGED, SEEN, RECENT, etc.
 - Logical operators: AND, OR, NOT
@@ -629,7 +626,7 @@ Support for all IMAP SEARCH criteria:
 ```
 * OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN LOGINDISABLED] Frímerki ready
 * OK [ALERT] System message
-* OK [BADCHARSET (UTF-8)] Charset not supported  
+* OK [BADCHARSET (UTF-8)] Charset not supported
 * OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Flags permitted
 * OK [READ-ONLY] Mailbox selected read-only
 * OK [READ-WRITE] Mailbox selected read-write
@@ -642,7 +639,7 @@ Support for all IMAP SEARCH criteria:
 #### Data Responses
 ```
 * 172 EXISTS                             -- Message count
-* 1 RECENT                               -- Recent message count  
+* 1 RECENT                               -- Recent message count
 * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)  -- Available flags
 * SEARCH 2 84 882                        -- Search results
 * LIST () "/" INBOX                      -- Folder listing
@@ -651,8 +648,8 @@ Support for all IMAP SEARCH criteria:
 
 #### Fetch Response Examples
 ```
-* 12 FETCH (FLAGS (\Seen) UID 4827313 INTERNALDATE "17-Jul-1996 02:44:25 -0700" 
-  RFC822.SIZE 4286 ENVELOPE ("Wed, 17 Jul 1996 02:23:25 -0700 (PDT)" 
+* 12 FETCH (FLAGS (\Seen) UID 4827313 INTERNALDATE "17-Jul-1996 02:44:25 -0700"
+  RFC822.SIZE 4286 ENVELOPE ("Wed, 17 Jul 1996 02:23:25 -0700 (PDT)"
   "IMAP4rev1 WG mtg summary" (("Terry Gray" NIL "gray" "example.com")) ...))
 ```
 
@@ -666,7 +663,7 @@ Support for all IMAP SEARCH criteria:
 - SEARCH with basic text and flag criteria
 - Proper sequence number and UID management
 
-#### Phase 2: Standard Compliance (Important)  
+#### Phase 2: Standard Compliance (Important)
 - Full SEARCH criteria support
 - Complete FETCH response types (ENVELOPE, BODYSTRUCTURE)
 - Folder operations (CREATE, DELETE, RENAME, LIST, LSUB)
@@ -675,7 +672,7 @@ Support for all IMAP SEARCH criteria:
 - Proper EXPUNGE handling
 
 #### Phase 3: Advanced Features (Enhancement)
-- IDLE for real-time notifications  
+- IDLE for real-time notifications
 - Partial FETCH with BODY[section] syntax
 - Advanced folder hierarchy management
 - Subscription management

@@ -29,6 +29,8 @@ public class Folder {
 
     public int Unseen { get; set; } = 0;
 
+    public bool Subscribed { get; set; } = true;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties

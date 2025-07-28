@@ -316,12 +316,12 @@ public class UserService : IUserService {
 
     private async Task CreateDefaultFoldersAsync(int userId) {
         var defaultFolders = new[] {
-            new Folder { UserId = userId, Name = "INBOX", SystemFolderType = "INBOX" },
-            new Folder { UserId = userId, Name = "SENT", SystemFolderType = "SENT" },
-            new Folder { UserId = userId, Name = "DRAFTS", SystemFolderType = "DRAFTS" },
-            new Folder { UserId = userId, Name = "TRASH", SystemFolderType = "TRASH" },
-            new Folder { UserId = userId, Name = "SPAM", SystemFolderType = "SPAM" },
-            new Folder { UserId = userId, Name = "OUTBOX", SystemFolderType = "OUTBOX" }
+            new Models.Entities.Folder { UserId = userId, Name = "INBOX", SystemFolderType = "INBOX" },
+            new Models.Entities.Folder { UserId = userId, Name = "SENT", SystemFolderType = "SENT" },
+            new Models.Entities.Folder { UserId = userId, Name = "DRAFTS", SystemFolderType = "DRAFTS" },
+            new Models.Entities.Folder { UserId = userId, Name = "TRASH", SystemFolderType = "TRASH" },
+            new Models.Entities.Folder { UserId = userId, Name = "SPAM", SystemFolderType = "SPAM" },
+            new Models.Entities.Folder { UserId = userId, Name = "OUTBOX", SystemFolderType = "OUTBOX" }
         };
 
         _context.Folders.AddRange(defaultFolders);
