@@ -1,5 +1,6 @@
 using Frimerki.Services.Authentication;
 using Frimerki.Services.Domain;
+using Frimerki.Services.Email;
 using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
 using Frimerki.Services.Server;
@@ -30,8 +31,8 @@ public static class ServiceCollectionExtensions {
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<ISessionService, SessionService>();
 
-        // Add your other services here as they are implemented
-        // services.AddScoped<IEmailService, EmailService>();
+        // Email services
+        services.AddScoped<SmtpClientService>();
 
         return services;
     }

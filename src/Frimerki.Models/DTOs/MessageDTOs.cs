@@ -16,8 +16,32 @@ public class MessageRequest {
     public string Body { get; set; } = string.Empty;
 
     public string? BodyHtml { get; set; }
+    public bool IsHtml { get; set; } = false;
     public string? InReplyTo { get; set; }
     public string? References { get; set; }
+    public List<MessageAttachmentRequest>? Attachments { get; set; }
+}
+
+public class MessageAttachmentRequest {
+    [Required]
+    public string Name { get; set; } = string.Empty;
+
+    [Required]
+    public string ContentType { get; set; } = string.Empty;
+
+    [Required]
+    public byte[] Content { get; set; } = [];
+}
+
+public class SimpleEmailRequest {
+    [Required, EmailAddress]
+    public string To { get; set; } = string.Empty;
+
+    [Required, StringLength(998)]
+    public string Subject { get; set; } = string.Empty;
+
+    [Required]
+    public string Body { get; set; } = string.Empty;
 }
 
 public class MessageUpdateRequest {

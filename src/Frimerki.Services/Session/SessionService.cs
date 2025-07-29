@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 
 using Frimerki.Data;
@@ -25,7 +26,7 @@ public class SessionService : ISessionService {
     private readonly ILogger<SessionService> _logger;
 
     // In-memory storage for refresh tokens (in production, use Redis or database)
-    private static readonly Dictionary<string, RefreshTokenInfo> _refreshTokens = new();
+    private static readonly ConcurrentDictionary<string, RefreshTokenInfo> _refreshTokens = new();
 
     public SessionService(
         EmailDbContext context,
@@ -106,7 +107,7 @@ public class SessionService : ISessionService {
                 .ToList();
 
             foreach (var token in tokensToRemove) {
-                _refreshTokens.Remove(token);
+                _refreshTokens.TryRemove(token, out _);
             }
 
             _logger.LogInformation("Logout successful for user ID: {UserId}", userId);
@@ -174,7 +175,7 @@ public class SessionService : ISessionService {
 
             if (tokenInfo.ExpiresAt < DateTime.UtcNow) {
                 _logger.LogWarning("Refresh token expired");
-                _refreshTokens.Remove(refreshToken);
+                _refreshTokens.TryRemove(refreshToken, out _);
                 return null;
             }
 
@@ -182,7 +183,7 @@ public class SessionService : ISessionService {
             var user = await _userService.GetUserEntityByEmailAsync(tokenInfo.Email);
             if (user == null || !user.CanLogin) {
                 _logger.LogWarning("User not found or disabled during token refresh: {Email}", tokenInfo.Email);
-                _refreshTokens.Remove(refreshToken);
+                _refreshTokens.TryRemove(refreshToken, out _);
                 return null;
             }
 
@@ -206,7 +207,7 @@ public class SessionService : ISessionService {
             var expiresAt = _jwtService.GetTokenExpiration();
 
             // Replace old refresh token with new one
-            _refreshTokens.Remove(refreshToken);
+            _refreshTokens.TryRemove(refreshToken, out _);
             _refreshTokens[newRefreshToken] = new RefreshTokenInfo {
                 UserId = user.Id,
                 Email = $"{user.Username}@{user.Domain.Name}",
@@ -232,7 +233,7 @@ public class SessionService : ISessionService {
         _logger.LogInformation("Refresh token revocation request");
 
         try {
-            var removed = _refreshTokens.Remove(refreshToken);
+            var removed = _refreshTokens.TryRemove(refreshToken, out _);
             _logger.LogInformation("Refresh token revocation result: {Removed}", removed);
             return removed;
         } catch (Exception ex) {

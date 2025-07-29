@@ -1,4 +1,6 @@
 using Frimerki.Protocols.Imap;
+using Frimerki.Protocols.Smtp;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -17,11 +19,19 @@ public static class ServiceCollectionExtensions {
     }
 
     /// <summary>
-    /// Adds all email protocol services (future: SMTP, POP3)
+    /// Adds SMTP server services to the dependency injection container
+    /// </summary>
+    public static IServiceCollection AddSmtpServer(this IServiceCollection services) {
+        services.AddSingleton<IHostedService, SmtpServer>();
+        return services;
+    }
+
+    /// <summary>
+    /// Adds all email protocol services
     /// </summary>
     public static IServiceCollection AddEmailProtocols(this IServiceCollection services) {
         services.AddImapServer();
-        // Future: services.AddSmtpServer();
+        services.AddSmtpServer();
         // Future: services.AddPop3Server();
         return services;
     }
