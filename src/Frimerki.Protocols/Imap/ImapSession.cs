@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
-using Frimerki.Services.User;
+using Frimerki.Models.DTOs;
+using Frimerki.Models.Entities;
 using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
-using Frimerki.Models.Entities;
-using Frimerki.Models.DTOs;
+using Frimerki.Services.User;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Protocols.Imap;
 

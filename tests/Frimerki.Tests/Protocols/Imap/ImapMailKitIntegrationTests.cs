@@ -1,19 +1,19 @@
 using System.Net;
 using System.Net.Sockets;
-using MailKit.Net.Imap;
+using Frimerki.Models.DTOs;
+using Frimerki.Models.Entities;
+using Frimerki.Protocols.Imap;
+using Frimerki.Services.Folder;
+using Frimerki.Services.Message;
+using Frimerki.Services.User;
 using MailKit;
+using MailKit.Net.Imap;
 using MailKit.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
-using Frimerki.Protocols.Imap;
-using Moq;
-using Frimerki.Services.User;
-using Frimerki.Services.Folder;
-using Frimerki.Services.Message;
-using Frimerki.Models.Entities;
-using Frimerki.Models.DTOs;
 
 namespace Frimerki.Tests.Protocols.Imap;
 

@@ -1,11 +1,11 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Moq;
-using Xunit;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Services.Message;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Frimerki.Tests.Services;
 

@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
-using Frimerki.Services.Domain;
 using Frimerki.Models.DTOs;
+using Frimerki.Services.Domain;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Frimerki.Server.Controllers;
 

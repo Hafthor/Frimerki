@@ -1,9 +1,11 @@
+using System.Security.Claims;
+
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Session;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.Security.Claims;
 
 namespace Frimerki.Server.Controllers;
 

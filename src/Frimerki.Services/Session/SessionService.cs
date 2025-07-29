@@ -1,10 +1,12 @@
+using System.Security.Claims;
+
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Authentication;
 using Frimerki.Services.User;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Security.Claims;
 
 namespace Frimerki.Services.Session;
 

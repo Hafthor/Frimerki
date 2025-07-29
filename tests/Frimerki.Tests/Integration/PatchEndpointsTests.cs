@@ -1,14 +1,14 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.EntityFrameworkCore;
-using Xunit;
 using Frimerki.Data;
-using Frimerki.Models.Entities;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.DTOs.Folder;
+using Frimerki.Models.Entities;
 using Frimerki.Services.User;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Frimerki.Tests.Integration;
 

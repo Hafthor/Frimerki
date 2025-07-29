@@ -1,4 +1,5 @@
 using Frimerki.Models.Entities;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Frimerki.Data;

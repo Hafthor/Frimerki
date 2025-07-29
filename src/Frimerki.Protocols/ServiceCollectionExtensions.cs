@@ -1,6 +1,6 @@
+using Frimerki.Protocols.Imap;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Frimerki.Protocols.Imap;
 
 namespace Frimerki.Protocols;
 

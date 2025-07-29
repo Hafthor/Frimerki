@@ -1,8 +1,8 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Frimerki.Data;
 using Frimerki.Models.DTOs.Folder;
 using Frimerki.Models.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Services.Folder;
 
@@ -113,7 +113,9 @@ public class FolderService : IFolderService {
         var folder = await _context.Folders
             .FirstOrDefaultAsync(f => f.UserId == userId && f.Name == folderName);
 
-        if (folder == null) return null;
+        if (folder == null) {
+            return null;
+        }
 
         // Prevent renaming system folders
         if (folder.SystemFolderType != null && !string.IsNullOrEmpty(request.Name) && request.Name != folder.Name) {
@@ -177,7 +179,9 @@ public class FolderService : IFolderService {
         var folder = await _context.Folders
             .FirstOrDefaultAsync(f => f.UserId == userId && f.Name == folderName);
 
-        if (folder == null) return false;
+        if (folder == null) {
+            return false;
+        }
 
         // Prevent deletion of system folders
         if (folder.SystemFolderType != null) {

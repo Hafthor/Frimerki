@@ -1,9 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Services.Message;
 
@@ -420,18 +420,53 @@ public class MessageService : IMessageService {
     private string BuildNextUrl(MessageFilterRequest request, int nextSkip) {
         var queryParams = new List<string> { $"skip={nextSkip}", $"take={request.Take}" };
 
-        if (!string.IsNullOrEmpty(request.Q)) queryParams.Add($"q={Uri.EscapeDataString(request.Q)}");
-        if (!string.IsNullOrEmpty(request.Folder)) queryParams.Add($"folder={Uri.EscapeDataString(request.Folder)}");
-        if (request.FolderId.HasValue) queryParams.Add($"folderId={request.FolderId.Value}");
-        if (!string.IsNullOrEmpty(request.Flags)) queryParams.Add($"flags={Uri.EscapeDataString(request.Flags)}");
-        if (!string.IsNullOrEmpty(request.From)) queryParams.Add($"from={Uri.EscapeDataString(request.From)}");
-        if (!string.IsNullOrEmpty(request.To)) queryParams.Add($"to={Uri.EscapeDataString(request.To)}");
-        if (request.Since.HasValue) queryParams.Add($"since={request.Since.Value:yyyy-MM-dd}");
-        if (request.Before.HasValue) queryParams.Add($"before={request.Before.Value:yyyy-MM-dd}");
-        if (request.MinSize.HasValue) queryParams.Add($"minSize={request.MinSize.Value}");
-        if (request.MaxSize.HasValue) queryParams.Add($"maxSize={request.MaxSize.Value}");
-        if (request.SortBy != "date") queryParams.Add($"sortBy={Uri.EscapeDataString(request.SortBy)}");
-        if (request.SortOrder != "desc") queryParams.Add($"sortOrder={Uri.EscapeDataString(request.SortOrder)}");
+        if (!string.IsNullOrEmpty(request.Q)) {
+            queryParams.Add($"q={Uri.EscapeDataString(request.Q)}");
+        }
+
+        if (!string.IsNullOrEmpty(request.Folder)) {
+            queryParams.Add($"folder={Uri.EscapeDataString(request.Folder)}");
+        }
+
+        if (request.FolderId.HasValue) {
+            queryParams.Add($"folderId={request.FolderId.Value}");
+        }
+
+        if (!string.IsNullOrEmpty(request.Flags)) {
+            queryParams.Add($"flags={Uri.EscapeDataString(request.Flags)}");
+        }
+
+        if (!string.IsNullOrEmpty(request.From)) {
+            queryParams.Add($"from={Uri.EscapeDataString(request.From)}");
+        }
+
+        if (!string.IsNullOrEmpty(request.To)) {
+            queryParams.Add($"to={Uri.EscapeDataString(request.To)}");
+        }
+
+        if (request.Since.HasValue) {
+            queryParams.Add($"since={request.Since.Value:yyyy-MM-dd}");
+        }
+
+        if (request.Before.HasValue) {
+            queryParams.Add($"before={request.Before.Value:yyyy-MM-dd}");
+        }
+
+        if (request.MinSize.HasValue) {
+            queryParams.Add($"minSize={request.MinSize.Value}");
+        }
+
+        if (request.MaxSize.HasValue) {
+            queryParams.Add($"maxSize={request.MaxSize.Value}");
+        }
+
+        if (request.SortBy != "date") {
+            queryParams.Add($"sortBy={Uri.EscapeDataString(request.SortBy)}");
+        }
+
+        if (request.SortOrder != "desc") {
+            queryParams.Add($"sortOrder={Uri.EscapeDataString(request.SortOrder)}");
+        }
 
         return $"/api/messages?{string.Join("&", queryParams)}";
     }
@@ -439,16 +474,45 @@ public class MessageService : IMessageService {
     private Dictionary<string, object> BuildAppliedFilters(MessageFilterRequest request) {
         var filters = new Dictionary<string, object>();
 
-        if (!string.IsNullOrEmpty(request.Q)) filters["q"] = request.Q;
-        if (!string.IsNullOrEmpty(request.Folder)) filters["folder"] = request.Folder;
-        if (request.FolderId.HasValue) filters["folderId"] = request.FolderId.Value;
-        if (!string.IsNullOrEmpty(request.Flags)) filters["flags"] = request.Flags;
-        if (!string.IsNullOrEmpty(request.From)) filters["from"] = request.From;
-        if (!string.IsNullOrEmpty(request.To)) filters["to"] = request.To;
-        if (request.Since.HasValue) filters["since"] = request.Since.Value.ToString("yyyy-MM-dd");
-        if (request.Before.HasValue) filters["before"] = request.Before.Value.ToString("yyyy-MM-dd");
-        if (request.MinSize.HasValue) filters["minSize"] = request.MinSize.Value;
-        if (request.MaxSize.HasValue) filters["maxSize"] = request.MaxSize.Value;
+        if (!string.IsNullOrEmpty(request.Q)) {
+            filters["q"] = request.Q;
+        }
+
+        if (!string.IsNullOrEmpty(request.Folder)) {
+            filters["folder"] = request.Folder;
+        }
+
+        if (request.FolderId.HasValue) {
+            filters["folderId"] = request.FolderId.Value;
+        }
+
+        if (!string.IsNullOrEmpty(request.Flags)) {
+            filters["flags"] = request.Flags;
+        }
+
+        if (!string.IsNullOrEmpty(request.From)) {
+            filters["from"] = request.From;
+        }
+
+        if (!string.IsNullOrEmpty(request.To)) {
+            filters["to"] = request.To;
+        }
+
+        if (request.Since.HasValue) {
+            filters["since"] = request.Since.Value.ToString("yyyy-MM-dd");
+        }
+
+        if (request.Before.HasValue) {
+            filters["before"] = request.Before.Value.ToString("yyyy-MM-dd");
+        }
+
+        if (request.MinSize.HasValue) {
+            filters["minSize"] = request.MinSize.Value;
+        }
+
+        if (request.MaxSize.HasValue) {
+            filters["maxSize"] = request.MaxSize.Value;
+        }
 
         return filters;
     }
