@@ -2,10 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.DTOs;
 
-public class UserResponse {
-    public int Id { get; set; }
-    public string Username { get; set; } = string.Empty;
+public class UserMinimalResponse {
     public string Email { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+}
+
+public class UserResponse : UserMinimalResponse {
     public string? FullName { get; set; }
     public string Role { get; set; } = string.Empty;
     public bool CanReceive { get; set; }
@@ -13,7 +15,6 @@ public class UserResponse {
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLogin { get; set; }
     public string DomainName { get; set; } = string.Empty;
-    public int DomainId { get; set; }
     public UserStatsResponse Stats { get; set; } = new();
 }
 

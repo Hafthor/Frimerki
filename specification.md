@@ -318,20 +318,118 @@ CREATE TABLE DKIMKeys (
   "subject": "Document with attachments",
   "attachments": [
     {
-      "id": 1,
       "fileName": "document.pdf",
       "contentType": "application/pdf",
       "size": 1024000,
       "path": "/attachments/550e8400-e29b-41d4-a716-446655440000.pdf"
     },
     {
-      "id": 2,
       "fileName": "photo.jpg",
       "contentType": "image/jpeg",
       "size": 2048000,
       "path": "/attachments/6ba7b810-9dad-11d1-80b4-00c04fd430c8.jpg"
     }
   ]
+}
+```
+
+## Backup Storage Strategy
+
+### File Storage Design
+- **Storage Location**: `/backups` directory (configurable)
+- **File Naming**: Date-time with GUID format: `YYYY-MM-DD-HH-mm-ss-{guid}.zip`
+- **Static Serving**: Files served directly by web server for performance
+- **URL Format**: `/backups/{datetime-guid}.zip` (relative path)
+
+### Backup ID Management
+- **Backup ID Format**: Date-time portion from filename (e.g., `2025-07-28-14-30-15`)
+- **File Identification**: Each backup file contains both timestamp and GUID for uniqueness
+- **DELETE Endpoint**: Uses date-time portion as `{backupId}` parameter
+- **Collision Handling**: GUID suffix prevents conflicts for backups created in same second
+
+### Security Considerations
+- **Initial Implementation**: Static file serving for simplicity (HostAdmin only access via web server config)
+- **Future Enhancement**: Authentication-protected streaming via API endpoint
+- **File Access**: Download URLs included in backup list response for direct client access
+- **GUID Benefits**:
+  - Prevents filename enumeration attacks
+  - Ensures uniqueness even with rapid backup creation
+  - Makes unauthorized backup discovery difficult
+  - Enables easy cleanup of orphaned files
+
+### Example Backup List Response
+```json
+{
+  "backups": [
+    {
+      "id": "2025-07-28-14-30-15",
+      "createdAt": "2025-07-28T14:30:15Z",
+      "size": 52428800,
+      "downloadUrl": "/backups/2025-07-28-14-30-15-550e8400-e29b-41d4-a716-446655440000.zip",
+      "description": "Scheduled daily backup"
+    },
+    {
+      "id": "2025-07-28-09-15-42",
+      "createdAt": "2025-07-28T09:15:42Z",
+      "size": 48234496,
+      "downloadUrl": "/backups/2025-07-28-09-15-42-6ba7b810-9dad-11d1-80b4-00c04fd430c8.zip",
+      "description": "Manual backup before upgrade"
+    }
+  ],
+  "totalSize": 100663296,
+  "totalCount": 2
+}
+```
+
+## Log Storage Strategy
+
+### Hybrid Approach Design
+- **API Endpoint**: `/api/server/logs` - Filtered/paginated log entries for querying and searching
+- **Static File Serving**: `/logs/{datetime}.log` - Direct log file downloads for full access
+- **File List Endpoint**: `/api/server/logfiles` - List available log files with download URLs
+
+### File Storage Design
+- **Storage Location**: `/logs` directory (configurable)
+- **File Naming**: Date-based format: `frimerki-YYYY-MM-DD.log`
+- **Static Serving**: Files served directly by web server for performance
+- **URL Format**: `/logs/frimerki-{date}.log` (relative path)
+
+### Log File Management
+- **Daily Rotation**: New log file created each day
+- **File Identification**: Date-based naming for easy chronological access
+- **Retention Policy**: Configurable log retention period (default: 30 days)
+- **Compression**: Optional gzip compression for older log files
+
+### Security Considerations
+- **Initial Implementation**: Static file serving for simplicity (HostAdmin only access via web server config)
+- **Future Enhancement**: Authentication-protected streaming via API endpoint
+- **File Access**: Download URLs included in log file list response for direct client access
+- **Access Control**: Log files restricted to HostAdmin role only
+
+### Example Log File List Response
+```json
+{
+  "logFiles": [
+    {
+      "fileName": "frimerki-2025-07-28.log",
+      "date": "2025-07-28",
+      "size": 1048576,
+      "downloadUrl": "/logs/frimerki-2025-07-28.log",
+      "isToday": true,
+      "compressed": false
+    },
+    {
+      "fileName": "frimerki-2025-07-27.log.gz",
+      "date": "2025-07-27",
+      "size": 262144,
+      "downloadUrl": "/logs/frimerki-2025-07-27.log.gz",
+      "isToday": false,
+      "compressed": true
+    }
+  ],
+  "totalSize": 1310720,
+  "totalCount": 2,
+  "retentionDays": 30
 }
 ```
 
@@ -342,16 +440,21 @@ CREATE TABLE DKIMKeys (
 POST   /api/session             - Create session (login)
 DELETE /api/session             - Delete session (logout)
 GET    /api/session             - Get current session/user info (auto-refreshes token)
+POST   /api/session/refresh     - Refresh access token using refresh token
+POST   /api/session/revoke      - Revoke refresh token
+GET    /api/session/status      - Check authentication status (lightweight)
 ```
 
 ### User Management
 ```
-GET    /api/users                    - List all users (HostAdmin) or domain users (DomainAdmin)
-POST   /api/users                    - Create new user (HostAdmin/DomainAdmin)
-GET    /api/users/{email}            - Get user details (own account or admin)
-PUT    /api/users/{email}            - Update user (own account or admin)
-PATCH  /api/users/{email}            - Partial update user including password (own account or admin)
-DELETE /api/users/{email}            - Delete user (HostAdmin/DomainAdmin)
+GET    /api/users                               - List all users (HostAdmin) or domain users (DomainAdmin)
+POST   /api/users                               - Create new user (HostAdmin/DomainAdmin)
+GET    /api/users/{email}                       - Get user details: full data for own account/admin, minimal for others, 404 if not found
+PUT    /api/users/{email}                       - Update user (own account or admin)
+PATCH  /api/users/{email}                       - Partial update user (own account or admin)
+PATCH  /api/users/{email}/password              - Update user password specifically
+DELETE /api/users/{email}                       - Delete user (HostAdmin/DomainAdmin)
+GET    /api/users/{email}/stats                 - Get user statistics (storage, message count, etc.)
 ```
 
 ### Message Management
@@ -360,6 +463,7 @@ GET    /api/messages                     - List messages with filtering (?q=sear
 GET    /api/messages/{id}                - Get complete message (includes envelope, bodystructure, flags, attachments)
 POST   /api/messages                     - Send new message
 PUT    /api/messages/{id}                - Update message (flags, folder move, etc.)
+PATCH  /api/messages/{id}                - Partially update message (flags, folder move, content for drafts)
 DELETE /api/messages/{id}                - Delete message (move to trash)
 ```
 
@@ -369,6 +473,7 @@ GET    /api/folders                           - List user folders with hierarchy
 GET    /api/folders/{name}                    - Get folder details and status (EXISTS, RECENT, UNSEEN, UIDNEXT, UIDVALIDITY, subscribed)
 POST   /api/folders                           - Create new folder
 PUT    /api/folders/{name}                    - Update folder (rename, subscription status, etc.)
+PATCH  /api/folders/{name}                    - Partially update folder
 DELETE /api/folders/{name}                    - Delete folder
 ```
 
@@ -381,23 +486,37 @@ DELETE /api/folders/{name}                    - Delete folder
 
 ### Domain Management (Admin)
 ```
-GET    /api/domains                    - List domains (HostAdmin sees all, DomainAdmin sees own)
-POST   /api/domains                    - Add new domain (HostAdmin only)
-GET    /api/domains/{domainname}       - Get domain details (includes DKIM public key, stats, users)
-PUT    /api/domains/{domainname}       - Update domain (HostAdmin only)
-DELETE /api/domains/{domainname}       - Delete domain (HostAdmin only)
-POST   /api/domains/{domainname}/dkim  - Generate new DKIM key pair
+GET    /api/domains                         - List domains (HostAdmin sees all, DomainAdmin sees own)
+POST   /api/domains                         - Add new domain (HostAdmin only), returns 409 if domain exists
+GET    /api/domains/{domainname}            - Get domain details including statistics, DKIM info, and usage data (raw numbers for frontend formatting)
+PUT    /api/domains/{domainname}            - Update domain (HostAdmin only)
+PATCH  /api/domains/{domainname}            - Partially update domain (HostAdmin only)
+DELETE /api/domains/{domainname}            - Delete domain (HostAdmin only)
+GET    /api/domains/{domainname}/dkim       - Get DKIM public key for DNS setup
+POST   /api/domains/{domainname}/dkim       - Generate new DKIM key pair
 ```
 
 ### Server Management (HostAdmin)
 ```
-GET    /api/server/status       - Server status and statistics (HostAdmin only)
-GET    /api/server/health       - Health check endpoint (HostAdmin only)
-GET    /api/server/metrics      - Performance metrics (HostAdmin only)
-GET    /api/server/logs         - Server logs (HostAdmin only)
-PUT    /api/server/settings     - Update server settings (HostAdmin only)
-POST   /api/server/backup       - Create backup (HostAdmin only)
-POST   /api/server/restore      - Restore from backup (HostAdmin only)
+GET    /api/server/status              - Server status and statistics (HostAdmin only)
+GET    /api/server/health              - Health check endpoint (HostAdmin only)
+GET    /api/server/metrics             - Performance metrics (HostAdmin only)
+GET    /api/server/logs                - Server logs with filtering/pagination (HostAdmin only)
+GET    /api/server/logfiles            - List available log files with download URLs (HostAdmin only)
+GET    /api/server/settings            - Get server settings (HostAdmin only)
+PUT    /api/server/settings            - Update server settings (HostAdmin only)
+POST   /api/server/backup              - Create backup (HostAdmin only)
+POST   /api/server/restore             - Restore from backup (HostAdmin only)
+GET    /api/server/backups             - List available backups with download URLs (HostAdmin only)
+DELETE /api/server/backup/{backupId}   - Delete specific backup by date-time ID (HostAdmin only)
+POST   /api/server/restart             - Restart server services (HostAdmin only)
+GET    /api/server/info                - Get system information (HostAdmin only)
+```
+
+### Health & System Endpoints
+```
+GET    /api/health                     - Basic health check (public)
+GET    /api/health/info                - Server information (public)
 ```
 
 ### Mail Processing (Future Enhancement)
@@ -420,6 +539,47 @@ POST   /api/mail-queue/retry    - Retry failed messages (HostAdmin only)
   - FolderCreated(folderInfo)            - New folder created
   - FolderDeleted(folderId)              - Folder deleted
   - FolderRenamed(folderId, newName)     - Folder renamed
+```
+
+## User Endpoint Behavior
+
+### GET /api/users/{email}
+
+This endpoint implements intelligent response behavior based on user permissions:
+
+**For Non-existent Users:**
+- Returns `404 Not Found` status
+- Clients can use this to check email availability (404 = available)
+
+**For Existing Users:**
+- **Admin users** (HostAdmin/DomainAdmin): Returns complete user details
+- **User accessing own account**: Returns complete user details
+- **Other authenticated users**: Returns minimal user information (email and username only)
+
+**Response Examples:**
+
+Admin or own account response:
+```json
+{
+  "username": "john.doe",
+  "email": "john.doe@example.com",
+  "fullName": "John Doe",
+  "role": "User",
+  "canReceive": true,
+  "canLogin": true,
+  "createdAt": "2025-01-15T10:30:00Z",
+  "lastLogin": "2025-01-27T08:45:00Z",
+  "domainName": "example.com",
+  "stats": { ... }
+}
+```
+
+Non-admin accessing other user:
+```json
+{
+  "email": "john.doe@example.com",
+  "username": "john.doe"
+}
 ```
 
 ## API Response Formats
@@ -518,6 +678,8 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
     "MaxMessageSize": "25MB",
     "StorageQuotaPerUser": "1GB",
     "AttachmentsPath": "/attachments",
+    "BackupsPath": "/backups",
+    "LogsPath": "/logs",
     "EnableSMTP": true,
     "EnableIMAP": true,
     "EnablePOP3": true,

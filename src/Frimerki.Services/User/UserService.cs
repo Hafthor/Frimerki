@@ -256,32 +256,39 @@ public class UserService : IUserService {
         return MapToUserResponse(user, stats);
     }
 
+    public async Task<Frimerki.Models.Entities.User?> AuthenticateUserEntityAsync(string email, string password) {
+        _logger.LogInformation("Authenticating user entity: {Email}", email);
+
+        var user = await _context.Users
+            .Include(u => u.Domain)
+            .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
+
+        if (user == null || !user.CanLogin) {
+            return null;
+        }
+
+        if (!VerifyPassword(password, user.PasswordHash, user.Salt)) {
+            return null;
+        }
+
+        // Update last login
+        user.LastLogin = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return user;
+    }
+
+    public async Task<Frimerki.Models.Entities.User?> GetUserEntityByEmailAsync(string email) {
+        _logger.LogInformation("Getting user entity by email: {Email}", email);
+
+        return await _context.Users
+            .Include(u => u.Domain)
+            .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
+    }
+
     public Task<bool> ValidateEmailFormatAsync(string email) {
         var emailRegex = new Regex(@"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
         return Task.FromResult(emailRegex.IsMatch(email));
-    }
-
-    public async Task<bool> ValidateUsernameAsync(string username, string domainName) {
-        // Check username format
-        var usernameRegex = new Regex(@"^[a-zA-Z0-9._-]+$");
-        if (!usernameRegex.IsMatch(username)) {
-            return false;
-        }
-
-        // Check if domain exists
-        var domainExists = await _context.Domains
-            .AnyAsync(d => d.Name == domainName);
-
-        if (!domainExists) {
-            return false;
-        }
-
-        // Check if username is available in domain
-        var userExists = await _context.Users
-            .Include(u => u.Domain)
-            .AnyAsync(u => u.Username == username && u.Domain.Name == domainName);
-
-        return !userExists;
     }
 
     private async Task<UserStatsResponse> GetUserStatsInternalAsync(int userId) {
@@ -330,7 +337,6 @@ public class UserService : IUserService {
 
     private UserResponse MapToUserResponse(Frimerki.Models.Entities.User user, UserStatsResponse stats) {
         return new UserResponse {
-            Id = user.Id,
             Username = user.Username,
             Email = $"{user.Username}@{user.Domain.Name}",
             FullName = user.FullName,
@@ -340,7 +346,6 @@ public class UserService : IUserService {
             CreatedAt = user.CreatedAt,
             LastLogin = user.LastLogin,
             DomainName = user.Domain.Name,
-            DomainId = user.DomainId,
             Stats = stats
         };
     }

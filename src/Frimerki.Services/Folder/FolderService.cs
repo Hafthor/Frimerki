@@ -21,7 +21,6 @@ public class FolderService : IFolderService {
         return await _context.Folders
             .Where(f => f.UserId == userId)
             .Select(f => new FolderListResponse {
-                Id = f.Id,
                 Name = f.Name,
                 SystemFolderType = f.SystemFolderType,
                 Attributes = f.Attributes,
@@ -43,7 +42,6 @@ public class FolderService : IFolderService {
         return await _context.Folders
             .Where(f => f.UserId == userId && f.Name == decodedFolderName)
             .Select(f => new FolderResponse {
-                Id = f.Id,
                 Name = f.Name,
                 Delimiter = f.Delimiter,
                 SystemFolderType = f.SystemFolderType,
@@ -95,7 +93,6 @@ public class FolderService : IFolderService {
             folder.Name, folder.Id, userId);
 
         return new FolderResponse {
-            Id = folder.Id,
             Name = folder.Name,
             Delimiter = folder.Delimiter,
             SystemFolderType = folder.SystemFolderType,
@@ -160,7 +157,6 @@ public class FolderService : IFolderService {
         _logger.LogInformation("Updated folder {FolderName} for user {UserId}", folder.Name, userId);
 
         return new FolderResponse {
-            Id = folder.Id,
             Name = folder.Name,
             Delimiter = folder.Delimiter,
             SystemFolderType = folder.SystemFolderType,

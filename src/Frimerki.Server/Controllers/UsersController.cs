@@ -2,6 +2,7 @@ using Frimerki.Models.DTOs;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace Frimerki.Server.Controllers;
 
@@ -25,8 +26,12 @@ public class UsersController : ControllerBase {
         [FromQuery] int pageSize = 50,
         [FromQuery] string? domain = null) {
         try {
-            if (page < 1) page = 1;
-            if (pageSize < 1 || pageSize > 100) pageSize = 50;
+            if (page < 1) {
+                page = 1;
+            }
+            if (pageSize < 1 || pageSize > 100) {
+                pageSize = 50;
+            }
 
             _logger.LogInformation("Getting users list - Page: {Page}, PageSize: {PageSize}, Domain: {Domain}",
                 page, pageSize, domain ?? "All");
@@ -63,19 +68,36 @@ public class UsersController : ControllerBase {
     }
 
     /// <summary>
-    /// Get user details (own account or admin)
+    /// Get user details (own account or admin), returns 404 if user doesn't exist
     /// </summary>
     [HttpGet("{email}")]
-    public async Task<ActionResult<UserResponse>> GetUser(string email) {
+    public async Task<ActionResult> GetUser(string email) {
         try {
             _logger.LogInformation("Getting user details: {Email}", email);
 
             var user = await _userService.GetUserByEmailAsync(email);
             if (user == null) {
-                return NotFound(new { error = $"User '{email}' not found" });
+                return NotFound();
             }
 
-            return Ok(user);
+            // Check if current user is admin or accessing their own account
+            var currentUserEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+            var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            bool isAdmin = currentUserRole == "HostAdmin" || currentUserRole == "DomainAdmin";
+            bool isOwnAccount = currentUserEmail == email;
+
+            if (isAdmin || isOwnAccount) {
+                // Return full user details for admins or own account
+                return Ok(user);
+            } else {
+                // Return minimal info for non-admin users accessing other accounts
+                var minimalResponse = new UserMinimalResponse {
+                    Email = user.Email,
+                    Username = user.Username
+                };
+                return Ok(minimalResponse);
+            }
         } catch (Exception ex) {
             _logger.LogError(ex, "Error getting user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
@@ -192,54 +214,6 @@ public class UsersController : ControllerBase {
             return NotFound(new { error = ex.Message });
         } catch (Exception ex) {
             _logger.LogError(ex, "Error getting stats for user: {Email}", email);
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
-
-    /// <summary>
-    /// Validate email format and availability
-    /// </summary>
-    [HttpGet("validate/{email}")]
-    public async Task<ActionResult> ValidateUser(string email) {
-        try {
-            _logger.LogInformation("Validating email: {Email}", email);
-
-            var isValidFormat = await _userService.ValidateEmailFormatAsync(email);
-            if (!isValidFormat) {
-                return Ok(new {
-                    isValid = false,
-                    isAvailable = false,
-                    message = "Invalid email format"
-                });
-            }
-
-            var exists = await _userService.UserExistsAsync(email);
-            return Ok(new {
-                isValid = true,
-                isAvailable = !exists,
-                message = exists ? "Email address already in use" : "Email address is available"
-            });
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Error validating email: {Email}", email);
-            return StatusCode(500, new { error = "Internal server error" });
-        }
-    }
-
-    /// <summary>
-    /// Validate username for a specific domain
-    /// </summary>
-    [HttpGet("validate/{username}/domain/{domainName}")]
-    public async Task<ActionResult> ValidateUsername(string username, string domainName) {
-        try {
-            _logger.LogInformation("Validating username: {Username} for domain: {Domain}", username, domainName);
-
-            var isValid = await _userService.ValidateUsernameAsync(username, domainName);
-            return Ok(new {
-                isValid = isValid,
-                message = isValid ? "Username is available" : "Username is invalid or already taken"
-            });
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Error validating username: {Username}@{Domain}", username, domainName);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

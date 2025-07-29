@@ -25,7 +25,6 @@ public class FolderUpdateRequest {
 }
 
 public class FolderResponse {
-    public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Delimiter { get; set; } = "/";
     public string? SystemFolderType { get; set; }
@@ -40,7 +39,6 @@ public class FolderResponse {
 }
 
 public class FolderListResponse {
-    public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? SystemFolderType { get; set; }
     public string? Attributes { get; set; }

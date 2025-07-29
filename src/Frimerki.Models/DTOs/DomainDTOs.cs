@@ -3,7 +3,6 @@ using System.ComponentModel.DataAnnotations;
 namespace Frimerki.Models.DTOs;
 
 public class DomainResponse {
-    public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public string? CatchAllUser { get; set; }
@@ -11,6 +10,7 @@ public class DomainResponse {
     public int UserCount { get; set; }
     public long StorageUsed { get; set; }
     public DkimKeyInfo? DkimKey { get; set; }
+    public bool HasDkim { get; set; }
 }
 
 public class DomainRequest {

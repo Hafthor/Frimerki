@@ -41,7 +41,7 @@ public class SessionService : ISessionService {
 
         try {
             // Authenticate user
-            var user = await _userService.AuthenticateUserAsync(request.Email, request.Password);
+            var user = await _userService.AuthenticateUserEntityAsync(request.Email, request.Password);
             if (user == null) {
                 _logger.LogWarning("Login failed for user: {Email} - Invalid credentials", request.Email);
                 return null;
@@ -56,12 +56,12 @@ public class SessionService : ISessionService {
             var sessionInfo = new UserSessionInfo {
                 Id = user.Id,
                 Username = user.Username,
-                Email = user.Email,
+                Email = $"{user.Username}@{user.Domain.Name}",
                 FullName = user.FullName,
                 Role = user.Role,
                 CanReceive = user.CanReceive,
                 CanLogin = user.CanLogin,
-                DomainName = user.DomainName,
+                DomainName = user.Domain.Name,
                 DomainId = user.DomainId,
                 LastLogin = user.LastLogin
             };
@@ -74,7 +74,7 @@ public class SessionService : ISessionService {
             // Store refresh token
             _refreshTokens[refreshToken] = new RefreshTokenInfo {
                 UserId = user.Id,
-                Email = user.Email,
+                Email = $"{user.Username}@{user.Domain.Name}",
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddDays(30) // Refresh tokens expire in 30 days
             };
@@ -127,7 +127,7 @@ public class SessionService : ISessionService {
             }
 
             // Get updated user information
-            var userInfo = await _userService.GetUserByEmailAsync(email);
+            var userInfo = await _userService.GetUserEntityByEmailAsync(email);
             if (userInfo == null) {
                 return new SessionResponse { IsAuthenticated = false };
             }
@@ -135,12 +135,12 @@ public class SessionService : ISessionService {
             var sessionInfo = new UserSessionInfo {
                 Id = userInfo.Id,
                 Username = userInfo.Username,
-                Email = userInfo.Email,
+                Email = $"{userInfo.Username}@{userInfo.Domain.Name}",
                 FullName = userInfo.FullName,
                 Role = userInfo.Role,
                 CanReceive = userInfo.CanReceive,
                 CanLogin = userInfo.CanLogin,
-                DomainName = userInfo.DomainName,
+                DomainName = userInfo.Domain.Name,
                 DomainId = userInfo.DomainId,
                 LastLogin = userInfo.LastLogin
             };
@@ -177,7 +177,7 @@ public class SessionService : ISessionService {
             }
 
             // Get current user information
-            var user = await _userService.GetUserByEmailAsync(tokenInfo.Email);
+            var user = await _userService.GetUserEntityByEmailAsync(tokenInfo.Email);
             if (user == null || !user.CanLogin) {
                 _logger.LogWarning("User not found or disabled during token refresh: {Email}", tokenInfo.Email);
                 _refreshTokens.Remove(refreshToken);
@@ -188,12 +188,12 @@ public class SessionService : ISessionService {
             var sessionInfo = new UserSessionInfo {
                 Id = user.Id,
                 Username = user.Username,
-                Email = user.Email,
+                Email = $"{user.Username}@{user.Domain.Name}",
                 FullName = user.FullName,
                 Role = user.Role,
                 CanReceive = user.CanReceive,
                 CanLogin = user.CanLogin,
-                DomainName = user.DomainName,
+                DomainName = user.Domain.Name,
                 DomainId = user.DomainId,
                 LastLogin = user.LastLogin
             };
@@ -207,12 +207,12 @@ public class SessionService : ISessionService {
             _refreshTokens.Remove(refreshToken);
             _refreshTokens[newRefreshToken] = new RefreshTokenInfo {
                 UserId = user.Id,
-                Email = user.Email,
+                Email = $"{user.Username}@{user.Domain.Name}",
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddDays(30)
             };
 
-            _logger.LogInformation("Token refresh successful for user: {Email}", user.Email);
+            _logger.LogInformation("Token refresh successful for user: {Email}", $"{user.Username}@{user.Domain.Name}");
 
             return new LoginResponse {
                 Token = accessToken,

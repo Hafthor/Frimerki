@@ -50,7 +50,6 @@ public class DomainService : IDomainService {
             var activeDkimKey = domain.DkimKeys?.FirstOrDefault(k => k.IsActive);
 
             domainResponses.Add(new DomainResponse {
-                Id = domain.Id,
                 Name = domain.Name,
                 IsActive = domain.IsActive,
                 CatchAllUser = domain.CatchAllUser != null
@@ -59,6 +58,7 @@ public class DomainService : IDomainService {
                 CreatedAt = domain.CreatedAt,
                 UserCount = userCount,
                 StorageUsed = storageUsed,
+                HasDkim = activeDkimKey != null,
                 DkimKey = activeDkimKey != null ? new DkimKeyInfo {
                     Selector = activeDkimKey.Selector,
                     PublicKey = activeDkimKey.PublicKey,
@@ -91,7 +91,6 @@ public class DomainService : IDomainService {
         var activeDkimKey = domain.DkimKeys?.FirstOrDefault(k => k.IsActive);
 
         return new DomainResponse {
-            Id = domain.Id,
             Name = domain.Name,
             IsActive = domain.IsActive,
             CatchAllUser = domain.CatchAllUser != null
@@ -100,6 +99,7 @@ public class DomainService : IDomainService {
             CreatedAt = domain.CreatedAt,
             UserCount = userCount,
             StorageUsed = storageUsed,
+            HasDkim = activeDkimKey != null,
             DkimKey = activeDkimKey != null ? new DkimKeyInfo {
                 Selector = activeDkimKey.Selector,
                 PublicKey = activeDkimKey.PublicKey,
@@ -140,13 +140,13 @@ public class DomainService : IDomainService {
         _logger.LogInformation("Domain '{DomainName}' created with ID {DomainId}", domain.Name, domain.Id);
 
         return new DomainResponse {
-            Id = domain.Id,
             Name = domain.Name,
             IsActive = domain.IsActive,
             CatchAllUser = request.CatchAllUser,
             CreatedAt = domain.CreatedAt,
             UserCount = 0,
             StorageUsed = 0,
+            HasDkim = false,
             DkimKey = null
         };
     }

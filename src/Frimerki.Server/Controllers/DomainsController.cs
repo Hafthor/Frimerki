@@ -186,70 +186,6 @@ public class DomainsController : ControllerBase {
         }
     }
 
-    /// <summary>
-    /// Get domain statistics and information
-    /// </summary>
-    [HttpGet("{domainName}/stats")]
-    public async Task<ActionResult> GetDomainStats(string domainName) {
-        try {
-            var domain = await _domainService.GetDomainByNameAsync(domainName);
-
-            var stats = new {
-                domain.Name,
-                domain.IsActive,
-                domain.UserCount,
-                domain.StorageUsed,
-                StorageUsedFormatted = FormatBytes(domain.StorageUsed),
-                domain.CreatedAt,
-                HasDkim = domain.DkimKey != null,
-                DkimSelector = domain.DkimKey?.Selector
-            };
-
-            return Ok(stats);
-        } catch (ArgumentException ex) {
-            return NotFound(new { error = ex.Message });
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving domain stats for {DomainName}", domainName);
-            return StatusCode(500, new { error = "Failed to retrieve domain statistics" });
-        }
-    }
-
-    /// <summary>
-    /// Validate domain name availability
-    /// </summary>
-    [HttpGet("validate/{domainName}")]
-    public async Task<ActionResult> ValidateDomainName(string domainName) {
-        try {
-            // Check if domain name is valid format
-            if (!IsValidDomainName(domainName)) {
-                return Ok(new {
-                    isValid = false,
-                    isAvailable = false,
-                    message = "Invalid domain name format"
-                });
-            }
-
-            // Check if domain already exists
-            try {
-                await _domainService.GetDomainByNameAsync(domainName);
-                return Ok(new {
-                    isValid = true,
-                    isAvailable = false,
-                    message = "Domain name is already registered"
-                });
-            } catch (ArgumentException) {
-                return Ok(new {
-                    isValid = true,
-                    isAvailable = true,
-                    message = "Domain name is available"
-                });
-            }
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Error validating domain name {DomainName}", domainName);
-            return StatusCode(500, new { error = "Failed to validate domain name" });
-        }
-    }
-
     private static bool IsValidDomainName(string domainName) {
         if (string.IsNullOrWhiteSpace(domainName) || domainName.Length > 255) {
             return false;
@@ -260,20 +196,5 @@ public class DomainsController : ControllerBase {
             !string.IsNullOrEmpty(part) &&
             part.Length <= 63 &&
             System.Text.RegularExpressions.Regex.IsMatch(part, @"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$"));
-    }
-
-    private static string FormatBytes(long bytes) {
-        if (bytes == 0) return "0 B";
-
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        int order = 0;
-        double size = bytes;
-
-        while (size >= 1024 && order < sizes.Length - 1) {
-            size /= 1024;
-            order++;
-        }
-
-        return $"{size:0.##} {sizes[order]}";
     }
 }

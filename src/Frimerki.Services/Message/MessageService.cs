@@ -159,7 +159,6 @@ public class MessageService : IMessageService {
             BodyStructure = bodyStructure,
             Flags = flags,
             Attachments = message.Attachments.Select(a => new MessageAttachmentResponse {
-                Id = a.Id,
                 FileName = a.FileName,
                 ContentType = a.ContentType ?? "application/octet-stream",
                 Size = a.Size ?? 0,
