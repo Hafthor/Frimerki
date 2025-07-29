@@ -42,7 +42,7 @@ public class DomainService : IDomainService {
             .OrderBy(d => d.Name)
             .ToListAsync();
 
-        var domainResponses = new List<DomainResponse>();
+        List<DomainResponse> domainResponses = [];
 
         foreach (var domain in domains) {
             var userCount = domain.Users?.Count ?? 0;
@@ -344,7 +344,7 @@ public class DomainService : IDomainService {
     }
 
     private static string FormatBase64(string base64String) {
-        var result = new StringBuilder();
+        StringBuilder result = new();
         for (int i = 0; i < base64String.Length; i += 64) {
             var length = Math.Min(64, base64String.Length - i);
             result.AppendLine(base64String.Substring(i, length));

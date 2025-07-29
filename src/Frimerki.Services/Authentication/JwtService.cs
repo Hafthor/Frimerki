@@ -64,7 +64,7 @@ public class JwtService : IJwtService {
 
     public ClaimsPrincipal? ValidateToken(string token) {
         try {
-            var tokenHandler = new JwtSecurityTokenHandler();
+            JwtSecurityTokenHandler tokenHandler = new();
             var key = Encoding.UTF8.GetBytes(GetJwtSecret());
 
             var validationParameters = new TokenValidationParameters {

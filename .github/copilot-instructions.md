@@ -23,11 +23,31 @@ public class Example {
 - **Brevity is preferred** - Write concise code without sacrificing clarity
 - Avoid verbose constructs when shorter, clear alternatives exist
 - Use expression-bodied members where appropriate
-- Prefer `var` when the type is obvious from context
+- **Prefer explicit type with target-typed new** - Use `TypeName variable = new();` over `var variable = new TypeName();`
+- **Prefer collection expressions for empty collections** - Use `List<T> variable = [];` over `List<T> variable = new();`
+- Prefer `var` when the type is obvious from context (assignments from method calls, literals)
 - Use meaningful but concise variable and method names
+- **Prefer range indexers over Substring/Slice** - Use `[start..end]` syntax for string slicing
 
 ### Formatting Examples
 ```csharp
+// Preferred - explicit type with target-typed new
+List<string> items = [];
+StringBuilder builder = new();
+Dictionary<string, int> counts = [];
+
+// Preferred when type is obvious from context
+var domain = await _context.Domains.FirstOrDefaultAsync();
+var result = GetDomainAsync(name);
+var count = 42;
+
+// Avoid - verbose type repetition
+List<string> items = new List<string>();
+StringBuilder builder = new StringBuilder();
+
+// Avoid - when collection expressions are available
+List<string> items = new();
+
 // Preferred - concise and clear
 public async Task<DomainResponse> GetDomainAsync(string name) =>
     await _context.Domains
@@ -54,6 +74,16 @@ public async Task<DomainResponse> GetDomainByNameAsync(string domainName) {
     }
     return null;
 }
+
+// Preferred - range indexers for string slicing
+var content = message[(headerEnd + 2)..];  // Skip headers and get body
+var size = literal[1..^1];                 // Remove surrounding braces
+var prefix = line[..colonIndex];           // Get everything before colon
+
+// Avoid - Substring/Slice methods
+var content = message.Substring(headerEnd + 2);
+var size = literal.Substring(1, literal.Length - 2);
+var prefix = line.Substring(0, colonIndex);
 ```
 
 ## Architecture Patterns

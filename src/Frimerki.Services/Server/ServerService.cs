@@ -54,7 +54,7 @@ public class ServerService : IServerService {
     }
 
     public async Task<ServerHealthResponse> GetServerHealthAsync() {
-        var checks = new List<HealthCheck>();
+        List<HealthCheck> checks = [];
         var overallStatus = "Healthy";
 
         // Database health check

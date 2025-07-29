@@ -40,7 +40,7 @@ public class UserService : IUserService {
             .Take(pageSize)
             .ToListAsync();
 
-        var userResponses = new List<UserResponse>();
+        List<UserResponse> userResponses = [];
 
         foreach (var user in users) {
             var stats = await GetUserStatsInternalAsync(user.Id);

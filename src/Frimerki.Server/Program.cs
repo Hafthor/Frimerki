@@ -1,6 +1,7 @@
 using Frimerki.Data;
 using Frimerki.Server;
 using Frimerki.Services;
+using Frimerki.Protocols;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -58,6 +59,9 @@ builder.Services.AddDbContext<EmailDbContext>(options =>
 
 // Add Frimerki services
 builder.Services.AddFrimerkiServices();
+
+// Add Email Protocols (IMAP, SMTP, POP3)
+builder.Services.AddEmailProtocols();
 
 // Add SignalR
 builder.Services.AddSignalR();

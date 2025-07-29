@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Frimerki.Data\Frimerki.Data.csproj" />
     <ProjectReference Include="..\Frimerki.Models\Frimerki.Models.csproj" />
     <ProjectReference Include="..\Frimerki.Services\Frimerki.Services.csproj" />
+    <ProjectReference Include="..\Frimerki.Protocols\Frimerki.Protocols.csproj" />
   </ItemGroup>
 
 </Project>

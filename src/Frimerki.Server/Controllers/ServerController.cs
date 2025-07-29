@@ -200,7 +200,7 @@ public class ServerController : ControllerBase {
     public async Task<ActionResult<List<BackupResponse>>> ListBackups() {
         try {
             // In a real implementation, list actual backup files
-            var backups = new List<BackupResponse>();
+            List<BackupResponse> backups = [];
 
             return Ok(backups);
         } catch (Exception ex) {
