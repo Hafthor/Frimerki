@@ -100,6 +100,28 @@ public class FoldersController : ControllerBase {
     }
 
     /// <summary>
+    /// Partially update folder (rename, subscription status, etc.)
+    /// </summary>
+    [HttpPatch("{name}")]
+    public async Task<ActionResult<FolderResponse>> PatchFolder(string name, FolderUpdateRequest request) {
+        try {
+            var userId = GetCurrentUserId();
+            var decodedName = Uri.UnescapeDataString(name);
+            var folder = await _folderService.UpdateFolderAsync(userId, decodedName, request);
+            return folder == null ? NotFound() : Ok(folder);
+        } catch (UnauthorizedAccessException ex) {
+            _logger.LogWarning("Unauthorized access attempt: {Message}", ex.Message);
+            return Unauthorized(new { error = ex.Message });
+        } catch (InvalidOperationException ex) {
+            _logger.LogWarning("Invalid folder patch request: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Error patching folder {FolderName}", name);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
     /// Delete folder
     /// </summary>
     [HttpDelete("{name}")]

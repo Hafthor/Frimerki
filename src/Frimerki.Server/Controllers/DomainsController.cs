@@ -101,6 +101,29 @@ public class DomainsController : ControllerBase {
     }
 
     /// <summary>
+    /// Partially update domain (HostAdmin only)
+    /// </summary>
+    [HttpPatch("{domainName}")]
+    public async Task<ActionResult<DomainResponse>> PatchDomain(string domainName, [FromBody] DomainUpdateRequest request) {
+        try {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState);
+            }
+
+            // TODO: Check if user is HostAdmin
+            var domain = await _domainService.UpdateDomainAsync(domainName, request);
+
+            _logger.LogInformation("Domain '{DomainName}' patched successfully", domainName);
+            return Ok(domain);
+        } catch (ArgumentException ex) {
+            return NotFound(new { error = ex.Message });
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Error patching domain {DomainName}", domainName);
+            return StatusCode(500, new { error = "Failed to patch domain" });
+        }
+    }
+
+    /// <summary>
     /// Delete domain (HostAdmin only)
     /// </summary>
     [HttpDelete("{domainName}")]

@@ -112,6 +112,34 @@ public class MessagesController : ControllerBase {
     }
 
     /// <summary>
+    /// Partially update a message (flags, folder, content for drafts)
+    /// </summary>
+    [HttpPatch("{id}")]
+    public async Task<ActionResult<MessageResponse>> PatchMessage(int id, [FromBody] MessageUpdateRequest request) {
+        try {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState);
+            }
+
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("Patching message {MessageId} for user {UserId}", id, userId);
+
+            var message = await _messageService.UpdateMessageAsync(userId, id, request);
+            if (message == null) {
+                return NotFound(new { error = "Message not found" });
+            }
+
+            return Ok(message);
+        } catch (ArgumentException ex) {
+            _logger.LogWarning(ex, "Invalid request for patching message {MessageId}", id);
+            return BadRequest(new { error = ex.Message });
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Error patching message {MessageId}", id);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Delete a message (move to trash)
     /// </summary>
     [HttpDelete("{id}")]

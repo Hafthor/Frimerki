@@ -163,6 +163,21 @@ public class DomainService : IDomainService {
 
         var hasChanges = false;
 
+        // Update Name if provided
+        if (!string.IsNullOrEmpty(request.Name) && domain.Name != request.Name) {
+            // Check if new name already exists
+            var existingDomain = await _dbContext.Domains
+                .FirstOrDefaultAsync(d => d.Name.ToLower() == request.Name.ToLower() && d.Id != domain.Id);
+
+            if (existingDomain != null) {
+                throw new InvalidOperationException($"Domain '{request.Name}' already exists");
+            }
+
+            domain.Name = request.Name;
+            hasChanges = true;
+            _logger.LogInformation("Domain '{DomainName}' name changed to '{NewName}'", domainName, request.Name);
+        }
+
         // Update IsActive if provided
         if (request.IsActive.HasValue && domain.IsActive != request.IsActive.Value) {
             domain.IsActive = request.IsActive.Value;
@@ -198,7 +213,7 @@ public class DomainService : IDomainService {
             _logger.LogInformation("Domain '{DomainName}' updated", domainName);
         }
 
-        return await GetDomainByNameAsync(domainName);
+        return await GetDomainByNameAsync(domain.Name);
     }
 
     public async Task DeleteDomainAsync(string domainName) {

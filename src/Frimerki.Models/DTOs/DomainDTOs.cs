@@ -27,6 +27,11 @@ public class DomainRequest {
 }
 
 public class DomainUpdateRequest {
+    [StringLength(255)]
+    [RegularExpression(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
+        ErrorMessage = "Invalid domain name format")]
+    public string? Name { get; set; }
+
     public bool? IsActive { get; set; }
 
     [EmailAddress]
