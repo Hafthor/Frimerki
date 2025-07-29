@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Services.User;
 
-public class UserService : IUserService {
+public partial class UserService : IUserService {
     private readonly EmailDbContext _context;
     private readonly ILogger<UserService> _logger;
 
@@ -288,9 +288,11 @@ public class UserService : IUserService {
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
     }
 
+    [GeneratedRegex(@"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")]
+    private static partial Regex EmailValidationRegex();
+
     public Task<bool> ValidateEmailFormatAsync(string email) {
-        var emailRegex = new Regex(@"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
-        return Task.FromResult(emailRegex.IsMatch(email));
+        return Task.FromResult(EmailValidationRegex().IsMatch(email));
     }
 
     private async Task<UserStatsResponse> GetUserStatsInternalAsync(int userId) {

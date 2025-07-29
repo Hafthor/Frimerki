@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
@@ -10,6 +11,24 @@ namespace Frimerki.Services.Message;
 public class MessageService : IMessageService {
     private readonly EmailDbContext _context;
     private readonly ILogger<MessageService> _logger;
+
+    // Standard IMAP flag names
+    private const string SeenFlag = "\\Seen";
+    private const string AnsweredFlag = "\\Answered";
+    private const string FlaggedFlag = "\\Flagged";
+    private const string DeletedFlag = "\\Deleted";
+    private const string DraftFlag = "\\Draft";
+    private const string RecentFlag = "\\Recent";
+
+    // Standard IMAP flags with their corresponding properties in MessageFlagsRequest
+    private static readonly FrozenDictionary<string, Func<MessageFlagsRequest, bool?>> StandardFlags =
+        new Dictionary<string, Func<MessageFlagsRequest, bool?>> {
+            [SeenFlag] = req => req.Seen,
+            [AnsweredFlag] = req => req.Answered,
+            [FlaggedFlag] = req => req.Flagged,
+            [DeletedFlag] = req => req.Deleted,
+            [DraftFlag] = req => req.Draft
+        }.ToFrozenDictionary();
 
     public MessageService(EmailDbContext context, ILogger<MessageService> logger) {
         _context = context;
@@ -233,7 +252,7 @@ public class MessageService : IMessageService {
         var seenFlag = new MessageFlag {
             MessageId = message.Id,
             UserId = userId,
-            FlagName = "\\Seen",
+            FlagName = SeenFlag,
             IsSet = true
         };
 
@@ -358,14 +377,14 @@ public class MessageService : IMessageService {
 
         // Mark as deleted
         var deletedFlag = await _context.MessageFlags
-            .Where(mf => mf.MessageId == messageId && mf.UserId == userId && mf.FlagName == "\\Deleted")
+            .Where(mf => mf.MessageId == messageId && mf.UserId == userId && mf.FlagName == DeletedFlag)
             .FirstOrDefaultAsync();
 
         if (deletedFlag == null) {
             _context.MessageFlags.Add(new MessageFlag {
                 MessageId = messageId,
                 UserId = userId,
-                FlagName = "\\Deleted",
+                FlagName = DeletedFlag,
                 IsSet = true
             });
         } else {
@@ -383,17 +402,17 @@ public class MessageService : IMessageService {
     private IQueryable<UserMessage> ApplyFlagFiltering(IQueryable<UserMessage> query, int userId, string flags) {
         return flags.ToLower() switch {
             "read" or "seen" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == "\\Seen" && mf.IsSet)),
+                .Any(mf => mf.UserId == userId && mf.FlagName == SeenFlag && mf.IsSet)),
             "unread" or "unseen" => query.Where(um => !um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == "\\Seen" && mf.IsSet)),
+                .Any(mf => mf.UserId == userId && mf.FlagName == SeenFlag && mf.IsSet)),
             "flagged" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == "\\Flagged" && mf.IsSet)),
+                .Any(mf => mf.UserId == userId && mf.FlagName == FlaggedFlag && mf.IsSet)),
             "answered" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == "\\Answered" && mf.IsSet)),
+                .Any(mf => mf.UserId == userId && mf.FlagName == AnsweredFlag && mf.IsSet)),
             "draft" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == "\\Draft" && mf.IsSet)),
+                .Any(mf => mf.UserId == userId && mf.FlagName == DraftFlag && mf.IsSet)),
             "deleted" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == "\\Deleted" && mf.IsSet)),
+                .Any(mf => mf.UserId == userId && mf.FlagName == DeletedFlag && mf.IsSet)),
             _ => query
         };
     }
@@ -474,74 +493,56 @@ public class MessageService : IMessageService {
     private Dictionary<string, object> BuildAppliedFilters(MessageFilterRequest request) {
         var filters = new Dictionary<string, object>();
 
-        if (!string.IsNullOrEmpty(request.Q)) {
-            filters["q"] = request.Q;
-        }
-
-        if (!string.IsNullOrEmpty(request.Folder)) {
-            filters["folder"] = request.Folder;
-        }
-
-        if (request.FolderId.HasValue) {
-            filters["folderId"] = request.FolderId.Value;
-        }
-
-        if (!string.IsNullOrEmpty(request.Flags)) {
-            filters["flags"] = request.Flags;
-        }
-
-        if (!string.IsNullOrEmpty(request.From)) {
-            filters["from"] = request.From;
-        }
-
-        if (!string.IsNullOrEmpty(request.To)) {
-            filters["to"] = request.To;
-        }
-
-        if (request.Since.HasValue) {
-            filters["since"] = request.Since.Value.ToString("yyyy-MM-dd");
-        }
-
-        if (request.Before.HasValue) {
-            filters["before"] = request.Before.Value.ToString("yyyy-MM-dd");
-        }
-
-        if (request.MinSize.HasValue) {
-            filters["minSize"] = request.MinSize.Value;
-        }
-
-        if (request.MaxSize.HasValue) {
-            filters["maxSize"] = request.MaxSize.Value;
-        }
+        AddStringFilter(filters, "q", request.Q);
+        AddStringFilter(filters, "folder", request.Folder);
+        AddFilter(filters, "folderId", request.FolderId);
+        AddStringFilter(filters, "flags", request.Flags);
+        AddStringFilter(filters, "from", request.From);
+        AddStringFilter(filters, "to", request.To);
+        AddFilter(filters, "since", request.Since?.ToString("yyyy-MM-dd"));
+        AddFilter(filters, "before", request.Before?.ToString("yyyy-MM-dd"));
+        AddFilter(filters, "minSize", request.MinSize);
+        AddFilter(filters, "maxSize", request.MaxSize);
 
         return filters;
+    }
+
+    private static void AddStringFilter(Dictionary<string, object> filters, string key, string? value) {
+        if (!string.IsNullOrEmpty(value)) {
+            filters[key] = value;
+        }
+    }
+
+    private static void AddFilter<T>(Dictionary<string, object> filters, string key, T? value) where T : struct {
+        if (value.HasValue) {
+            filters[key] = value.Value;
+        }
+    }
+
+    private static void AddFilter(Dictionary<string, object> filters, string key, string? value) {
+        if (value != null) {
+            filters[key] = value;
+        }
     }
 
     private MessageFlagsResponse GetMessageFlags(IEnumerable<MessageFlag> flags) {
         var flagDict = flags.Where(f => f.IsSet).ToDictionary(f => f.FlagName, f => f.IsSet);
 
         return new MessageFlagsResponse {
-            Seen = flagDict.GetValueOrDefault("\\Seen", false),
-            Answered = flagDict.GetValueOrDefault("\\Answered", false),
-            Flagged = flagDict.GetValueOrDefault("\\Flagged", false),
-            Deleted = flagDict.GetValueOrDefault("\\Deleted", false),
-            Draft = flagDict.GetValueOrDefault("\\Draft", false),
-            Recent = flagDict.GetValueOrDefault("\\Recent", false),
-            CustomFlags = flags.Where(f => f.IsSet && !f.FlagName.StartsWith("\\"))
+            Seen = flagDict.GetValueOrDefault(SeenFlag, false),
+            Answered = flagDict.GetValueOrDefault(AnsweredFlag, false),
+            Flagged = flagDict.GetValueOrDefault(FlaggedFlag, false),
+            Deleted = flagDict.GetValueOrDefault(DeletedFlag, false),
+            Draft = flagDict.GetValueOrDefault(DraftFlag, false),
+            Recent = flagDict.GetValueOrDefault(RecentFlag, false),
+            CustomFlags = flags.Where(f => f.IsSet && !StandardFlags.ContainsKey(f.FlagName) && f.FlagName != RecentFlag)
                 .Select(f => f.FlagName).ToList()
         };
     }
 
     private async Task UpdateMessageFlagsAsync(int userId, int messageId, MessageFlagsRequest flagsRequest) {
-        var standardFlags = new[] {
-            ("\\Seen", flagsRequest.Seen),
-            ("\\Answered", flagsRequest.Answered),
-            ("\\Flagged", flagsRequest.Flagged),
-            ("\\Deleted", flagsRequest.Deleted),
-            ("\\Draft", flagsRequest.Draft)
-        };
-
-        foreach (var (flagName, value) in standardFlags) {
+        foreach (var (flagName, valueExtractor) in StandardFlags) {
+            var value = valueExtractor(flagsRequest);
             if (value.HasValue) {
                 await SetMessageFlagAsync(userId, messageId, flagName, value.Value);
             }
@@ -590,7 +591,7 @@ public class MessageService : IMessageService {
     private bool IsDraftMessage(int userId, int messageId) {
         return _context.MessageFlags
             .Any(mf => mf.MessageId == messageId && mf.UserId == userId &&
-                      mf.FlagName == "\\Draft" && mf.IsSet);
+                      mf.FlagName == DraftFlag && mf.IsSet);
     }
 
     private async Task<string> GetUserEmailAsync(int userId) {

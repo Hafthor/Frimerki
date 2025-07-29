@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
+using Frimerki.Services.Email;
 using Frimerki.Services.User;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -40,7 +41,8 @@ public class SmtpServer : BackgroundService, IDisposable {
                     var clientTask = Task.Run(async () => {
                         using var scope = _serviceProvider.CreateScope();
                         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-                        var session = new SmtpSession(tcpClient, userService, _logger);
+                        var emailDeliveryService = scope.ServiceProvider.GetRequiredService<EmailDeliveryService>();
+                        var session = new SmtpSession(tcpClient, userService, emailDeliveryService, _logger);
 
                         try {
                             await session.HandleAsync(stoppingToken);
@@ -94,6 +96,5 @@ public class SmtpServer : BackgroundService, IDisposable {
     public new void Dispose() {
         _listener?.Stop();
         base.Dispose();
-        GC.SuppressFinalize(this);
     }
 }

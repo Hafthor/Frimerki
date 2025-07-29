@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions {
 
         // Email services
         services.AddScoped<SmtpClientService>();
+        services.AddScoped<EmailDeliveryService>();
 
         return services;
     }

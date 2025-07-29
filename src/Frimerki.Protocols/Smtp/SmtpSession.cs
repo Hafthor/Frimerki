@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using Frimerki.Models.Entities;
+using Frimerki.Services.Email;
 using Frimerki.Services.User;
 
 using Microsoft.Extensions.Logging;
@@ -12,12 +13,13 @@ namespace Frimerki.Protocols.Smtp;
 /// <summary>
 /// Handles individual SMTP client sessions following RFC 5321
 /// </summary>
-public class SmtpSession : IDisposable {
+public partial class SmtpSession : IDisposable {
     private readonly TcpClient _client;
     private readonly NetworkStream _stream;
     private readonly StreamReader _reader;
     private readonly StreamWriter _writer;
     private readonly IUserService _userService;
+    private readonly EmailDeliveryService _emailDeliveryService;
     private readonly ILogger _logger;
 
     private SmtpSessionState _state = SmtpSessionState.Initial;
@@ -26,12 +28,19 @@ public class SmtpSession : IDisposable {
     private readonly List<string> _rcptTo = [];
     private readonly StringBuilder _messageData = new();
 
-    public SmtpSession(TcpClient client, IUserService userService, ILogger logger) {
+    [GeneratedRegex(@"FROM:\s*<(.*)>", RegexOptions.IgnoreCase)]
+    private static partial Regex MailFromRegex();
+
+    [GeneratedRegex(@"TO:\s*<(.*)>", RegexOptions.IgnoreCase)]
+    private static partial Regex RcptToRegex();
+
+    public SmtpSession(TcpClient client, IUserService userService, EmailDeliveryService emailDeliveryService, ILogger logger) {
         _client = client;
         _stream = client.GetStream();
         _reader = new StreamReader(_stream, Encoding.UTF8);
         _writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
         _userService = userService;
+        _emailDeliveryService = emailDeliveryService;
         _logger = logger;
     }
 
@@ -71,41 +80,19 @@ public class SmtpSession : IDisposable {
         var cmd = parts[0].ToUpperInvariant();
         var args = parts.Length > 1 ? parts[1] : string.Empty;
 
-        switch (cmd) {
-            case "HELO":
-                await HandleHeloAsync(args);
-                break;
-            case "EHLO":
-                await HandleEhloAsync(args);
-                break;
-            case "AUTH":
-                await HandleAuthAsync(args);
-                break;
-            case "MAIL":
-                await HandleMailFromAsync(args);
-                break;
-            case "RCPT":
-                await HandleRcptToAsync(args);
-                break;
-            case "DATA":
-                await HandleDataAsync();
-                break;
-            case "RSET":
-                await HandleRsetAsync();
-                break;
-            case "NOOP":
-                await SendResponseAsync("250 OK");
-                break;
-            case "QUIT":
-                await HandleQuitAsync();
-                break;
-            case "HELP":
-                await HandleHelpAsync();
-                break;
-            default:
-                await SendResponseAsync("500 Syntax error, command unrecognized");
-                break;
-        }
+        await (cmd switch {
+            "HELO" => HandleHeloAsync(args),
+            "EHLO" => HandleEhloAsync(args),
+            "AUTH" => HandleAuthAsync(args),
+            "MAIL" => HandleMailFromAsync(args),
+            "RCPT" => HandleRcptToAsync(args),
+            "DATA" => HandleDataAsync(),
+            "RSET" => HandleRsetAsync(),
+            "NOOP" => SendResponseAsync("250 OK"),
+            "QUIT" => HandleQuitAsync(),
+            "HELP" => HandleHelpAsync(),
+            _ => SendResponseAsync("500 Syntax error, command unrecognized")
+        });
     }
 
     private async Task HandleHeloAsync(string hostname) {
@@ -140,17 +127,11 @@ public class SmtpSession : IDisposable {
         var parts = args.Split(' ', 2);
         var mechanism = parts[0].ToUpperInvariant();
 
-        switch (mechanism) {
-            case "PLAIN":
-                await HandleAuthPlainAsync(parts.Length > 1 ? parts[1] : null);
-                break;
-            case "LOGIN":
-                await HandleAuthLoginAsync();
-                break;
-            default:
-                await SendResponseAsync("504 Authentication mechanism not supported");
-                break;
-        }
+        await (mechanism switch {
+            "PLAIN" => HandleAuthPlainAsync(parts.Length > 1 ? parts[1] : null),
+            "LOGIN" => HandleAuthLoginAsync(),
+            _ => SendResponseAsync("504 Authentication mechanism not supported")
+        });
     }
 
     private async Task HandleAuthPlainAsync(string? credentials) {
@@ -228,7 +209,7 @@ public class SmtpSession : IDisposable {
             return;
         }
 
-        var match = Regex.Match(args, @"FROM:\s*<(.*)>", RegexOptions.IgnoreCase);
+        var match = MailFromRegex().Match(args);
         if (!match.Success) {
             await SendResponseAsync("501 Syntax: MAIL FROM:<address>");
             return;
@@ -251,7 +232,7 @@ public class SmtpSession : IDisposable {
             return;
         }
 
-        var match = Regex.Match(args, @"TO:\s*<(.*)>", RegexOptions.IgnoreCase);
+        var match = RcptToRegex().Match(args);
         if (!match.Success) {
             await SendResponseAsync("501 Syntax: RCPT TO:<address>");
             return;
@@ -299,12 +280,23 @@ public class SmtpSession : IDisposable {
 
     private async Task ProcessMessageAsync() {
         try {
-            // TODO: Process the message (store it, route it, etc.)
-            // For now, just accept it
-            _logger.LogInformation("Received message from {From} to {Recipients}",
+            var messageData = _messageData.ToString();
+
+            _logger.LogInformation("Processing message from {From} to {Recipients}",
                 _mailFrom, string.Join(", ", _rcptTo));
 
-            await SendResponseAsync("250 OK: Message accepted for delivery");
+            // Deliver the message using the email delivery service
+            var delivered = await _emailDeliveryService.DeliverEmailAsync(_mailFrom!, _rcptTo, messageData);
+
+            if (delivered) {
+                await SendResponseAsync("250 OK: Message accepted for delivery");
+                _logger.LogInformation("Message delivered successfully from {From} to {Recipients}",
+                    _mailFrom, string.Join(", ", _rcptTo));
+            } else {
+                await SendResponseAsync("550 Requested action not taken: mailbox unavailable");
+                _logger.LogWarning("Message delivery failed from {From} to {Recipients}",
+                    _mailFrom, string.Join(", ", _rcptTo));
+            }
 
             // Reset for next message
             _mailFrom = null;
@@ -349,7 +341,6 @@ public class SmtpSession : IDisposable {
         _reader?.Dispose();
         _stream?.Dispose();
         _client?.Dispose();
-        GC.SuppressFinalize(this);
     }
 }
 
