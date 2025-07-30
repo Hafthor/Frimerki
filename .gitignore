@@ -146,6 +146,9 @@ coverage*.info
 *.coverage
 *.coveragexml
 
+# ReportGenerator coverage reports
+CoverageReport/
+
 # NCrunch
 _NCrunch_*
 .*crunch*.local.xml
@@ -358,6 +361,7 @@ autom4te.cache/
 *.tar.gz
 tarballs/
 test-results/
+TestResults/
 
 # Mac bundle stuff
 *.dmg
