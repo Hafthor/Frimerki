@@ -32,7 +32,7 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
 
         Assert.NotNull(status);
         Assert.Equal("Running", status.Status);
-        Assert.Equal("1.0.0-alpha", status.Version);
+        Assert.StartsWith("1.0.0", status.Version);
         Assert.NotNull(status.Statistics);
         Assert.NotNull(status.Services);
     }

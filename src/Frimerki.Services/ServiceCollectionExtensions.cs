@@ -1,4 +1,5 @@
 using Frimerki.Services.Authentication;
+using Frimerki.Services.Common;
 using Frimerki.Services.Domain;
 using Frimerki.Services.Email;
 using Frimerki.Services.Folder;
@@ -12,6 +13,9 @@ namespace Frimerki.Services;
 
 public static class ServiceCollectionExtensions {
     public static IServiceCollection AddFrimerkiServices(this IServiceCollection services) {
+        // Common services
+        services.AddSingleton<INowProvider, SystemNowProvider>();
+
         // Server management services
         services.AddScoped<IServerService, ServerService>();
 

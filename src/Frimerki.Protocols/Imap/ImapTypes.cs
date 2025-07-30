@@ -40,9 +40,9 @@ public enum ImapResponseType {
 /// IMAP response with status and message
 /// </summary>
 public class ImapResponse {
-    public string Tag { get; set; } = string.Empty;
+    public string Tag { get; set; } = "";
     public ImapResponseType Type { get; set; }
-    public string Message { get; set; } = string.Empty;
+    public string Message { get; set; } = "";
     public string? ResponseCode { get; set; }
 
     public override string ToString() =>
@@ -55,8 +55,8 @@ public class ImapResponse {
 /// Parsed IMAP command from client
 /// </summary>
 public class ImapCommand {
-    public string Tag { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public List<string> Arguments { get; set; } = new();
-    public string RawCommand { get; set; } = string.Empty;
+    public string Tag { get; set; } = "";
+    public string Name { get; set; } = "";
+    public List<string> Arguments { get; set; } = [];
+    public string RawCommand { get; set; } = "";
 }

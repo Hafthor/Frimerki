@@ -22,7 +22,7 @@ public class MessagesController : ControllerBase {
     /// Get messages with filtering and pagination
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<MessageListResponse>> GetMessages([FromQuery] MessageFilterRequest request) {
+    public async Task<ActionResult<PaginatedInfo<MessageListItemResponse>>> GetMessages([FromQuery] MessageFilterRequest request) {
         try {
             var userId = GetCurrentUserId();
             _logger.LogInformation("Getting messages for user {UserId} with filters", userId);

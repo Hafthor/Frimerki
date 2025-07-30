@@ -36,7 +36,7 @@ public class SmtpServer : BackgroundService, IDisposable {
 
             while (!stoppingToken.IsCancellationRequested) {
                 try {
-                    var tcpClient = await _listener.AcceptTcpClientAsync();
+                    var tcpClient = await _listener.AcceptTcpClientAsync(stoppingToken);
 
                     var clientTask = Task.Run(async () => {
                         using var scope = _serviceProvider.CreateScope();

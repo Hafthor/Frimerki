@@ -60,14 +60,11 @@ builder.Services.AddAuthorization();
 builder.Services.AddDbContext<EmailDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add Frimerki services
-builder.Services.AddFrimerkiServices();
 
-// Add Email Protocols (IMAP, SMTP, POP3)
-builder.Services.AddEmailProtocols();
-
-// Add SignalR
-builder.Services.AddSignalR();
+builder.Services
+    .AddFrimerkiServices() // Add Frimerki services
+    .AddEmailProtocols() // Add Email Protocols (IMAP, SMTP, POP3)
+    .AddSignalR(); // Add SignalR
 
 var app = builder.Build();
 

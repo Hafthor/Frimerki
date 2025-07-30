@@ -11,7 +11,7 @@ public class MessageFlag {
 
     [Required]
     [MaxLength(50)]
-    public string FlagName { get; set; } = string.Empty;
+    public string FlagName { get; set; } = "";
 
     public bool IsSet { get; set; } = true;
 

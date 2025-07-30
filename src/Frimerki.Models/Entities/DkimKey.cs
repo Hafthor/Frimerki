@@ -9,13 +9,13 @@ public class DkimKey {
 
     [Required]
     [MaxLength(50)]
-    public string Selector { get; set; } = string.Empty;
+    public string Selector { get; set; } = "";
 
     [Required]
-    public string PrivateKey { get; set; } = string.Empty;
+    public string PrivateKey { get; set; } = "";
 
     [Required]
-    public string PublicKey { get; set; } = string.Empty;
+    public string PublicKey { get; set; } = "";
 
     public bool IsActive { get; set; } = true;
 

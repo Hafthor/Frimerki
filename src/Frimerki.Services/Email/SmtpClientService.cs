@@ -130,7 +130,7 @@ public class SmtpClientService {
                 return false;
             }
 
-            if (!int.TryParse(smtpPort, out var port) || port <= 0 || port > 65535) {
+            if (!int.TryParse(smtpPort, out var port) || port is <= 0 or > 65535) {
                 _logger.LogWarning("Invalid SMTP port configuration: {Port}", smtpPort);
                 return false;
             }

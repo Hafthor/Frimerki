@@ -1,19 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
 
 using Frimerki.Models.Entities;
+using Frimerki.Services.Message;
 
 namespace Frimerki.Protocols.Imap;
 
 /// <summary>
 /// Handles MIME message conversion for IMAP responses
 /// </summary>
-public class ImapMessageConverter {
-    private static readonly HashSet<string> StandardImapFlags = new() {
-        "\\Seen", "\\Answered", "\\Flagged", "\\Deleted", "\\Draft"
-    };
+public partial class ImapMessageConverter {
+    [GeneratedRegex(@"^(?:""?([^""<>]+?)""?\s*)?<([^<>]+@[^<>]+)>$|^([^<>@]+@[^<>@]+)$", RegexOptions.IgnoreCase)]
+    private static partial Regex EmailAddressRegex();
+
     /// <summary>
     /// Converts a Message entity to an IMAP FETCH response
     /// </summary>
@@ -24,52 +22,37 @@ public class ImapMessageConverter {
         List<string> parts = [];
 
         foreach (var item in fetchItems) {
-            switch (item.ToUpperInvariant()) {
-                case "UID":
-                    parts.Add($"UID {message.Uid}");
-                    break;
-                case "FLAGS":
-                    parts.Add($"FLAGS ({GetImapFlags(message)})");
-                    break;
-                case "ENVELOPE":
-                    parts.Add($"ENVELOPE {GetBasicEnvelope(message)}");
-                    break;
-                case "RFC822.SIZE":
-                    parts.Add($"RFC822.SIZE {message.MessageSize}");
-                    break;
-                case "INTERNALDATE":
-                    parts.Add($"INTERNALDATE \"{message.ReceivedAt:dd-MMM-yyyy HH:mm:ss zzz}\"");
-                    break;
-                case "RFC822":
-                    parts.Add($"RFC822 {{{message.MessageSize}}}\r\n{message.Headers}\r\n\r\n{message.Body ?? ""}");
-                    break;
-                case "RFC822.HEADER":
-                    parts.Add($"RFC822.HEADER {{{message.Headers?.Length ?? 0}}}\r\n{message.Headers ?? ""}");
-                    break;
-                case "RFC822.TEXT":
-                    parts.Add($"RFC822.TEXT {{{message.Body?.Length ?? 0}}}\r\n{message.Body ?? ""}");
-                    break;
-                case "BODY":
-                case "BODYSTRUCTURE":
-                    parts.Add($"{item} (\"text\" \"plain\" NIL NIL NIL \"7bit\" {message.Body?.Length ?? 0} NIL NIL NIL)");
-                    break;
+            var part = item.ToUpperInvariant() switch {
+                "UID" => $"UID {message.Uid}",
+                "FLAGS" => $"FLAGS ({GetImapFlags(message)})",
+                "ENVELOPE" => $"ENVELOPE {GetBasicEnvelope(message)}",
+                "RFC822.SIZE" => $"RFC822.SIZE {message.MessageSize}",
+                "INTERNALDATE" => $"INTERNALDATE \"{message.ReceivedAt:dd-MMM-yyyy HH:mm:ss zzz}\"",
+                "RFC822" => $"RFC822 {{{message.MessageSize}}}\r\n{message.Headers}\r\n\r\n{message.Body ?? ""}",
+                "RFC822.HEADER" => $"RFC822.HEADER {{{message.Headers?.Length ?? 0}}}\r\n{message.Headers ?? ""}",
+                "RFC822.TEXT" => $"RFC822.TEXT {{{message.Body?.Length ?? 0}}}\r\n{message.Body ?? ""}",
+                "BODY" or "BODYSTRUCTURE" => $"{item} (\"text\" \"plain\" NIL NIL NIL \"7bit\" {message.Body?.Length ?? 0} NIL NIL NIL)",
+                _ => null
+            };
+
+            if (part != null) {
+                parts.Add(part);
             }
         }
 
         return string.Join(" ", parts);
     }
 
-    private string GetImapFlags(Message message) =>
-        string.Join(" ", message.MessageFlags?
-            .Select(f => f.FlagName)
-            .Where(f => StandardImapFlags.Contains(f))
-            .ToList() ?? []);
+    private static string GetImapFlags(Message message) =>
+        string.Join(" ", message.MessageFlags.Select(f => f.FlagName)
+            .Where(f => MessageService.StandardFlags.ContainsKey(f))
+            .ToList());
 
     private string GetBasicEnvelope(Message message) {
         // IMAP ENVELOPE format: (date subject from sender reply-to to cc bcc in-reply-to message-id)
         // For now, return a basic envelope structure
-        var subject = ExtractSubject(message.Headers ?? "");
-        var from = ExtractFrom(message.Headers ?? "");
+        var subject = ExtractField(message.Headers, "Subject");
+        var from = ExtractFrom(message.Headers);
 
         return $"(\"{message.ReceivedAt:dd-MMM-yyyy HH:mm:ss zzz}\" " +
                $"\"{EscapeString(subject)}\" " +
@@ -77,42 +60,49 @@ public class ImapMessageConverter {
                $"\"{EscapeString(message.HeaderMessageId)}\" NIL)";
     }
 
-    private string ExtractSubject(string headers) {
+    private static string ExtractField(string headers, string fieldName) {
         var span = headers.AsSpan();
+        string match = fieldName + ":";
         foreach (var line in span.EnumerateLines()) {
-            if (line.StartsWith("Subject:", StringComparison.OrdinalIgnoreCase)) {
-                return line[8..].Trim().ToString();
+            if (line.StartsWith(match, StringComparison.OrdinalIgnoreCase)) {
+                return line[match.Length..].Trim().ToString();
             }
         }
         return "";
     }
 
     private string ExtractFrom(string headers) {
-        var span = headers.AsSpan();
-        foreach (var line in span.EnumerateLines()) {
-            if (line.StartsWith("From:", StringComparison.OrdinalIgnoreCase)) {
-                var from = line[5..].Trim();
-                // Basic email parsing - could be enhanced
-                var fromStr = from.ToString(); // Convert to string for Contains/IndexOf operations
-                if (fromStr.Contains("<") && fromStr.Contains(">")) {
-                    var emailStart = fromStr.IndexOf('<') + 1;
-                    var emailEnd = fromStr.IndexOf('>');
-                    var email = fromStr[emailStart..emailEnd];
-                    var name = fromStr[..fromStr.IndexOf('<')].Trim().Trim('"');
-                    if (email.Contains("@")) {
-                        var parts = email.Split('@');
-                        return $"((\"{EscapeString(name)}\" NIL \"{EscapeString(parts[0])}\" \"{EscapeString(parts[1])}\"))";
-                    }
-                }
-            }
+        var fromStr = ExtractField(headers, "From");
+        if (string.IsNullOrEmpty(fromStr)) {
+            return "NIL";
         }
+
+        var match = EmailAddressRegex().Match(fromStr.Trim());
+        if (!match.Success) {
+            return "NIL";
+        }
+
+        string name, email;
+
+        if (match.Groups[3].Success) {
+            // Simple email format: user@domain.com
+            email = match.Groups[3].Value;
+            name = "";
+        } else {
+            // Name + email format: "Name" <user@domain.com> or Name <user@domain.com>
+            name = match.Groups[1].Value;
+            email = match.Groups[2].Value;
+        }
+
+        if (email.Contains('@')) {
+            var parts = email.Split('@', 2);
+            return $"((\"{EscapeString(name)}\" NIL \"{EscapeString(parts[0])}\" \"{EscapeString(parts[1])}\"))";
+        }
+
         return "NIL";
     }
 
     private string EscapeString(string input) {
-        if (string.IsNullOrEmpty(input)) {
-            return "";
-        }
-        return input.Replace("\"", "\\\"");
+        return string.IsNullOrEmpty(input) ? "" : input.Replace("\"", "\\\"");
     }
 }

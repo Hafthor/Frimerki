@@ -1,3 +1,5 @@
+using System.Reflection;
+using Frimerki.Services.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Frimerki.Server.Controllers;
@@ -6,9 +8,23 @@ namespace Frimerki.Server.Controllers;
 [Route("api/[controller]")]
 public class HealthController : ControllerBase {
     private readonly ILogger<HealthController> _logger;
+    private readonly INowProvider _nowProvider;
 
-    public HealthController(ILogger<HealthController> logger) {
+    // Assembly information - cached at startup since it cannot change during runtime
+    private static readonly string Version;
+    private static readonly string ProductName;
+    private static readonly string Description;
+
+    static HealthController() {
+        var assembly = Assembly.GetEntryAssembly();
+        Version = assembly?.GetName().Version?.ToString() ?? "Unknown";
+        ProductName = assembly?.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? "Frímerki";
+        Description = assembly?.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description ?? "Lightweight Email Server";
+    }
+
+    public HealthController(ILogger<HealthController> logger, INowProvider nowProvider) {
         _logger = logger;
+        _nowProvider = nowProvider;
     }
 
     [HttpGet]
@@ -16,8 +32,8 @@ public class HealthController : ControllerBase {
         var response = new {
             Status = "Healthy",
             Server = "Frímerki Email Server",
-            Version = "1.0.0-alpha",
-            Timestamp = DateTime.UtcNow,
+            Version = Version,
+            Timestamp = _nowProvider.UtcNow,
             Framework = ".NET 8"
         };
 
@@ -28,9 +44,9 @@ public class HealthController : ControllerBase {
     [HttpGet("info")]
     public IActionResult GetServerInfo() {
         var response = new {
-            Name = "Frímerki",
-            Description = "Lightweight Email Server",
-            Version = "1.0.0-alpha",
+            Name = ProductName,
+            Description = Description,
+            Version = Version,
             Framework = ".NET 8",
             Database = "SQLite",
             Protocols = new {

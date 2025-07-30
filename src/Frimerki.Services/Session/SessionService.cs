@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Authentication;
+using Frimerki.Services.Common;
 using Frimerki.Services.User;
 
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public class SessionService : ISessionService {
     private readonly EmailDbContext _context;
     private readonly IUserService _userService;
     private readonly IJwtService _jwtService;
+    private readonly INowProvider _nowProvider;
     private readonly ILogger<SessionService> _logger;
 
     // In-memory storage for refresh tokens (in production, use Redis or database)
@@ -32,10 +34,12 @@ public class SessionService : ISessionService {
         EmailDbContext context,
         IUserService userService,
         IJwtService jwtService,
+        INowProvider nowProvider,
         ILogger<SessionService> logger) {
         _context = context;
         _userService = userService;
         _jwtService = jwtService;
+        _nowProvider = nowProvider;
         _logger = logger;
     }
 
@@ -75,11 +79,12 @@ public class SessionService : ISessionService {
             var expiresAt = _jwtService.GetTokenExpiration(request.RememberMe);
 
             // Store refresh token
+            var now = _nowProvider.UtcNow;
             _refreshTokens[refreshToken] = new RefreshTokenInfo {
                 UserId = user.Id,
                 Email = $"{user.Username}@{user.Domain.Name}",
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddDays(30) // Refresh tokens expire in 30 days
+                CreatedAt = now,
+                ExpiresAt = now.AddDays(30) // Refresh tokens expire in 30 days
             };
 
             _logger.LogInformation("Login successful for user: {Email}", request.Email);
@@ -173,7 +178,7 @@ public class SessionService : ISessionService {
                 return null;
             }
 
-            if (tokenInfo.ExpiresAt < DateTime.UtcNow) {
+            if (tokenInfo.ExpiresAt < _nowProvider.UtcNow) {
                 _logger.LogWarning("Refresh token expired");
                 _refreshTokens.TryRemove(refreshToken, out _);
                 return null;
@@ -208,11 +213,12 @@ public class SessionService : ISessionService {
 
             // Replace old refresh token with new one
             _refreshTokens.TryRemove(refreshToken, out _);
+            var now = _nowProvider.UtcNow;
             _refreshTokens[newRefreshToken] = new RefreshTokenInfo {
                 UserId = user.Id,
                 Email = $"{user.Username}@{user.Domain.Name}",
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddDays(30)
+                CreatedAt = now,
+                ExpiresAt = now.AddDays(30)
             };
 
             _logger.LogInformation("Token refresh successful for user: {Email}", $"{user.Username}@{user.Domain.Name}");
@@ -244,7 +250,7 @@ public class SessionService : ISessionService {
 
     private class RefreshTokenInfo {
         public int UserId { get; set; }
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; } = "";
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
     }

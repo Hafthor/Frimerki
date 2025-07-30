@@ -15,44 +15,39 @@ public class ImapCommandParser {
         List<string> parts = [];
         StringBuilder currentPart = new();
         var inQuotes = false;
-        var inLiteral = false;
         var literalLength = 0;
 
         for (int i = 0; i < trimmed.Length; i++) {
             var ch = trimmed[i];
 
-            if (inLiteral) {
+            if (literalLength > 0) {
                 currentPart.Append(ch);
                 literalLength--;
-                if (literalLength == 0) {
-                    inLiteral = false;
-                }
-                continue;
-            }
-
-            switch (ch) {
-                case '"':
-                    inQuotes = !inQuotes;
-                    break;
-                case ' ' when !inQuotes:
-                    if (currentPart.Length > 0) {
-                        parts.Add(currentPart.ToString());
-                        currentPart.Clear();
-                    }
-                    break;
-                case '{' when !inQuotes:
-                    // Handle literal syntax {length}
-                    var closeBrace = trimmed.IndexOf('}', i);
-                    if (closeBrace > i && int.TryParse(trimmed[(i + 1)..closeBrace], out literalLength)) {
-                        inLiteral = true;
-                        i = closeBrace;
-                    } else {
+            } else if (ch == '"') {
+                inQuotes = !inQuotes;
+            } else if (inQuotes) {
+                currentPart.Append(ch);
+            } else {
+                switch (ch) {
+                    case ' ':
+                        if (currentPart.Length > 0) {
+                            parts.Add(currentPart.ToString());
+                            currentPart.Clear();
+                        }
+                        break;
+                    case '{':
+                        // Handle literal syntax {length}
+                        var closeBrace = trimmed.IndexOf('}', i);
+                        if (closeBrace > i && int.TryParse(trimmed[(i + 1)..closeBrace], out literalLength)) {
+                            i = closeBrace;
+                        } else {
+                            currentPart.Append(ch);
+                        }
+                        break;
+                    default:
                         currentPart.Append(ch);
-                    }
-                    break;
-                default:
-                    currentPart.Append(ch);
-                    break;
+                        break;
+                }
             }
         }
 
@@ -76,11 +71,8 @@ public class ImapCommandParser {
     /// Unquotes a quoted string argument
     /// </summary>
     public string UnquoteString(string quotedString) {
-        if (string.IsNullOrEmpty(quotedString)) {
-            return quotedString;
-        }
-
-        if (quotedString.Length < 2 || !quotedString.StartsWith('"') || !quotedString.EndsWith('"')) {
+        if (string.IsNullOrEmpty(quotedString) ||
+            quotedString.Length < 2 || !quotedString.StartsWith('"') || !quotedString.EndsWith('"')) {
             return quotedString;
         }
 
@@ -106,13 +98,13 @@ public class ImapCommandParser {
                     }
                 }
             } else {
-                var num = part == "*" ? maxSequence : uint.Parse(part);
+                var num = part == "*" ? maxSequence : uint.TryParse(part, out uint partNum) ? partNum : maxSequence;
                 if (num <= maxSequence) {
                     result.Add(num);
                 }
             }
         }
 
-        return result.Distinct().OrderBy(x => x).ToList();
+        return result.Distinct().Order().ToList();
     }
 }

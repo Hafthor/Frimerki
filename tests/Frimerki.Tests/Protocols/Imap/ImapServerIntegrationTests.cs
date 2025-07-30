@@ -347,7 +347,7 @@ public class TestUserService : IUserService {
         return Task.FromResult<User?>(null);
     }
 
-    public Task<UserListResponse> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) =>
+    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) =>
         throw new NotImplementedException();
 
     public Task<UserResponse?> GetUserByEmailAsync(string email) =>
@@ -405,7 +405,7 @@ public class TestFolderService : IFolderService {
 /// Test implementation of IMessageService for testing
 /// </summary>
 public class TestMessageService : IMessageService {
-    public Task<MessageListResponse> GetMessagesAsync(int userId, MessageFilterRequest request) =>
+    public Task<PaginatedInfo<MessageListItemResponse>> GetMessagesAsync(int userId, MessageFilterRequest request) =>
         throw new NotImplementedException();
 
     public Task<MessageResponse?> GetMessageAsync(int userId, int messageId) =>

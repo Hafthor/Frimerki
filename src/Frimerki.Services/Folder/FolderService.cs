@@ -67,7 +67,7 @@ public class FolderService : IFolderService {
 
         // Validate parent folder exists for hierarchical folders
         if (request.Name.Contains(request.Delimiter)) {
-            var parentPath = request.Name.Substring(0, request.Name.LastIndexOf(request.Delimiter));
+            var parentPath = request.Name[..request.Name.LastIndexOf(request.Delimiter)];
             if (!await _context.Folders.AnyAsync(f => f.UserId == userId && f.Name == parentPath)) {
                 throw new InvalidOperationException($"Parent folder '{parentPath}' does not exist");
             }
@@ -135,7 +135,7 @@ public class FolderService : IFolderService {
                 .ToListAsync();
 
             foreach (var child in childFolders) {
-                child.Name = request.Name + child.Name.Substring(folder.Name.Length);
+                child.Name = request.Name + child.Name[folder.Name.Length..];
             }
 
             folder.Name = request.Name;

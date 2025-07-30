@@ -28,6 +28,8 @@ public class Example {
 - Prefer `var` when the type is obvious from context (assignments from method calls, literals)
 - Use meaningful but concise variable and method names
 - **Prefer range indexers over Substring/Slice** - Use `[start..end]` syntax for string slicing
+- **Prefer "" over string.Empty** - Use `""` for empty strings
+- **Prefer ++ and -- over += 1 and -= 1** - Use `counter++` instead of `counter += 1`
 
 ### Formatting Examples
 ```csharp
@@ -84,6 +86,16 @@ var prefix = line[..colonIndex];           // Get everything before colon
 var content = message.Substring(headerEnd + 2);
 var size = literal.Substring(1, literal.Length - 2);
 var prefix = line.Substring(0, colonIndex);
+
+// Preferred - concise increment/decrement
+folder.Exists++;
+folder.Recent++;
+counter--;
+
+// Avoid - verbose increment/decrement
+folder.Exists += 1;
+folder.Recent += 1;
+counter -= 1;
 ```
 
 ## Architecture Patterns
@@ -124,6 +136,7 @@ public class DomainService {
 - Keep DTOs simple and focused
 - Include validation attributes on request DTOs
 - Use descriptive but concise property names
+- Avoid "Smurf-naming" (e.g. `MessageId` instead the `Message` class. Use `Id` instead.)
 
 ```csharp
 public class DomainRequest {
@@ -176,6 +189,7 @@ public async Task<ActionResult<DomainResponse>> GetDomain(string name) {
 - Prefer LINQ method syntax over query syntax
 - Project to DTOs in queries when possible
 - Use `FirstOrDefaultAsync()` instead of `SingleOrDefaultAsync()` unless uniqueness is critical
+- Prefer .Order over .OrderBy when you were going to order by the element itself, i.e. `list.Order(x => x)`
 
 ```csharp
 public async Task<DomainResponse> GetDomainAsync(string name) =>

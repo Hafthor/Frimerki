@@ -7,15 +7,15 @@ public class User {
 
     [Required]
     [MaxLength(255)]
-    public string Username { get; set; } = string.Empty;
+    public string Username { get; set; } = "";
 
     public int DomainId { get; set; }
 
     [Required]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = "";
 
     [Required]
-    public string Salt { get; set; } = string.Empty;
+    public string Salt { get; set; } = "";
 
     [MaxLength(255)]
     public string? FullName { get; set; }

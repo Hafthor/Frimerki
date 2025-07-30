@@ -4,7 +4,7 @@ namespace Frimerki.Models.DTOs.Folder;
 
 public class FolderRequest {
     [Required, StringLength(255)]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     [StringLength(1)]
     public string Delimiter { get; set; } = "/";
@@ -25,7 +25,7 @@ public class FolderUpdateRequest {
 }
 
 public class FolderResponse {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public string Delimiter { get; set; } = "/";
     public string? SystemFolderType { get; set; }
     public string? Attributes { get; set; }
@@ -39,7 +39,7 @@ public class FolderResponse {
 }
 
 public class FolderListResponse {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public string? SystemFolderType { get; set; }
     public string? Attributes { get; set; }
     public bool Subscribed { get; set; }

@@ -9,7 +9,7 @@ public class Folder {
 
     [Required]
     [MaxLength(255)]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     [MaxLength(1)]
     public string Delimiter { get; set; } = "/";

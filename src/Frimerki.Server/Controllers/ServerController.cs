@@ -1,3 +1,4 @@
+using System.Reflection;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Server;
 
@@ -12,6 +13,16 @@ namespace Frimerki.Server.Controllers;
 public class ServerController : ControllerBase {
     private readonly IServerService _serverService;
     private readonly ILogger<ServerController> _logger;
+
+    // Assembly information - cached at startup since it cannot change during runtime
+    private static readonly string ApplicationVersion;
+
+    static ServerController() {
+        var assembly = Assembly.GetEntryAssembly();
+        ApplicationVersion = assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                           ?? assembly?.GetName().Version?.ToString()
+                           ?? "Unknown";
+    }
 
     public ServerController(IServerService serverService, ILogger<ServerController> logger) {
         _serverService = serverService;
@@ -91,7 +102,7 @@ public class ServerController : ControllerBase {
                 page = 1;
             }
 
-            if (pageSize < 1 || pageSize > 1000) {
+            if (pageSize is < 1 or > 1000) {
                 pageSize = 100;
             }
 
@@ -259,7 +270,7 @@ public class ServerController : ControllerBase {
                 Framework = Environment.Version.ToString(),
                 ProcessorCount = Environment.ProcessorCount,
                 WorkingDirectory = Environment.CurrentDirectory,
-                ApplicationVersion = "1.0.0-alpha",
+                ApplicationVersion = ApplicationVersion,
                 StartTime = System.Diagnostics.Process.GetCurrentProcess().StartTime,
                 Uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime
             };

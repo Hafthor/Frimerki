@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace Frimerki.Models.DTOs;
 
 public class ServerStatusResponse {
-    public string Status { get; set; } = string.Empty;
-    public string Version { get; set; } = string.Empty;
+    public string Status { get; set; } = "";
+    public string Version { get; set; } = "";
     public DateTime Uptime { get; set; }
     public ServerStatistics Statistics { get; set; } = new();
     public ServerServices Services { get; set; } = new();
@@ -38,15 +38,15 @@ public class ServiceStatus {
 }
 
 public class ServerHealthResponse {
-    public string Status { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public List<HealthCheck> Checks { get; set; } = new();
+    public string Status { get; set; } = "";
+    public string Message { get; set; } = "";
+    public List<HealthCheck> Checks { get; set; } = [];
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }
 
 public class HealthCheck {
-    public string Name { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
+    public string Status { get; set; } = "";
     public string? Message { get; set; }
     public long ResponseTimeMs { get; set; }
 }
@@ -88,15 +88,15 @@ public class DatabaseMetrics {
 
 public class ServerLogEntry {
     public DateTime Timestamp { get; set; }
-    public string Level { get; set; } = string.Empty;
-    public string Logger { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
+    public string Level { get; set; } = "";
+    public string Logger { get; set; } = "";
+    public string Message { get; set; } = "";
     public string? Exception { get; set; }
     public Dictionary<string, object>? Properties { get; set; }
 }
 
 public class ServerLogsResponse {
-    public List<ServerLogEntry> Logs { get; set; } = new();
+    public List<ServerLogEntry> Logs { get; set; } = [];
     public int TotalCount { get; set; }
     public int PageSize { get; set; }
     public int CurrentPage { get; set; }
@@ -119,17 +119,17 @@ public class BackupRequest {
 }
 
 public class BackupResponse {
-    public string BackupId { get; set; } = string.Empty;
-    public string FileName { get; set; } = string.Empty;
+    public string BackupId { get; set; } = "";
+    public string FileName { get; set; } = "";
     public long SizeBytes { get; set; }
     public DateTime CreatedAt { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } = "";
     public string? DownloadUrl { get; set; }
 }
 
 public class RestoreRequest {
     [Required]
-    public string BackupId { get; set; } = string.Empty;
+    public string BackupId { get; set; } = "";
     public bool RestoreSettings { get; set; } = true;
     public bool RestoreUsers { get; set; } = true;
     public bool RestoreMessages { get; set; } = true;
@@ -137,8 +137,8 @@ public class RestoreRequest {
 }
 
 public class RestoreResponse {
-    public string Status { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
+    public string Status { get; set; } = "";
+    public string Message { get; set; } = "";
     public DateTime StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 }

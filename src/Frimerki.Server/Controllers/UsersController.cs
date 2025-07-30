@@ -23,7 +23,7 @@ public class UsersController : ControllerBase {
     /// List all users (HostAdmin) or domain users (DomainAdmin)
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<UserListResponse>> GetUsers(
+    public async Task<ActionResult<PaginatedInfo<UserResponse>>> GetUsers(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] string? domain = null) {
@@ -31,7 +31,7 @@ public class UsersController : ControllerBase {
             if (page < 1) {
                 page = 1;
             }
-            if (pageSize < 1 || pageSize > 100) {
+            if (pageSize is < 1 or > 100) {
                 pageSize = 50;
             }
 

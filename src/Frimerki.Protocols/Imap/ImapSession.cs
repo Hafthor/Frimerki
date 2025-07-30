@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Frimerki.Models.DTOs;
@@ -6,7 +5,6 @@ using Frimerki.Models.Entities;
 using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
 using Frimerki.Services.User;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Protocols.Imap;
@@ -51,7 +49,7 @@ public class ImapSession {
 
             while (_client.Connected && State != ImapConnectionState.Logout) {
                 var buffer = new byte[8192];
-                var bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
+                var bytesRead = await _stream.ReadAsync(buffer);
 
                 if (bytesRead == 0) {
                     break;
@@ -195,7 +193,7 @@ public class ImapSession {
 
             // Read the authentication data from the client
             var buffer = new byte[1024];
-            var bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
+            var bytesRead = await _stream.ReadAsync(buffer);
             var authData = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
 
             try {
@@ -290,7 +288,7 @@ public class ImapSession {
 
         try {
             // Handle standard folders - in full implementation, use folder service
-            if (folderName.ToUpper() == "INBOX" || folderName.ToUpper() == "DRAFTS") {
+            if (folderName.Equals("INBOX", StringComparison.OrdinalIgnoreCase) || folderName.Equals("DRAFTS", StringComparison.OrdinalIgnoreCase)) {
                 SelectedFolder = folderName.ToUpper();
                 IsReadOnly = readOnly;
                 State = ImapConnectionState.Selected;
@@ -376,7 +374,7 @@ public class ImapSession {
             var mailbox = parts[2].Trim('"');
 
             // Find the literal size at the end
-            var lastPart = parts[parts.Length - 1];
+            var lastPart = parts[^1];
             if (lastPart.StartsWith('{') && lastPart.EndsWith('}')) {
                 var sizeString = lastPart[1..^1];
                 if (int.TryParse(sizeString, out var literalSize)) {
@@ -389,7 +387,7 @@ public class ImapSession {
                     var buffer = new byte[literalSize];
                     var totalRead = 0;
                     while (totalRead < literalSize) {
-                        var bytesRead = await _stream.ReadAsync(buffer, totalRead, literalSize - totalRead);
+                        var bytesRead = await _stream.ReadAsync(buffer.AsMemory(totalRead, literalSize - totalRead));
                         if (bytesRead == 0) {
                             break;
                         }
@@ -402,18 +400,19 @@ public class ImapSession {
                     try {
                         // Create new message using message service
                         var toRecipients = ExtractToRecipientsFromMessage(messageContent);
-                        var toAddress = toRecipients.FirstOrDefault() ?? "unknown@localhost";
+                        var toAddress = toRecipients.FirstOrDefault("unknown@localhost");
+                        var subject = ExtractHeaderValue(messageContent, "Subject") ?? "No Subject";
 
                         _logger.LogInformation("APPEND: Creating message with subject '{Subject}' for mailbox '{Mailbox}'",
-                            ExtractSubjectFromMessage(messageContent), mailbox);
+                            subject, mailbox);
 
                         var messageRequest = new MessageRequest {
-                            Subject = ExtractSubjectFromMessage(messageContent),
+                            Subject = subject,
                             Body = ExtractBodyFromMessage(messageContent),
                             ToAddress = toAddress,
                             CcAddress = toRecipients.Skip(1).FirstOrDefault(),
-                            InReplyTo = ExtractInReplyToFromMessage(messageContent),
-                            References = ExtractReferencesFromMessage(messageContent)
+                            InReplyTo = ExtractHeaderValue(messageContent, "In-Reply-To"),
+                            References = ExtractHeaderValue(messageContent, "References")
                         };
 
                         // Use folder ID 1 for INBOX, 2 for Drafts
@@ -549,9 +548,6 @@ public class ImapSession {
         return null;
     }
 
-    private string ExtractSubjectFromMessage(string messageContent) =>
-        ExtractHeaderValue(messageContent, "Subject") ?? "No Subject";
-
     private string ExtractBodyFromMessage(string messageContent) {
         // Find the empty line that separates headers from body
         var emptyLineIndex = messageContent.IndexOf("\n\n");
@@ -577,15 +573,9 @@ public class ImapSession {
                       .ToList();
     }
 
-    private string? ExtractInReplyToFromMessage(string messageContent) =>
-        ExtractHeaderValue(messageContent, "In-Reply-To");
-
-    private string? ExtractReferencesFromMessage(string messageContent) =>
-        ExtractHeaderValue(messageContent, "References");
-
     private async Task SendResponseAsync(string response) {
         var bytes = Encoding.UTF8.GetBytes(response + "\r\n");
-        await _stream.WriteAsync(bytes, 0, bytes.Length);
+        await _stream.WriteAsync(bytes);
         await _stream.FlushAsync();
         _logger.LogInformation("IMAP Response: {Response}", response);
     }

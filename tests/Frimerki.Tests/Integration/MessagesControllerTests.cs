@@ -182,14 +182,14 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
         // Assert
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<MessageListResponse>(content, new JsonSerializerOptions {
+        var result = JsonSerializer.Deserialize<PaginatedInfo<MessageListItemResponse>>(content, new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true
         });
 
         Assert.NotNull(result);
-        Assert.Single(result.Messages);
-        Assert.Equal("Test Message", result.Messages[0].Subject);
-        Assert.Equal(1, result.Pagination.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal("Test Message", result.Items[0].Subject);
+        Assert.Equal(1, result.TotalCount);
     }
 
     [Fact]
@@ -200,13 +200,13 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
         // Assert
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<MessageListResponse>(content, new JsonSerializerOptions {
+        var result = JsonSerializer.Deserialize<PaginatedInfo<MessageListItemResponse>>(content, new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true
         });
 
         Assert.NotNull(result);
-        Assert.Single(result.Messages);
-        Assert.Contains("folder", result.AppliedFilters.Keys);
+        Assert.Single(result.Items);
+        Assert.Contains("folder", result.AppliedFilters!.Keys);
     }
 
     [Fact]
@@ -217,14 +217,14 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
         // Assert
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<MessageListResponse>(content, new JsonSerializerOptions {
+        var result = JsonSerializer.Deserialize<PaginatedInfo<MessageListItemResponse>>(content, new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true
         });
 
         Assert.NotNull(result);
-        Assert.Equal(0, result.Pagination.Skip);
-        Assert.Equal(10, result.Pagination.Take);
-        Assert.Null(result.Pagination.NextUrl); // Only 1 message, so no next page
+        Assert.Equal(0, result.Skip);
+        Assert.Equal(10, result.Take);
+        Assert.Null(result.NextUrl); // Only 1 message, so no next page
     }
 
     [Fact]

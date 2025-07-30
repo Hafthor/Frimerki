@@ -1,19 +1,20 @@
 using System.ComponentModel.DataAnnotations;
+using MimeKit;
 
 namespace Frimerki.Models.DTOs;
 
 public class MessageRequest {
     [Required, EmailAddress]
-    public string ToAddress { get; set; } = string.Empty;
+    public string ToAddress { get; set; } = "";
 
     public string? CcAddress { get; set; }
     public string? BccAddress { get; set; }
 
     [Required, StringLength(998)]
-    public string Subject { get; set; } = string.Empty;
+    public string Subject { get; set; } = "";
 
     [Required]
-    public string Body { get; set; } = string.Empty;
+    public string Body { get; set; } = "";
 
     public string? BodyHtml { get; set; }
     public bool IsHtml { get; set; } = false;
@@ -24,10 +25,10 @@ public class MessageRequest {
 
 public class MessageAttachmentRequest {
     [Required]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     [Required]
-    public string ContentType { get; set; } = string.Empty;
+    public string ContentType { get; set; } = "";
 
     [Required]
     public byte[] Content { get; set; } = [];
@@ -35,13 +36,13 @@ public class MessageAttachmentRequest {
 
 public class SimpleEmailRequest {
     [Required, EmailAddress]
-    public string To { get; set; } = string.Empty;
+    public string To { get; set; } = "";
 
     [Required, StringLength(998)]
-    public string Subject { get; set; } = string.Empty;
+    public string Subject { get; set; } = "";
 
     [Required]
-    public string Body { get; set; } = string.Empty;
+    public string Body { get; set; } = "";
 }
 
 public class MessageUpdateRequest {
@@ -80,75 +81,76 @@ public class MessageFilterRequest {
 
 public class MessageResponse {
     public int Id { get; set; }
-    public string Subject { get; set; } = string.Empty;
-    public string FromAddress { get; set; } = string.Empty;
-    public string ToAddress { get; set; } = string.Empty;
+    public string Subject { get; set; } = "";
+    public string FromAddress { get; set; } = "";
+    public string ToAddress { get; set; } = "";
     public string? CcAddress { get; set; }
     public string? BccAddress { get; set; }
     public DateTime SentDate { get; set; }
     public DateTime ReceivedAt { get; set; }
     public int MessageSize { get; set; }
-    public string Body { get; set; } = string.Empty;
+    public string Body { get; set; } = "";
     public string? BodyHtml { get; set; }
-    public string Headers { get; set; } = string.Empty;
+    public string Headers { get; set; } = "";
     public MessageEnvelopeResponse Envelope { get; set; } = new();
     public MessageBodyStructureResponse BodyStructure { get; set; } = new();
     public MessageFlagsResponse Flags { get; set; } = new();
-    public List<MessageAttachmentResponse> Attachments { get; set; } = new();
+    public List<MessageAttachmentResponse> Attachments { get; set; } = [];
     public int Uid { get; set; }
     public int UidValidity { get; set; }
     public DateTime InternalDate { get; set; }
     public string? InReplyTo { get; set; }
     public string? References { get; set; }
-    public string Folder { get; set; } = string.Empty;
+    public string Folder { get; set; } = "";
 }
 
 public class MessageListItemResponse {
     public int Id { get; set; }
-    public string Subject { get; set; } = string.Empty;
-    public string FromAddress { get; set; } = string.Empty;
-    public string ToAddress { get; set; } = string.Empty;
+    public string Subject { get; set; } = "";
+    public string FromAddress { get; set; } = "";
+    public string ToAddress { get; set; } = "";
     public DateTime SentDate { get; set; }
     public MessageFlagsResponse Flags { get; set; } = new();
-    public string Folder { get; set; } = string.Empty;
+    public string Folder { get; set; } = "";
     public bool HasAttachments { get; set; }
     public int MessageSize { get; set; }
-    public string MessageSizeFormatted { get; set; } = string.Empty;
+    public string MessageSizeFormatted { get; set; } = "";
 }
 
-public class MessageListResponse {
-    public List<MessageListItemResponse> Messages { get; set; } = new();
-    public MessagePaginationResponse Pagination { get; set; } = new();
-    public Dictionary<string, object> AppliedFilters { get; set; } = new();
-}
-
-public class MessagePaginationResponse {
-    public int Skip { get; set; }
-    public int Take { get; set; }
-    public int TotalCount { get; set; }
-    public string? NextUrl { get; set; }
-}
+// MessageListResponse is now replaced by PaginatedInfo<MessageListItemResponse>
+// MessagePaginationResponse is now replaced by PaginatedInfo<T>
 
 public class MessageEnvelopeResponse {
-    public string Date { get; set; } = string.Empty;
-    public string Subject { get; set; } = string.Empty;
-    public List<MessageAddressResponse> From { get; set; } = new();
-    public List<MessageAddressResponse> ReplyTo { get; set; } = new();
-    public List<MessageAddressResponse> To { get; set; } = new();
-    public List<MessageAddressResponse> Cc { get; set; } = new();
+    public string Date { get; set; } = "";
+    public string Subject { get; set; } = "";
+    public List<MessageAddressResponse> From { get; set; } = [];
+    public List<MessageAddressResponse> ReplyTo { get; set; } = [];
+    public List<MessageAddressResponse> To { get; set; } = [];
+    public List<MessageAddressResponse> Cc { get; set; } = [];
     public List<MessageAddressResponse>? Bcc { get; set; }
     public string? InReplyTo { get; set; }
-    public string MessageId { get; set; } = string.Empty;
+    public string MessageId { get; set; } = "";
 }
 
 public class MessageAddressResponse {
     public string? Name { get; set; }
-    public string Email { get; set; } = string.Empty;
+    public string Email { get; set; } = "";
+
+    public MessageAddressResponse() { }
+
+    public MessageAddressResponse(InternetAddress address) {
+        if (address is MailboxAddress mailbox) {
+            Name = mailbox.Name;
+            Email = mailbox.Address;
+        } else {
+            Email = address.ToString();
+        }
+    }
 }
 
 public class MessageBodyStructureResponse {
-    public string Type { get; set; } = string.Empty;
-    public string Subtype { get; set; } = string.Empty;
+    public string Type { get; set; } = "";
+    public string Subtype { get; set; } = "";
     public List<MessageBodyStructureResponse>? Parts { get; set; }
     public Dictionary<string, string>? Parameters { get; set; }
     public string? ContentId { get; set; }
@@ -164,13 +166,13 @@ public class MessageFlagsResponse {
     public bool Deleted { get; set; }
     public bool Draft { get; set; }
     public bool Recent { get; set; }
-    public List<string> CustomFlags { get; set; } = new();
+    public List<string> CustomFlags { get; set; } = [];
 }
 
 public class MessageAttachmentResponse {
-    public string FileName { get; set; } = string.Empty;
-    public string ContentType { get; set; } = string.Empty;
+    public string FileName { get; set; } = "";
+    public string ContentType { get; set; } = "";
     public int Size { get; set; }
-    public string SizeFormatted { get; set; } = string.Empty;
-    public string Path { get; set; } = string.Empty;
+    public string SizeFormatted { get; set; } = "";
+    public string Path { get; set; } = "";
 }

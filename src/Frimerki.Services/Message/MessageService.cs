@@ -3,6 +3,7 @@ using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
+using Frimerki.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -10,6 +11,7 @@ namespace Frimerki.Services.Message;
 
 public class MessageService : IMessageService {
     private readonly EmailDbContext _context;
+    private readonly INowProvider _nowProvider;
     private readonly ILogger<MessageService> _logger;
 
     // Standard IMAP flag names
@@ -21,7 +23,7 @@ public class MessageService : IMessageService {
     private const string RecentFlag = "\\Recent";
 
     // Standard IMAP flags with their corresponding properties in MessageFlagsRequest
-    private static readonly FrozenDictionary<string, Func<MessageFlagsRequest, bool?>> StandardFlags =
+    public static readonly FrozenDictionary<string, Func<MessageFlagsRequest, bool?>> StandardFlags =
         new Dictionary<string, Func<MessageFlagsRequest, bool?>> {
             [SeenFlag] = req => req.Seen,
             [AnsweredFlag] = req => req.Answered,
@@ -30,12 +32,13 @@ public class MessageService : IMessageService {
             [DraftFlag] = req => req.Draft
         }.ToFrozenDictionary();
 
-    public MessageService(EmailDbContext context, ILogger<MessageService> logger) {
+    public MessageService(EmailDbContext context, INowProvider nowProvider, ILogger<MessageService> logger) {
         _context = context;
+        _nowProvider = nowProvider;
         _logger = logger;
     }
 
-    public async Task<MessageListResponse> GetMessagesAsync(int userId, MessageFilterRequest request) {
+    public async Task<PaginatedInfo<MessageListItemResponse>> GetMessagesAsync(int userId, MessageFilterRequest request) {
         _logger.LogInformation("Getting messages for user {UserId} with filters", userId);
 
         // Validate take parameter
@@ -88,11 +91,11 @@ public class MessageService : IMessageService {
 
         // Apply full-text search
         if (!string.IsNullOrEmpty(request.Q)) {
-            var searchTerm = request.Q.ToLower();
+            var searchTerm = request.Q;
             query = query.Where(um =>
-                (um.Message.Subject != null && um.Message.Subject.ToLower().Contains(searchTerm)) ||
-                (um.Message.Body != null && um.Message.Body.ToLower().Contains(searchTerm)) ||
-                um.Message.FromAddress.ToLower().Contains(searchTerm));
+                (um.Message.Subject != null && um.Message.Subject.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                (um.Message.Body != null && um.Message.Body.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                um.Message.FromAddress.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
         }
 
         // Get total count before pagination
@@ -107,9 +110,9 @@ public class MessageService : IMessageService {
             .Take(take)
             .Select(um => new MessageListItemResponse {
                 Id = um.Message.Id,
-                Subject = um.Message.Subject ?? string.Empty,
+                Subject = um.Message.Subject ?? "",
                 FromAddress = um.Message.FromAddress,
-                ToAddress = um.Message.ToAddress ?? string.Empty,
+                ToAddress = um.Message.ToAddress ?? "",
                 SentDate = um.Message.SentDate ?? um.Message.ReceivedAt,
                 Folder = um.Folder.Name,
                 HasAttachments = um.Message.Attachments.Any(),
@@ -125,14 +128,12 @@ public class MessageService : IMessageService {
             nextUrl = BuildNextUrl(request, request.Skip + take);
         }
 
-        var response = new MessageListResponse {
-            Messages = messages,
-            Pagination = new MessagePaginationResponse {
-                Skip = request.Skip,
-                Take = take,
-                TotalCount = totalCount,
-                NextUrl = nextUrl
-            },
+        var response = new PaginatedInfo<MessageListItemResponse> {
+            Items = messages,
+            Skip = request.Skip,
+            Take = take,
+            TotalCount = totalCount,
+            NextUrl = nextUrl,
             AppliedFilters = BuildAppliedFilters(request)
         };
 
@@ -163,15 +164,15 @@ public class MessageService : IMessageService {
 
         var response = new MessageResponse {
             Id = message.Id,
-            Subject = message.Subject ?? string.Empty,
+            Subject = message.Subject ?? "",
             FromAddress = message.FromAddress,
-            ToAddress = message.ToAddress ?? string.Empty,
+            ToAddress = message.ToAddress ?? "",
             CcAddress = message.CcAddress,
             BccAddress = message.BccAddress,
             SentDate = message.SentDate ?? message.ReceivedAt,
             ReceivedAt = message.ReceivedAt,
             MessageSize = message.MessageSize,
-            Body = message.Body ?? string.Empty,
+            Body = message.Body ?? "",
             BodyHtml = message.BodyHtml,
             Headers = message.Headers,
             Envelope = envelope,
@@ -182,7 +183,7 @@ public class MessageService : IMessageService {
                 ContentType = a.ContentType ?? "application/octet-stream",
                 Size = a.Size ?? 0,
                 SizeFormatted = FormatMessageSize(a.Size ?? 0),
-                Path = a.FilePath ?? string.Empty
+                Path = a.FilePath ?? ""
             }).ToList(),
             Uid = userMessage.Uid,
             UidValidity = message.UidValidity,
@@ -210,7 +211,7 @@ public class MessageService : IMessageService {
 
         // Generate unique UIDs
         var uid = await GetNextUidAsync();
-        var messageId = $"<{Guid.NewGuid()}@{DateTime.UtcNow:yyyyMMddHHmmss}>";
+        var messageId = $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>";
 
         // Create the message
         var message = new Frimerki.Models.Entities.Message {
@@ -224,8 +225,8 @@ public class MessageService : IMessageService {
             BodyHtml = request.BodyHtml,
             Headers = BuildHeaders(messageId, request),
             MessageSize = CalculateMessageSize(request),
-            SentDate = DateTime.UtcNow,
-            ReceivedAt = DateTime.UtcNow,
+            SentDate = _nowProvider.UtcNow,
+            ReceivedAt = _nowProvider.UtcNow,
             InReplyTo = request.InReplyTo,
             References = request.References,
             Uid = uid,
@@ -243,7 +244,7 @@ public class MessageService : IMessageService {
             MessageId = message.Id,
             FolderId = sentFolder.Id,
             Uid = uid,
-            ReceivedAt = DateTime.UtcNow
+            ReceivedAt = _nowProvider.UtcNow
         };
 
         _context.UserMessages.Add(userMessage);
@@ -389,7 +390,7 @@ public class MessageService : IMessageService {
             });
         } else {
             deletedFlag.IsSet = true;
-            deletedFlag.ModifiedAt = DateTime.UtcNow;
+            deletedFlag.ModifiedAt = _nowProvider.UtcNow;
         }
 
         await _context.SaveChangesAsync();
@@ -418,7 +419,7 @@ public class MessageService : IMessageService {
     }
 
     private IQueryable<UserMessage> ApplySorting(IQueryable<UserMessage> query, string sortBy, string sortOrder) {
-        var isDescending = sortOrder.ToLower() == "desc";
+        var isDescending = sortOrder.Equals("desc", StringComparison.OrdinalIgnoreCase);
 
         return sortBy.ToLower() switch {
             "subject" => isDescending
@@ -559,7 +560,7 @@ public class MessageService : IMessageService {
             foreach (var flag in existingCustomFlags) {
                 if (!flagsRequest.CustomFlags.Contains(flag.FlagName)) {
                     flag.IsSet = false;
-                    flag.ModifiedAt = DateTime.UtcNow;
+                    flag.ModifiedAt = _nowProvider.UtcNow;
                 }
             }
 
@@ -584,7 +585,7 @@ public class MessageService : IMessageService {
             });
         } else {
             flag.IsSet = isSet;
-            flag.ModifiedAt = DateTime.UtcNow;
+            flag.ModifiedAt = _nowProvider.UtcNow;
         }
     }
 
@@ -650,7 +651,7 @@ public class MessageService : IMessageService {
     private string BuildHeaders(string messageId, MessageRequest request) {
         var headers = new List<string> {
             $"Message-ID: {messageId}",
-            $"Date: {DateTime.UtcNow:r}",
+            $"Date: {_nowProvider.UtcNow:r}",
             $"From: {request.ToAddress}",
             $"To: {request.ToAddress}",
             $"Subject: {request.Subject}"
@@ -692,18 +693,17 @@ public class MessageService : IMessageService {
 
     private string BuildEnvelopeJson(MessageRequest request, string fromEmail) {
         var envelope = new MessageEnvelopeResponse {
-            Date = DateTime.UtcNow.ToString("r"),
+            Date = _nowProvider.UtcNow.ToString("r"),
             Subject = request.Subject,
             From = new List<MessageAddressResponse> { new() { Email = fromEmail } },
             ReplyTo = new List<MessageAddressResponse> { new() { Email = fromEmail } },
             To = new List<MessageAddressResponse> { new() { Email = request.ToAddress } },
-            MessageId = $"<{Guid.NewGuid()}@{DateTime.UtcNow:yyyyMMddHHmmss}>"
+            MessageId = $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>"
         };
 
         if (!string.IsNullOrEmpty(request.CcAddress)) {
-            envelope.Cc = request.CcAddress.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(email => new MessageAddressResponse { Email = email.Trim() })
-                .ToList();
+            envelope.Cc = [.. request.CcAddress.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(email => new MessageAddressResponse { Email = email.Trim() })];
         }
 
         return JsonSerializer.Serialize(envelope);

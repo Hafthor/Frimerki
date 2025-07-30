@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
@@ -28,6 +29,9 @@ public class ServerService : IServerService {
     private readonly ILogger<ServerService> _logger;
     private static readonly DateTime _startTime = DateTime.UtcNow;
 
+    private static readonly string ApplicationVersion = Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0-alpha";
+
     public ServerService(
         EmailDbContext dbContext,
         IConfiguration configuration,
@@ -44,7 +48,7 @@ public class ServerService : IServerService {
 
             return new ServerStatusResponse {
                 Status = "Running",
-                Version = "1.0.0-alpha",
+                Version = ApplicationVersion,
                 Uptime = _startTime,
                 Statistics = statistics,
                 Services = services

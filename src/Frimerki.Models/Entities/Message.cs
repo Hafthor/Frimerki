@@ -7,11 +7,11 @@ public class Message {
 
     [Required]
     [MaxLength(255)]
-    public string HeaderMessageId { get; set; } = string.Empty;
+    public string HeaderMessageId { get; set; } = "";
 
     [Required]
     [MaxLength(255)]
-    public string FromAddress { get; set; } = string.Empty;
+    public string FromAddress { get; set; } = "";
 
     [MaxLength(255)]
     public string? ToAddress { get; set; }
@@ -23,7 +23,7 @@ public class Message {
     public string? Subject { get; set; }
 
     [Required]
-    public string Headers { get; set; } = string.Empty;
+    public string Headers { get; set; } = "";
 
     public string? Body { get; set; }
 

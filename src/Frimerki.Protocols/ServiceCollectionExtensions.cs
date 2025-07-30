@@ -30,9 +30,9 @@ public static class ServiceCollectionExtensions {
     /// Adds all email protocol services
     /// </summary>
     public static IServiceCollection AddEmailProtocols(this IServiceCollection services) {
-        services.AddImapServer();
-        services.AddSmtpServer();
-        // Future: services.AddPop3Server();
-        return services;
+        return services
+            .AddImapServer()
+            // Future .AddPop3Server();
+            .AddSmtpServer();
     }
 }

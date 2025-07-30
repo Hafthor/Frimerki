@@ -1,6 +1,7 @@
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
+using Frimerki.Services.Common;
 using Frimerki.Services.Message;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,7 @@ public class MessageServiceTests : IDisposable {
     private readonly EmailDbContext _context;
     private readonly MessageService _messageService;
     private readonly Mock<ILogger<MessageService>> _mockLogger;
+    private readonly TestNowProvider _nowProvider;
 
     public MessageServiceTests() {
         var options = new DbContextOptionsBuilder<EmailDbContext>()
@@ -21,7 +23,8 @@ public class MessageServiceTests : IDisposable {
 
         _context = new EmailDbContext(options);
         _mockLogger = new Mock<ILogger<MessageService>>();
-        _messageService = new MessageService(_context, _mockLogger.Object);
+        _nowProvider = new TestNowProvider();
+        _messageService = new MessageService(_context, _nowProvider, _mockLogger.Object);
 
         SeedTestData();
     }
@@ -151,11 +154,11 @@ public class MessageServiceTests : IDisposable {
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result.Messages);
-        Assert.Equal(1, result.Pagination.TotalCount);
-        Assert.Equal("Test Message", result.Messages[0].Subject);
-        Assert.Equal("sender@example.com", result.Messages[0].FromAddress);
-        Assert.Null(result.Pagination.NextUrl); // No more pages
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Test Message", result.Items[0].Subject);
+        Assert.Equal("sender@example.com", result.Items[0].FromAddress);
+        Assert.Null(result.NextUrl); // No more pages
     }
 
     [Fact]
@@ -172,9 +175,9 @@ public class MessageServiceTests : IDisposable {
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result.Messages);
-        Assert.Equal("INBOX", result.Messages[0].Folder);
-        Assert.Contains("folder", result.AppliedFilters.Keys);
+        Assert.Single(result.Items);
+        Assert.Equal("INBOX", result.Items[0].Folder);
+        Assert.Contains("folder", result.AppliedFilters!.Keys);
         Assert.Equal("INBOX", result.AppliedFilters["folder"]);
     }
 
@@ -192,8 +195,8 @@ public class MessageServiceTests : IDisposable {
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result.Messages);
-        Assert.Contains("q", result.AppliedFilters.Keys);
+        Assert.Single(result.Items);
+        Assert.Contains("q", result.AppliedFilters!.Keys);
         Assert.Equal("test", result.AppliedFilters["q"]);
     }
 
@@ -241,12 +244,12 @@ public class MessageServiceTests : IDisposable {
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(25, result.Messages.Count);
-        Assert.Equal(55, result.Pagination.TotalCount);
-        Assert.Equal(0, result.Pagination.Skip);
-        Assert.Equal(25, result.Pagination.Take);
-        Assert.NotNull(result.Pagination.NextUrl);
-        Assert.Contains("skip=25", result.Pagination.NextUrl);
+        Assert.Equal(25, result.Items.Count);
+        Assert.Equal(55, result.TotalCount);
+        Assert.Equal(0, result.Skip);
+        Assert.Equal(25, result.Take);
+        Assert.NotNull(result.NextUrl);
+        Assert.Contains("skip=25", result.NextUrl);
     }
 
     [Fact]

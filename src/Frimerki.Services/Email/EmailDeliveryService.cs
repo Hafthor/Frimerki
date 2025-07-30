@@ -3,6 +3,7 @@ using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
+using Frimerki.Services.Common;
 using Frimerki.Services.User;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -16,14 +17,17 @@ namespace Frimerki.Services.Email;
 public class EmailDeliveryService {
     private readonly EmailDbContext _context;
     private readonly IUserService _userService;
+    private readonly INowProvider _nowProvider;
     private readonly ILogger<EmailDeliveryService> _logger;
 
     public EmailDeliveryService(
         EmailDbContext context,
         IUserService userService,
+        INowProvider nowProvider,
         ILogger<EmailDeliveryService> logger) {
         _context = context;
         _userService = userService;
+        _nowProvider = nowProvider;
         _logger = logger;
     }
 
@@ -102,11 +106,11 @@ public class EmailDeliveryService {
 
             // Generate unique UID for this folder
             var uid = await GetNextUidAsync(inboxFolder);
-            var messageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{DateTime.UtcNow:yyyyMMddHHmmss}>";
+            var messageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>";
 
             // Extract message content
-            var subject = mimeMessage.Subject ?? string.Empty;
-            var textBody = mimeMessage.TextBody ?? string.Empty;
+            var subject = mimeMessage.Subject ?? "";
+            var textBody = mimeMessage.TextBody ?? "";
             var htmlBody = mimeMessage.HtmlBody;
 
             // Build headers from the raw message
@@ -117,15 +121,15 @@ public class EmailDeliveryService {
                 HeaderMessageId = messageId,
                 FromAddress = fromAddress,
                 ToAddress = toAddress,
-                CcAddress = ExtractCcAddresses(mimeMessage),
-                BccAddress = ExtractBccAddresses(mimeMessage),
+                CcAddress = ExtractAddresses(mimeMessage.Cc),
+                BccAddress = ExtractAddresses(mimeMessage.Bcc),
                 Subject = subject,
                 Body = textBody,
                 BodyHtml = htmlBody,
                 Headers = headers,
                 MessageSize = rawMessageData.Length,
                 SentDate = mimeMessage.Date.DateTime,
-                ReceivedAt = DateTime.UtcNow,
+                ReceivedAt = _nowProvider.UtcNow,
                 InReplyTo = mimeMessage.InReplyTo,
                 References = string.Join(" ", mimeMessage.References),
                 Uid = uid,
@@ -143,7 +147,7 @@ public class EmailDeliveryService {
                 MessageId = message.Id,
                 FolderId = inboxFolder.Id,
                 Uid = uid,
-                ReceivedAt = DateTime.UtcNow
+                ReceivedAt = _nowProvider.UtcNow
             };
 
             _context.UserMessages.Add(userMessage);
@@ -159,9 +163,9 @@ public class EmailDeliveryService {
             _context.MessageFlags.Add(recentFlag);
 
             // Update folder statistics
-            inboxFolder.Exists += 1;
-            inboxFolder.Recent += 1;
-            inboxFolder.Unseen += 1; // Since we didn't set \Seen flag
+            inboxFolder.Exists++;
+            inboxFolder.Recent++;
+            inboxFolder.Unseen++; // Since we didn't set \Seen flag
             inboxFolder.UidNext = uid + 1;
 
             await _context.SaveChangesAsync();
@@ -189,53 +193,33 @@ public class EmailDeliveryService {
 
     private string ExtractHeaders(string rawMessageData) {
         // Extract headers from raw message data (everything before first empty line)
-        var lines = rawMessageData.Split('\n');
-        var headerLines = new List<string>();
-
-        foreach (var line in lines) {
-            if (string.IsNullOrWhiteSpace(line.TrimEnd('\r'))) {
-                break; // Empty line marks end of headers
-            }
-            headerLines.Add(line.TrimEnd('\r'));
-        }
+        var headerLines = rawMessageData.Split('\n')
+            .TakeWhile(line => !string.IsNullOrWhiteSpace(line.TrimEnd('\r')))
+            .Select(line => line.TrimEnd('\r'))
+            .ToList();
 
         return string.Join("\r\n", headerLines) + "\r\n";
     }
 
-    private string? ExtractCcAddresses(MimeMessage mimeMessage) {
-        if (mimeMessage.Cc?.Count > 0) {
-            return string.Join(", ", mimeMessage.Cc.Select(addr => addr.ToString()));
+    private string? ExtractAddresses(InternetAddressList? addressList) {
+        if (!(addressList?.Count > 0)) {
+            return null;
         }
-        return null;
-    }
-
-    private string? ExtractBccAddresses(MimeMessage mimeMessage) {
-        if (mimeMessage.Bcc?.Count > 0) {
-            return string.Join(", ", mimeMessage.Bcc.Select(addr => addr.ToString()));
-        }
-        return null;
+        return string.Join(", ", addressList);
     }
 
     private string BuildEnvelopeJson(MimeMessage mimeMessage) {
         var envelope = new MessageEnvelopeResponse {
             Date = mimeMessage.Date.ToString("r"),
-            Subject = mimeMessage.Subject ?? string.Empty,
-            From = mimeMessage.From.Select(addr => new MessageAddressResponse {
-                Email = addr is MailboxAddress mb ? mb.Address : addr.ToString()
-            }).ToList(),
-            ReplyTo = mimeMessage.ReplyTo.Select(addr => new MessageAddressResponse {
-                Email = addr is MailboxAddress mb ? mb.Address : addr.ToString()
-            }).ToList(),
-            To = mimeMessage.To.Select(addr => new MessageAddressResponse {
-                Email = addr is MailboxAddress mb ? mb.Address : addr.ToString()
-            }).ToList(),
-            MessageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{DateTime.UtcNow:yyyyMMddHHmmss}>"
+            Subject = mimeMessage.Subject ?? "",
+            From = [.. mimeMessage.From.Select(addr => new MessageAddressResponse(addr))],
+            ReplyTo = [.. mimeMessage.ReplyTo.Select(addr => new MessageAddressResponse(addr))],
+            To = [.. mimeMessage.To.Select(addr => new MessageAddressResponse(addr))],
+            MessageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>"
         };
 
         if (mimeMessage.Cc?.Count > 0) {
-            envelope.Cc = mimeMessage.Cc.Select(addr => new MessageAddressResponse {
-                Email = addr is MailboxAddress mb ? mb.Address : addr.ToString()
-            }).ToList();
+            envelope.Cc = [.. mimeMessage.Cc.Select(addr => new MessageAddressResponse(addr))];
         }
 
         return JsonSerializer.Serialize(envelope);

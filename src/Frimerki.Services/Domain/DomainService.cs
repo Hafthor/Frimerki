@@ -82,7 +82,7 @@ public class DomainService : IDomainService {
             .Include(d => d.CatchAllUser)
             .Include(d => d.DkimKeys)
             .Include(d => d.Users)
-            .FirstOrDefaultAsync(d => d.Name.ToLower() == domainName.ToLower());
+            .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
         if (domain == null) {
             throw new ArgumentException($"Domain '{domainName}' not found");
@@ -114,7 +114,7 @@ public class DomainService : IDomainService {
     public async Task<DomainResponse> CreateDomainAsync(DomainRequest request) {
         // Check if domain already exists
         var existingDomain = await _dbContext.Domains
-            .FirstOrDefaultAsync(d => d.Name.ToLower() == request.Name.ToLower());
+            .FirstOrDefaultAsync(d => d.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase));
 
         if (existingDomain != null) {
             throw new InvalidOperationException($"Domain '{request.Name}' already exists");
@@ -123,7 +123,7 @@ public class DomainService : IDomainService {
         // Validate catch-all user if specified
         if (!string.IsNullOrEmpty(request.CatchAllUser)) {
             var emailParts = request.CatchAllUser.Split('@');
-            if (emailParts.Length != 2 || emailParts[1].ToLower() != request.Name.ToLower()) {
+            if (emailParts.Length != 2 || !emailParts[1].Equals(request.Name, StringComparison.OrdinalIgnoreCase)) {
                 throw new ArgumentException("Catch-all user must belong to the domain being created");
             }
 
@@ -157,7 +157,7 @@ public class DomainService : IDomainService {
         var domain = await _dbContext.Domains
             .Include(d => d.CatchAllUser)
             .Include(d => d.Users)
-            .FirstOrDefaultAsync(d => d.Name.ToLower() == domainName.ToLower());
+            .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
         if (domain == null) {
             throw new ArgumentException($"Domain '{domainName}' not found");
@@ -169,7 +169,7 @@ public class DomainService : IDomainService {
         if (!string.IsNullOrEmpty(request.Name) && domain.Name != request.Name) {
             // Check if new name already exists
             var existingDomain = await _dbContext.Domains
-                .FirstOrDefaultAsync(d => d.Name.ToLower() == request.Name.ToLower() && d.Id != domain.Id);
+                .FirstOrDefaultAsync(d => d.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase) && d.Id != domain.Id);
 
             if (existingDomain != null) {
                 throw new InvalidOperationException($"Domain '{request.Name}' already exists");
@@ -194,12 +194,12 @@ public class DomainService : IDomainService {
                 hasChanges = true;
             } else {
                 var emailParts = request.CatchAllUser.Split('@');
-                if (emailParts.Length != 2 || emailParts[1].ToLower() != domain.Name.ToLower()) {
+                if (emailParts.Length != 2 || !emailParts[1].Equals(domain.Name, StringComparison.OrdinalIgnoreCase)) {
                     throw new ArgumentException("Catch-all user must belong to this domain");
                 }
 
                 var catchAllUser = await _dbContext.Users
-                    .FirstOrDefaultAsync(u => u.Username.ToLower() == emailParts[0].ToLower() && u.DomainId == domain.Id);
+                    .FirstOrDefaultAsync(u => u.Username.Equals(emailParts[0], StringComparison.OrdinalIgnoreCase) && u.DomainId == domain.Id);
 
                 if (catchAllUser == null) {
                     throw new ArgumentException($"User '{emailParts[0]}' not found in domain '{domain.Name}'");
@@ -222,7 +222,7 @@ public class DomainService : IDomainService {
         var domain = await _dbContext.Domains
             .Include(d => d.Users)
             .Include(d => d.DkimKeys)
-            .FirstOrDefaultAsync(d => d.Name.ToLower() == domainName.ToLower());
+            .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
         if (domain == null) {
             throw new ArgumentException($"Domain '{domainName}' not found");
@@ -242,7 +242,7 @@ public class DomainService : IDomainService {
     public async Task<DkimKeyResponse> GetDkimKeyAsync(string domainName) {
         var domain = await _dbContext.Domains
             .Include(d => d.DkimKeys)
-            .FirstOrDefaultAsync(d => d.Name.ToLower() == domainName.ToLower());
+            .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
         if (domain == null) {
             throw new ArgumentException($"Domain '{domainName}' not found");
@@ -267,7 +267,7 @@ public class DomainService : IDomainService {
     public async Task<DkimKeyResponse> GenerateDkimKeyAsync(string domainName, GenerateDkimKeyRequest request) {
         var domain = await _dbContext.Domains
             .Include(d => d.DkimKeys)
-            .FirstOrDefaultAsync(d => d.Name.ToLower() == domainName.ToLower());
+            .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
         if (domain == null) {
             throw new ArgumentException($"Domain '{domainName}' not found");

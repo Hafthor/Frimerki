@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Frimerki.Models.DTOs;
 
 public class DomainResponse {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
     public bool IsActive { get; set; }
     public string? CatchAllUser { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -18,7 +18,7 @@ public class DomainRequest {
     [StringLength(255)]
     [RegularExpression(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
         ErrorMessage = "Invalid domain name format")]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = "";
 
     public bool IsActive { get; set; } = true;
 
@@ -39,16 +39,16 @@ public class DomainUpdateRequest {
 }
 
 public class DkimKeyInfo {
-    public string Selector { get; set; } = string.Empty;
-    public string PublicKey { get; set; } = string.Empty;
+    public string Selector { get; set; } = "";
+    public string PublicKey { get; set; } = "";
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
 public class DkimKeyResponse {
-    public string Selector { get; set; } = string.Empty;
-    public string PublicKey { get; set; } = string.Empty;
-    public string DnsRecord { get; set; } = string.Empty;
+    public string Selector { get; set; } = "";
+    public string PublicKey { get; set; } = "";
+    public string DnsRecord { get; set; } = "";
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -64,7 +64,7 @@ public class GenerateDkimKeyRequest {
 }
 
 public class DomainListResponse {
-    public List<DomainResponse> Domains { get; set; } = new();
+    public List<DomainResponse> Domains { get; set; } = [];
     public int TotalCount { get; set; }
     public bool CanManageAll { get; set; }
 }

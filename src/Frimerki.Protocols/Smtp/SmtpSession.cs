@@ -52,10 +52,10 @@ public partial class SmtpSession : IDisposable {
 
             string? line;
             while (!cancellationToken.IsCancellationRequested &&
-                   (line = await _reader.ReadLineAsync()) != null) {
+                   (line = await _reader.ReadLineAsync(cancellationToken)) != null) {
 
                 try {
-                    await ProcessCommandAsync(line.Trim());
+                    await ProcessCommandAsync(line.Trim(), cancellationToken);
 
                     if (_state == SmtpSessionState.Quit) {
                         break;
@@ -70,7 +70,7 @@ public partial class SmtpSession : IDisposable {
         }
     }
 
-    private async Task ProcessCommandAsync(string command) {
+    private async Task ProcessCommandAsync(string command, CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(command)) {
             await SendResponseAsync("500 Syntax error, command unrecognized");
             return;
@@ -78,15 +78,15 @@ public partial class SmtpSession : IDisposable {
 
         var parts = command.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         var cmd = parts[0].ToUpperInvariant();
-        var args = parts.Length > 1 ? parts[1] : string.Empty;
+        var args = parts.Length > 1 ? parts[1] : "";
 
         await (cmd switch {
             "HELO" => HandleHeloAsync(args),
             "EHLO" => HandleEhloAsync(args),
-            "AUTH" => HandleAuthAsync(args),
+            "AUTH" => HandleAuthAsync(args, cancellationToken),
             "MAIL" => HandleMailFromAsync(args),
             "RCPT" => HandleRcptToAsync(args),
-            "DATA" => HandleDataAsync(),
+            "DATA" => HandleDataAsync(cancellationToken),
             "RSET" => HandleRsetAsync(),
             "NOOP" => SendResponseAsync("250 OK"),
             "QUIT" => HandleQuitAsync(),
@@ -118,7 +118,7 @@ public partial class SmtpSession : IDisposable {
         await SendResponseAsync("250 ENHANCEDSTATUSCODES");
     }
 
-    private async Task HandleAuthAsync(string args) {
+    private async Task HandleAuthAsync(string args, CancellationToken cancellationToken) {
         if (_state != SmtpSessionState.Ehlo && _state != SmtpSessionState.Helo) {
             await SendResponseAsync("503 Bad sequence of commands");
             return;
@@ -128,16 +128,16 @@ public partial class SmtpSession : IDisposable {
         var mechanism = parts[0].ToUpperInvariant();
 
         await (mechanism switch {
-            "PLAIN" => HandleAuthPlainAsync(parts.Length > 1 ? parts[1] : null),
-            "LOGIN" => HandleAuthLoginAsync(),
+            "PLAIN" => HandleAuthPlainAsync(parts.Length > 1 ? parts[1] : null, cancellationToken),
+            "LOGIN" => HandleAuthLoginAsync(cancellationToken),
             _ => SendResponseAsync("504 Authentication mechanism not supported")
         });
     }
 
-    private async Task HandleAuthPlainAsync(string? credentials) {
+    private async Task HandleAuthPlainAsync(string? credentials, CancellationToken cancellationToken) {
         if (credentials == null) {
             await SendResponseAsync("334 ");
-            credentials = await _reader.ReadLineAsync();
+            credentials = await _reader.ReadLineAsync(cancellationToken);
             if (credentials == null) {
                 await SendResponseAsync("501 Authentication cancelled");
                 return;
@@ -167,10 +167,10 @@ public partial class SmtpSession : IDisposable {
         await SendResponseAsync("535 Authentication failed");
     }
 
-    private async Task HandleAuthLoginAsync() {
+    private async Task HandleAuthLoginAsync(CancellationToken cancellationToken) {
         await SendResponseAsync("334 VXNlcm5hbWU6"); // "Username:" in base64
 
-        var username = await _reader.ReadLineAsync();
+        var username = await _reader.ReadLineAsync(cancellationToken);
         if (username == null) {
             await SendResponseAsync("501 Authentication cancelled");
             return;
@@ -178,7 +178,7 @@ public partial class SmtpSession : IDisposable {
 
         await SendResponseAsync("334 UGFzc3dvcmQ6"); // "Password:" in base64
 
-        var password = await _reader.ReadLineAsync();
+        var password = await _reader.ReadLineAsync(cancellationToken);
         if (password == null) {
             await SendResponseAsync("501 Authentication cancelled");
             return;
@@ -247,7 +247,7 @@ public partial class SmtpSession : IDisposable {
         await SendResponseAsync("250 OK");
     }
 
-    private async Task HandleDataAsync() {
+    private async Task HandleDataAsync(CancellationToken cancellationToken) {
         if (_state != SmtpSessionState.RcptTo) {
             await SendResponseAsync("503 Bad sequence of commands");
             return;
@@ -262,7 +262,7 @@ public partial class SmtpSession : IDisposable {
         _state = SmtpSessionState.Data;
 
         string? line;
-        while ((line = await _reader.ReadLineAsync()) != null) {
+        while ((line = await _reader.ReadLineAsync(cancellationToken)) != null) {
             if (line == ".") {
                 // End of message
                 await ProcessMessageAsync();

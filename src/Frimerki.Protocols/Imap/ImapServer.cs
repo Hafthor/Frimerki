@@ -27,7 +27,7 @@ public class ImapServer : BackgroundService {
         _logger = logger;
         _configuration = configuration;
         _serviceProvider = serviceProvider;
-        _port = _configuration.GetValue<int>("Ports:IMAP", 143);
+        _port = _configuration.GetValue("Ports:IMAP", 143);
     }
 
     /// <summary>

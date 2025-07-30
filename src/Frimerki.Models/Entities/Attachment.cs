@@ -9,7 +9,7 @@ public class Attachment {
 
     [Required]
     [MaxLength(255)]
-    public string FileName { get; set; } = string.Empty;
+    public string FileName { get; set; } = "";
 
     [MaxLength(100)]
     public string? ContentType { get; set; }
@@ -18,7 +18,7 @@ public class Attachment {
 
     [Required]
     [MaxLength(36)]
-    public string FileGuid { get; set; } = string.Empty;
+    public string FileGuid { get; set; } = "";
 
     [MaxLength(10)]
     public string? FileExtension { get; set; }

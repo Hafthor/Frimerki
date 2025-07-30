@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
+using Frimerki.Services.Common;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -13,14 +14,16 @@ namespace Frimerki.Services.User;
 
 public partial class UserService : IUserService {
     private readonly EmailDbContext _context;
+    private readonly INowProvider _nowProvider;
     private readonly ILogger<UserService> _logger;
 
-    public UserService(EmailDbContext context, ILogger<UserService> logger) {
+    public UserService(EmailDbContext context, INowProvider nowProvider, ILogger<UserService> logger) {
         _context = context;
+        _nowProvider = nowProvider;
         _logger = logger;
     }
 
-    public async Task<UserListResponse> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) {
+    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) {
         _logger.LogInformation("Getting users list - Page: {Page}, PageSize: {PageSize}, Domain: {Domain}",
             page, pageSize, domainFilter ?? "All");
 
@@ -33,12 +36,12 @@ public partial class UserService : IUserService {
         }
 
         var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+        var skip = (page - 1) * pageSize;
 
         var users = await query
             .OrderBy(u => u.Domain.Name)
             .ThenBy(u => u.Username)
-            .Skip((page - 1) * pageSize)
+            .Skip(skip)
             .Take(pageSize)
             .ToListAsync();
 
@@ -49,12 +52,11 @@ public partial class UserService : IUserService {
             userResponses.Add(MapToUserResponse(user, stats));
         }
 
-        return new UserListResponse {
-            Users = userResponses,
-            TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize,
-            TotalPages = totalPages
+        return new PaginatedInfo<UserResponse> {
+            Items = userResponses,
+            Skip = skip,
+            Take = pageSize,
+            TotalCount = totalCount
         };
     }
 
@@ -105,7 +107,7 @@ public partial class UserService : IUserService {
             Role = request.Role,
             CanReceive = request.CanReceive,
             CanLogin = request.CanLogin,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = _nowProvider.UtcNow
         };
 
         _context.Users.Add(user);
@@ -251,7 +253,7 @@ public partial class UserService : IUserService {
         }
 
         // Update last login
-        user.LastLogin = DateTime.UtcNow;
+        user.LastLogin = _nowProvider.UtcNow;
         await _context.SaveChangesAsync();
 
         var stats = await GetUserStatsInternalAsync(user.Id);
@@ -274,7 +276,7 @@ public partial class UserService : IUserService {
         }
 
         // Update last login
-        user.LastLogin = DateTime.UtcNow;
+        user.LastLogin = _nowProvider.UtcNow;
         await _context.SaveChangesAsync();
 
         return user;
