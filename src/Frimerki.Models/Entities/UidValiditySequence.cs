@@ -12,6 +12,6 @@ public class UidValiditySequence {
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public Domain Domain { get; set; } = null!;
+    public DomainSettings Domain { get; set; } = null!;
     public ICollection<Message> Messages { get; set; } = new List<Message>();
 }

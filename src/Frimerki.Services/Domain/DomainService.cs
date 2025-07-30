@@ -13,7 +13,7 @@ namespace Frimerki.Services.Domain;
 public interface IDomainService {
     Task<DomainListResponse> GetDomainsAsync(string? userRole = null, int? userDomainId = null);
     Task<DomainResponse> GetDomainByNameAsync(string domainName);
-    Task<DomainResponse> CreateDomainAsync(DomainRequest request);
+    Task<CreateDomainResponse> CreateDomainAsync(DomainRequest request);
     Task<DomainResponse> UpdateDomainAsync(string domainName, DomainUpdateRequest request);
     Task DeleteDomainAsync(string domainName);
     Task<DkimKeyResponse> GetDkimKeyAsync(string domainName);
@@ -22,10 +22,18 @@ public interface IDomainService {
 
 public class DomainService : IDomainService {
     private readonly EmailDbContext _dbContext;
+    private readonly IDomainRegistryService _domainRegistryService;
+    private readonly IDomainDbContextFactory _domainDbFactory;
     private readonly ILogger<DomainService> _logger;
 
-    public DomainService(EmailDbContext dbContext, ILogger<DomainService> logger) {
+    public DomainService(
+        EmailDbContext dbContext,
+        IDomainRegistryService domainRegistryService,
+        IDomainDbContextFactory domainDbFactory,
+        ILogger<DomainService> logger) {
         _dbContext = dbContext;
+        _domainRegistryService = domainRegistryService;
+        _domainDbFactory = domainDbFactory;
         _logger = logger;
     }
 
@@ -53,7 +61,9 @@ public class DomainService : IDomainService {
 
             domainResponses.Add(new DomainResponse {
                 Name = domain.Name,
-                IsActive = domain.IsActive,
+                IsActive = await GetDomainIsActiveAsync(domain.Name),
+                DatabaseName = "", // Will be populated from registry if needed
+                IsDedicated = false, // Will be calculated if needed
                 CatchAllUser = domain.CatchAllUser != null
                     ? $"{domain.CatchAllUser.Username}@{domain.Name}"
                     : null,
@@ -94,7 +104,9 @@ public class DomainService : IDomainService {
 
         return new DomainResponse {
             Name = domain.Name,
-            IsActive = domain.IsActive,
+            IsActive = await GetDomainIsActiveAsync(domain.Name),
+            DatabaseName = "", // Will be populated from registry if needed
+            IsDedicated = false, // Will be calculated if needed
             CatchAllUser = domain.CatchAllUser != null
                 ? $"{domain.CatchAllUser.Username}@{domain.Name}"
                 : null,
@@ -111,13 +123,11 @@ public class DomainService : IDomainService {
         };
     }
 
-    public async Task<DomainResponse> CreateDomainAsync(DomainRequest request) {
-        // Check if domain already exists
-        var existingDomain = await _dbContext.Domains
-            .FirstOrDefaultAsync(d => d.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase));
-
-        if (existingDomain != null) {
-            throw new InvalidOperationException($"Domain '{request.Name}' already exists");
+    public async Task<CreateDomainResponse> CreateDomainAsync(DomainRequest request) {
+        // Check if domain already exists in domain registry
+        var existingRegistry = await _domainRegistryService.GetDomainRegistryAsync(request.Name);
+        if (existingRegistry != null) {
+            throw new InvalidOperationException($"Domain '{request.Name}' is already registered in the domain registry");
         }
 
         // Validate catch-all user if specified
@@ -126,31 +136,53 @@ public class DomainService : IDomainService {
             if (emailParts.Length != 2 || !emailParts[1].Equals(request.Name, StringComparison.OrdinalIgnoreCase)) {
                 throw new ArgumentException("Catch-all user must belong to the domain being created");
             }
-
-            // Note: We'll validate the user exists after domain creation when implementing user management
         }
 
-        var domain = new Models.Entities.Domain {
-            Name = request.Name.ToLower(),
-            IsActive = request.IsActive,
-            CreatedAt = DateTime.UtcNow
-        };
+        var normalizedDomainName = request.Name.ToLower();
 
-        _dbContext.Domains.Add(domain);
-        await _dbContext.SaveChangesAsync();
+        try {
+            // Step 1: Register domain in the domain registry (this creates the domain-specific database)
+            var domainRegistry = await _domainRegistryService.RegisterDomainAsync(
+                normalizedDomainName,
+                request.DatabaseName,
+                request.CreateDatabase);
+            _logger.LogInformation("Domain '{DomainName}' registered in domain registry with database '{DatabaseName}'",
+                normalizedDomainName, domainRegistry.DatabaseName);
 
-        _logger.LogInformation("Domain '{DomainName}' created with ID {DomainId}", domain.Name, domain.Id);
+            // Step 2: Create domain settings in the domain-specific database
+            using var domainContext = await _domainDbFactory.CreateDbContextAsync(normalizedDomainName);
+            var domainSettings = new Models.Entities.DomainSettings {
+                Name = normalizedDomainName,
+                CreatedAt = DateTime.UtcNow
+            };
 
-        return new DomainResponse {
-            Name = domain.Name,
-            IsActive = domain.IsActive,
-            CatchAllUser = request.CatchAllUser,
-            CreatedAt = domain.CreatedAt,
-            UserCount = 0,
-            StorageUsed = 0,
-            HasDkim = false,
-            DkimKey = null
-        };
+            domainContext.DomainSettings.Add(domainSettings);
+            await domainContext.SaveChangesAsync();
+
+            _logger.LogInformation("Domain '{DomainName}' created in domain-specific database with ID {DomainId}",
+                domainSettings.Name, domainSettings.Id);
+
+            // Determine if database is dedicated (only used by this domain)
+            var allDomains = await _domainRegistryService.GetAllDomainsAsync();
+            var isDedicated = allDomains.Count(d => d.DatabaseName == domainRegistry.DatabaseName) == 1;
+
+            return new CreateDomainResponse {
+                Name = domainSettings.Name,
+                DatabaseName = domainRegistry.DatabaseName,
+                IsActive = domainRegistry.IsActive,
+                IsDedicated = isDedicated,
+                CreatedAt = domainSettings.CreatedAt,
+                DatabaseCreated = request.CreateDatabase || request.DatabaseName == null,
+                InitialSetup = new InitialSetupInfo {
+                    AdminUserCreated = false,
+                    DefaultFoldersCreated = true,
+                    DkimKeysGenerated = false
+                }
+            };
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Failed to create domain '{DomainName}'", normalizedDomainName);
+            throw;
+        }
     }
 
     public async Task<DomainResponse> UpdateDomainAsync(string domainName, DomainUpdateRequest request) {
@@ -180,9 +212,9 @@ public class DomainService : IDomainService {
             _logger.LogInformation("Domain '{DomainName}' name changed to '{NewName}'", domainName, request.Name);
         }
 
-        // Update IsActive if provided
-        if (request.IsActive.HasValue && domain.IsActive != request.IsActive.Value) {
-            domain.IsActive = request.IsActive.Value;
+        // Update IsActive if provided - this updates the global registry, not domain settings
+        if (request.IsActive.HasValue) {
+            await _domainRegistryService.SetDomainActiveAsync(domainName, request.IsActive.Value);
             hasChanges = true;
             _logger.LogInformation("Domain '{DomainName}' IsActive changed to {IsActive}", domainName, request.IsActive.Value);
         }
@@ -331,26 +363,32 @@ public class DomainService : IDomainService {
     private static (string privateKey, string publicKey) GenerateRsaKeyPair(int keySize) {
         using var rsa = RSA.Create(keySize);
 
-        // Export private key in PKCS#8 format
-        var privateKeyBytes = rsa.ExportPkcs8PrivateKey();
-        var privateKey = Convert.ToBase64String(privateKeyBytes);
-
         // Export public key for DKIM (remove headers and newlines)
         var publicKeyInfo = rsa.ExportRSAPublicKey();
         var publicKey = Convert.ToBase64String(publicKeyInfo);
 
-        // Format private key with PEM headers
-        var formattedPrivateKey = $"-----BEGIN PRIVATE KEY-----\n{FormatBase64(privateKey)}\n-----END PRIVATE KEY-----";
+        // Export private key in PKCS#8 format
+        var privateKeyBytes = rsa.ExportPkcs8PrivateKey();
+        var privateKey = Convert.ToBase64String(privateKeyBytes);
+        var formattedPrivateKey = FormatBase64PrivateKey(privateKey);
 
         return (formattedPrivateKey, publicKey);
     }
 
-    private static string FormatBase64(string base64String) {
+    // Format private key with PEM headers
+    private static string FormatBase64PrivateKey(string base64String) {
         StringBuilder result = new();
+        result.AppendLine("-----BEGIN PRIVATE KEY-----");
         for (int i = 0; i < base64String.Length; i += 64) {
             var length = Math.Min(64, base64String.Length - i);
             result.AppendLine(base64String.Substring(i, length));
         }
-        return result.ToString().Trim();
+        result.Append("-----END PRIVATE KEY-----");
+        return result.ToString();
+    }
+
+    private async Task<bool> GetDomainIsActiveAsync(string domainName) {
+        var domainRegistry = await _domainRegistryService.GetDomainRegistryAsync(domainName);
+        return domainRegistry?.IsActive ?? false;
     }
 }

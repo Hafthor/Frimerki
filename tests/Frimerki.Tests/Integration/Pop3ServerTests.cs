@@ -46,10 +46,9 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
 
-        var domain = new Domain {
+        var domain = new DomainSettings {
             Id = 1,
             Name = "test.com",
-            IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
 

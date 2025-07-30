@@ -4,6 +4,7 @@ using System.Text;
 using Frimerki.Data;
 using Frimerki.Protocols;
 using Frimerki.Server;
+using Frimerki.Server.Middleware;
 using Frimerki.Services;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -56,7 +57,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Configure Entity Framework
+// Configure Entity Framework - Global Database
+builder.Services.AddDbContext<GlobalDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("GlobalConnection") ?? "Data Source=frimerki_global.db"));
+
+// Configure Entity Framework - Legacy single database (for migration period)
 builder.Services.AddDbContext<EmailDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -77,6 +82,9 @@ if (app.Environment.IsDevelopment()) {
 // Serve static files from wwwroot
 app.UseStaticFiles();
 
+// Add domain context middleware
+app.UseDomainContext();
+
 app.UseRouting();
 
 app.UseAuthentication();
@@ -91,11 +99,17 @@ app.MapFallbackToFile("index.html");
 try {
     Log.Information("Starting Frímerki Email Server");
 
-    // Ensure database is created
+    // Ensure databases are created
     using (var scope = app.Services.CreateScope()) {
-        var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
-        context.Database.EnsureCreated();
-        Log.Information("Database initialized successfully");
+        // Initialize global database
+        var globalContext = scope.ServiceProvider.GetRequiredService<GlobalDbContext>();
+        await globalContext.Database.EnsureCreatedAsync();
+        Log.Information("Global database initialized successfully");
+
+        // Keep legacy database for migration period
+        var emailContext = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+        emailContext.Database.EnsureCreated();
+        Log.Information("Legacy email database initialized successfully");
     }
 
     app.Run();

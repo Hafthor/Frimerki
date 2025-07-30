@@ -27,10 +27,9 @@ public class FolderServiceTests : IDisposable {
     }
 
     private void SeedTestData() {
-        var domain = new Domain {
+        var domain = new DomainSettings {
             Id = 1,
             Name = "example.com",
-            IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
 

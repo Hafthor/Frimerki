@@ -38,7 +38,7 @@
    # Create a domain
    curl -X POST http://localhost:5000/api/domains \
      -H "Content-Type: application/json" \
-     -d '{"name": "example.com", "isActive": true}'
+     -d '{"name": "example.com"}'
 
    # Create a user
    curl -X POST http://localhost:5000/api/users \
@@ -71,7 +71,7 @@ Frimerki/
 ├── tests/
 │   └── Frimerki.Tests/       # Comprehensive test suite (113 tests)
 ├── Frimerki.sln             # Solution file
-└── specification.md         # Full technical specification
+└── SPECIFICATION.md         # Full technical specification
 ```
 
 ## 📧 Email Protocol Support
@@ -182,7 +182,7 @@ dotnet watch test
 
 ## 📖 Documentation
 
-- [Full Specification](specification.md) - Complete technical specification
+- [Full Specification](SPECIFICATION.md) - Complete technical specification
 - [API Documentation](http://localhost:5000/swagger) - Interactive API docs (when running)
 
 ## 🌟 Why Frímerki?

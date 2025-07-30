@@ -5,6 +5,7 @@ using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Server;
+using Frimerki.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,23 +13,70 @@ using Xunit;
 
 namespace Frimerki.Tests.Integration;
 
+// Test implementation of IDomainDbContextFactory for integration tests
+public class TestDomainDbContextFactory : IDomainDbContextFactory {
+    private readonly string _databaseName;
+
+    public TestDomainDbContextFactory(string databaseName) {
+        _databaseName = databaseName;
+    }
+
+    public DomainDbContext CreateDbContext(string domainName) {
+        var options = new DbContextOptionsBuilder<DomainDbContext>()
+            .UseInMemoryDatabase(_databaseName)
+            .Options;
+        return new DomainDbContext(options, domainName);
+    }
+
+    public Task<DomainDbContext> CreateDbContextAsync(string domainName) {
+        return Task.FromResult(CreateDbContext(domainName));
+    }
+
+    public string GetDatabasePath(string domainName) {
+        return _databaseName;
+    }
+
+    public Task EnsureDatabaseExistsAsync(string domainName) {
+        return Task.CompletedTask;
+    }
+}
+
 public class SessionControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly string _databaseName;
+    private readonly string _globalDatabaseName;
+    private readonly string _domainDatabaseName;
 
     public SessionControllerTests(WebApplicationFactory<Program> factory) {
-        _databaseName = "TestDatabase_" + Guid.NewGuid();
+        _globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
+        _domainDatabaseName = "DomainTestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
             builder.ConfigureServices(services => {
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
-                if (descriptor != null) {
-                    services.Remove(descriptor);
+                // Remove existing DbContext registrations
+                var globalDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<GlobalDbContext>));
+                if (globalDescriptor != null) {
+                    services.Remove(globalDescriptor);
                 }
 
+                var emailDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
+                if (emailDescriptor != null) {
+                    services.Remove(emailDescriptor);
+                }
+
+                // Add test databases
+                services.AddDbContext<GlobalDbContext>(options => {
+                    options.UseInMemoryDatabase(_globalDatabaseName);
+                });
+
+                // Add legacy EmailDbContext for services that still use it
                 services.AddDbContext<EmailDbContext>(options => {
-                    options.UseInMemoryDatabase(_databaseName);
+                    options.UseInMemoryDatabase(_domainDatabaseName);
+                });
+
+                // Override the domain DB context factory for testing
+                services.AddSingleton<IDomainDbContextFactory>(provider => {
+                    return new TestDomainDbContextFactory(_domainDatabaseName);
                 });
             });
         });
@@ -40,12 +88,24 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
 
     private void SeedTestData() {
         using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
 
-        var domain = new Domain {
+        // First, set up the global database with domain registry
+        var globalContext = scope.ServiceProvider.GetRequiredService<GlobalDbContext>();
+        var domainRegistry = new DomainRegistry {
+            Name = "example.com",
+            DatabaseName = _domainDatabaseName,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        globalContext.DomainRegistry.Add(domainRegistry);
+        globalContext.SaveChanges();
+
+        // Set up the legacy EmailDbContext that services still use
+        var emailContext = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+
+        var domain = new DomainSettings {
             Id = 1,
             Name = "example.com",
-            IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -71,9 +131,9 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
             Domain = domain
         };
 
-        context.Domains.Add(domain);
-        context.Users.Add(user);
-        context.SaveChanges();
+        emailContext.Domains.Add(domain);
+        emailContext.Users.Add(user);
+        emailContext.SaveChanges();
     }
 
     [Fact]

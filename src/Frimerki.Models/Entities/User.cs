@@ -33,7 +33,7 @@ public class User {
     public DateTime? LastLogin { get; set; }
 
     // Navigation properties
-    public Domain Domain { get; set; } = null!;
+    public DomainSettings Domain { get; set; } = null!;
     public ICollection<Folder> Folders { get; set; } = new List<Folder>();
     public ICollection<UserMessage> UserMessages { get; set; } = new List<UserMessage>();
     public ICollection<MessageFlag> MessageFlags { get; set; } = new List<MessageFlag>();

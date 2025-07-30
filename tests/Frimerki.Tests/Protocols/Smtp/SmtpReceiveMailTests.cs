@@ -69,10 +69,9 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
 
     private async Task InitializeTestData() {
         // Add test domain
-        var domain = new Domain {
+        var domain = new DomainSettings {
             Id = 1,
             Name = "example.com",
-            IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
 

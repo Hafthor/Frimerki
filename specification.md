@@ -45,8 +45,10 @@ This document outlines the specification for Frímerki, a lightweight, self-cont
    - Real-time notifications (SignalR)
 
 3. **Data Layer**
-   - SQLite database
-   - Entity Framework Core
+   - Multi-database architecture with SQLite
+   - Global database for server-wide settings (domain registry)
+   - Domain-specific databases for email data and user management
+   - Entity Framework Core with separate contexts
    - Repository pattern
 
 4. **Security Layer**
@@ -60,6 +62,156 @@ This document outlines the specification for Frímerki, a lightweight, self-cont
    - User account management
    - Security settings
 
+## Database Architecture
+
+Frímerki uses a **multi-database architecture** to efficiently manage server-wide settings and domain-specific data:
+
+### Global Database (`frimerki_global.db`)
+Contains server-wide configuration and domain registry:
+
+#### DomainRegistry
+```sql
+CREATE TABLE DomainRegistry (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique domain identifier
+    Name TEXT NOT NULL UNIQUE,                               -- Domain name (e.g., example.com)
+    DatabaseName TEXT NOT NULL,                              -- Database filename for this domain (e.g., 'domain_example_com' or 'shared_small_domains')
+    IsActive BOOLEAN DEFAULT 1,                              -- Whether domain accepts mail (HostAdmin control)
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Domain creation timestamp
+);
+```
+
+**Database Naming Strategy:**
+- **Default**: Each domain gets its own database (e.g., `frimerki_domain_example_com.db`)
+- **Shared**: Multiple domains can share a database (e.g., `frimerki_shared_small_domains.db`)
+- **Custom**: Flexible naming for specific organizational needs
+
+**Registry Caching:**
+- In-memory cache of domain-to-database mappings for performance
+- Cache invalidation when DomainRegistry is modified
+- Fallback to direct database lookup if cache miss occurs
+
+#### Users (Global HostAdmin Accounts)
+```sql
+CREATE TABLE Users (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique user identifier
+    Username TEXT NOT NULL UNIQUE,                           -- Username for HostAdmin accounts
+    Email TEXT NOT NULL UNIQUE,                              -- Full email (username@frimerki.local)
+    PasswordHash TEXT NOT NULL,                              -- BCrypt hashed password
+    Salt TEXT NOT NULL,                                      -- Salt used for password hashing
+    FullName TEXT,                                           -- User's display name
+    Role TEXT NOT NULL DEFAULT 'HostAdmin',                  -- Always 'HostAdmin' in global database
+    CanLogin BOOLEAN DEFAULT 1,                              -- Whether user can log in
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Account creation timestamp
+    LastLogin DATETIME                                       -- Last successful login timestamp
+);
+```
+
+**Note**: Global Users table is specifically for HostAdmin accounts with emails like `admin@frimerki.local`. Domain-specific user accounts are stored in their respective domain databases.
+
+### Domain-Specific Databases (`frimerki_domain_{database_name}.db`)
+Each domain references a database containing users, messages, and settings. Multiple domains can share the same database, or each domain can have its own dedicated database:
+
+### Architecture Benefits
+- **Separation of Concerns**: Server-level operations (domain activation) separate from domain-specific data
+- **Administrative Isolation**: HostAdmin accounts stored globally (e.g., `admin@frimerki.local`), domain users stored per-domain
+- **Flexible Database Grouping**: Domains can share databases for efficiency or have dedicated databases for isolation
+- **Scalability**: Domain data can be distributed across multiple databases based on size and usage patterns
+- **Security**: Domain administrators cannot access server-wide settings or other domains (even when sharing databases)
+- **Performance**: Optimized database sizing - small domains can share resources, large domains get dedicated databases
+- **Migration Flexibility**: Domains can be moved between databases by updating the registry
+- **Cost Optimization**: Hosting providers can balance resource usage across shared and dedicated databases
+
+### Domain-to-Database Resolution Implementation
+
+The flexible database architecture requires a domain resolution system that maps domains to their respective databases:
+
+#### Domain Resolution Service
+```csharp
+public interface IDomainResolver {
+    Task<string> GetDatabaseNameAsync(string domain);
+    Task InvalidateCacheAsync(string domain = null);
+}
+
+public class DomainResolver : IDomainResolver {
+    private readonly IMemoryCache _cache;
+    private readonly GlobalDbContext _globalContext;
+
+    public async Task<string> GetDatabaseNameAsync(string domain) {
+        return await _cache.GetOrCreateAsync($"domain:{domain}", async entry => {
+            entry.SlidingExpiration = TimeSpan.FromHours(1);
+            entry.Size = 1; // For cache size management
+
+            return await _globalContext.DomainRegistry
+                .Where(d => d.Name == domain && d.IsActive)
+                .Select(d => d.DatabaseName)
+                .FirstOrDefaultAsync();
+        });
+    }
+
+    public async Task InvalidateCacheAsync(string domain = null) {
+        if (domain != null) {
+            _cache.Remove($"domain:{domain}");
+        } else {
+            // Clear all domain cache entries
+            _cache.Remove("domain");
+        }
+    }
+}
+```
+
+#### Database Context Factory
+```csharp
+public interface IDomainDbContextFactory {
+    Task<DomainDbContext> CreateContextAsync(string domain);
+}
+
+public class DomainDbContextFactory : IDomainDbContextFactory {
+    private readonly IDomainResolver _domainResolver;
+    private readonly IConfiguration _configuration;
+
+    public async Task<DomainDbContext> CreateContextAsync(string domain) {
+        var databaseName = await _domainResolver.GetDatabaseNameAsync(domain);
+        if (databaseName == null) {
+            throw new InvalidOperationException($"Domain '{domain}' not found or inactive");
+        }
+
+        var basePath = _configuration["Database:DomainDatabasePath"];
+        var connectionString = $"Data Source={Path.Combine(basePath, $"frimerki_{databaseName}.db")}";
+
+        var options = new DbContextOptionsBuilder<DomainDbContext>()
+            .UseSqlite(connectionString)
+            .Options;
+
+        return new DomainDbContext(options);
+    }
+}
+```
+
+#### Usage Examples
+```csharp
+// Get messages for a specific domain
+public async Task<List<Message>> GetMessagesAsync(string domain, int userId) {
+    using var context = await _domainDbContextFactory.CreateContextAsync(domain);
+    return await context.Messages
+        .Where(m => m.Users.Any(u => u.UserId == userId))
+        .ToListAsync();
+}
+
+// Domain administration - move domain to different database
+public async Task MoveDomainAsync(string domain, string newDatabaseName) {
+    // 1. Export domain data from current database
+    // 2. Import domain data to new database
+    // 3. Update DomainRegistry.DatabaseName
+    // 4. Invalidate cache
+
+    await _globalContext.DomainRegistry
+        .Where(d => d.Name == domain)
+        .ExecuteUpdateAsync(d => d.SetProperty(x => x.DatabaseName, newDatabaseName));
+
+    await _domainResolver.InvalidateCacheAsync(domain);
+}
+```
+
 ## Database Schema
 
 ### Core Tables
@@ -69,7 +221,7 @@ This document outlines the specification for Frímerki, a lightweight, self-cont
 CREATE TABLE Users (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique user identifier
     Username TEXT NOT NULL,                                  -- Username part of email address (before @)
-    DomainId INTEGER NOT NULL,                               -- Foreign key to Domains table
+    DomainId INTEGER NOT NULL,                               -- Foreign key to DomainSettings table
     PasswordHash TEXT NOT NULL,                              -- BCrypt hashed password
     Salt TEXT NOT NULL,                                      -- Salt used for password hashing
     FullName TEXT,                                           -- User's display name
@@ -78,27 +230,32 @@ CREATE TABLE Users (
     CanLogin BOOLEAN DEFAULT 1,                              -- Whether user can log in to services
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Account creation timestamp
     LastLogin DATETIME,                                      -- Last successful login timestamp
-    FOREIGN KEY (DomainId) REFERENCES Domains(Id),
+    FOREIGN KEY (DomainId) REFERENCES DomainSettings(Id),
     UNIQUE(Username, DomainId)                               -- Unique username per domain
 );
 ```
 
 **Role Enum Values:**
-- `"User"` - Regular email user with access to their own emails and folders
-- `"DomainAdmin"` - Can manage users within their domain only
-- `"HostAdmin"` - Can manage all domains, users, and server settings
+- `"User"` - Regular email user with access to their own emails and folders (stored in domain-specific database)
+- `"DomainAdmin"` - Can manage users within their domain only (stored in domain-specific database)
+- `"HostAdmin"` - Can manage all domains, users, and server settings (stored in global database with `@frimerki.local` email)
 
-#### Domains
+#### DomainSettings
 ```sql
-CREATE TABLE Domains (
+CREATE TABLE DomainSettings (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,                    -- Unique domain identifier
     Name TEXT NOT NULL UNIQUE,                               -- Domain name (e.g., example.com)
-    IsActive BOOLEAN DEFAULT 1,                              -- Whether domain accepts mail
     CatchAllUserId INTEGER DEFAULT NULL,                     -- Optional catch-all user for unmatched addresses
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Domain creation timestamp
     FOREIGN KEY (CatchAllUserId) REFERENCES Users(Id)
 );
 ```
+
+**Important Notes**:
+- When domains share a database, this table contains **multiple records** (one per domain)
+- When a domain has its own dedicated database, this table contains exactly **one record**
+- The `IsActive` setting is managed in the global database's `DomainRegistry` table by the HostAdmin, while domain-specific settings like `CatchAllUserId` are managed within each domain's database
+- The table name reflects its purpose as a domain-specific settings store
 
 #### Messages
 ```sql
@@ -145,7 +302,7 @@ CREATE TABLE UidValiditySequence (
     DomainId INTEGER NOT NULL,                               -- Domain this sequence belongs to
     Value INTEGER NOT NULL DEFAULT 1,                        -- Current UIDVALIDITY value
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- When this UIDVALIDITY was created
-    FOREIGN KEY (DomainId) REFERENCES Domains(Id),
+    FOREIGN KEY (DomainId) REFERENCES DomainSettings(Id),
     UNIQUE(DomainId, Value)                                  -- One UIDVALIDITY per domain
 );
 ```
@@ -239,7 +396,7 @@ CREATE TABLE DKIMKeys (
     PublicKey TEXT NOT NULL,                                 -- RSA public key for DNS TXT record
     IsActive BOOLEAN DEFAULT 1,                              -- Whether this key is active for signing
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,            -- Key creation timestamp
-    FOREIGN KEY (DomainId) REFERENCES Domains(Id),
+    FOREIGN KEY (DomainId) REFERENCES DomainSettings(Id),
     UNIQUE(DomainId, Selector)                               -- One selector per domain
 );
 ```
@@ -494,6 +651,95 @@ PATCH  /api/domains/{domainname}            - Partially update domain (HostAdmin
 DELETE /api/domains/{domainname}            - Delete domain (HostAdmin only)
 GET    /api/domains/{domainname}/dkim       - Get DKIM public key for DNS setup
 POST   /api/domains/{domainname}/dkim       - Generate new DKIM key pair
+POST   /api/domains/{domainname}/move       - Move domain to different database (HostAdmin only)
+GET    /api/databases                       - List all domain databases with statistics (HostAdmin only)
+GET    /api/databases/{databasename}        - Get database details and domain list (HostAdmin only)
+```
+
+**New Database Management Features:**
+- **Domain Migration**: `POST /api/domains/{domainname}/move` allows moving domains between databases
+- **Database Statistics**: View which domains share databases and their resource usage
+- **Flexible Assignment**: New domains can be assigned to existing shared databases or get dedicated ones
+
+#### POST /api/domains - Create New Domain
+
+**Request Body Options:**
+
+**Option 1: Dedicated Database (Default)**
+```json
+{
+  "name": "newcorp.com"
+  // databaseName will be auto-generated as "domain_newcorp_com"
+  // Database will be created automatically
+}
+```
+
+**Option 2: Use Existing Shared Database**
+```json
+{
+  "name": "smallbiz.net",
+  "databaseName": "shared_small_domains"
+  // Will fail if database doesn't exist
+}
+```
+
+**Option 3: Create New Shared Database**
+```json
+{
+  "name": "startup.io",
+  "databaseName": "shared_tech_startups",
+  "createDatabase": true
+  // Will create the database, fails if it already exists
+}
+```
+
+**Response Examples:**
+
+**Success Response (201 Created):**
+```json
+{
+  "name": "newcorp.com",
+  "databaseName": "domain_newcorp_com",
+  "isActive": true,
+  "isDedicated": true,
+  "createdAt": "2025-07-30T14:30:00Z",
+  "databaseCreated": true,
+  "initialSetup": {
+    "adminUserCreated": false,
+    "defaultFoldersCreated": true,
+    "dkimKeysGenerated": false
+  }
+}
+```
+
+**Error Response (409 Conflict - Domain Exists):**
+```json
+{
+  "error": "DomainAlreadyExists",
+  "message": "Domain 'newcorp.com' already exists",
+  "details": {
+    "existingDomain": "newcorp.com",
+    "currentDatabase": "domain_newcorp_com"
+  }
+}
+```
+
+**Error Response (400 Bad Request - Database Not Found):**
+```json
+{
+  "error": "DatabaseNotFound",
+  "message": "Database 'shared_small_domains' does not exist",
+  "suggestion": "Set 'createDatabase' to true to create the database"
+}
+```
+
+**Error Response (409 Conflict - Database Already Exists):**
+```json
+{
+  "error": "DatabaseAlreadyExists",
+  "message": "Database 'shared_tech_startups' already exists",
+  "suggestion": "Remove 'createDatabase' flag to use existing database or choose a different name"
+}
 ```
 
 ### Server Management (HostAdmin)
@@ -641,6 +887,101 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
 }
 ```
 
+### Domain Management Response Examples
+
+#### GET /api/domains Response
+```json
+{
+  "domains": [
+    {
+      "name": "bigcorp.com",
+      "databaseName": "domain_bigcorp_com",
+      "isActive": true,
+      "userCount": 500,
+      "messageCount": 25000,
+      "storageUsed": 5368709120,
+      "isDedicated": true,
+      "createdAt": "2025-01-15T10:30:00Z"
+    },
+    {
+      "name": "smallbiz.com",
+      "databaseName": "shared_small_domains",
+      "isActive": true,
+      "userCount": 5,
+      "messageCount": 150,
+      "storageUsed": 15728640,
+      "isDedicated": false,
+      "createdAt": "2025-02-20T14:15:00Z"
+    },
+    {
+      "name": "startup.com",
+      "databaseName": "shared_small_domains",
+      "isActive": true,
+      "userCount": 8,
+      "messageCount": 320,
+      "storageUsed": 31457280,
+      "isDedicated": false,
+      "createdAt": "2025-03-10T09:45:00Z"
+    }
+  ]
+}
+```
+
+#### GET /api/databases Response
+```json
+{
+  "databases": [
+    {
+      "name": "domain_bigcorp_com",
+      "filePath": "./data/domains/frimerki_domain_bigcorp_com.db",
+      "fileSize": 5368709120,
+      "domains": ["bigcorp.com"],
+      "totalUsers": 500,
+      "totalMessages": 25000,
+      "isDedicated": true,
+      "createdAt": "2025-01-15T10:30:00Z"
+    },
+    {
+      "name": "shared_small_domains",
+      "filePath": "./data/domains/frimerki_shared_small_domains.db",
+      "fileSize": 52428800,
+      "domains": ["smallbiz.com", "startup.com", "family.org"],
+      "totalUsers": 23,
+      "totalMessages": 850,
+      "isDedicated": false,
+      "createdAt": "2025-02-20T14:15:00Z"
+    }
+  ],
+  "totalSize": 5421137920,
+  "totalDomains": 4,
+  "totalUsers": 523,
+  "totalMessages": 25850
+}
+```
+
+#### POST /api/domains/{domainname}/move Request/Response
+```json
+// Request
+{
+  "targetDatabaseName": "shared_medium_domains",
+  "createIfNotExists": true
+}
+
+// Response
+{
+  "success": true,
+  "domain": "example.com",
+  "previousDatabase": "shared_small_domains",
+  "newDatabase": "shared_medium_domains",
+  "migrationDetails": {
+    "usersMigrated": 12,
+    "messagesMigrated": 450,
+    "attachmentsMigrated": 23,
+    "migrationTimeMs": 2500
+  }
+}
+```
+
 ## Security Features
 
 ### Encryption
@@ -649,9 +990,12 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
 - **Perfect Forward Secrecy**: Modern cipher suites
 
 ### Authentication
-- **Password Hashing**: BCrypt with salt
+- **Password Hashing**: BCrypt with salt for all user types
 - **JWT Tokens**: For web API authentication
 - **Session Management**: Secure session handling
+- **Multi-Database Authentication**:
+  - HostAdmin accounts authenticate against global database (`admin@frimerki.local`)
+  - Domain users authenticate against their domain-specific database (`user@domain.com`)
 - **Multi-factor Authentication**: TOTP support (future enhancement)
 
 ### Authorization
@@ -683,7 +1027,8 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
     "EnableSMTP": true,
     "EnableIMAP": true,
     "EnablePOP3": true,
-    "EnableWebAPI": true
+    "EnableWebAPI": true,
+    "ReservedDomain": "frimerki.local"
   },
   "Ports": {
     "SMTP": 25,
@@ -697,8 +1042,11 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
     "WebAPI_SSL": 8443
   },
   "Database": {
-    "ConnectionString": "Data Source=emailserver.db",
-    "BackupInterval": "24h"
+    "GlobalConnectionString": "Data Source=frimerki_global.db",
+    "DomainDatabasePath": "./data/domains/",
+    "BackupInterval": "24h",
+    "RegistryCacheExpiration": "1h",
+    "RegistryCacheSize": 1000
   },
   "Security": {
     "RequireSSL": true,
@@ -733,6 +1081,7 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
 
 ### Database
 - **SQLite**: Embedded database with FTS5 full-text search
+- **Multi-Database Architecture**: Global server database + domain-specific databases
 - **SQLite.Interop**: Native SQLite library
 
 #### Sequence Number Management
@@ -921,7 +1270,65 @@ TXT   _dmarc.example.com   → "v=DMARC1; p=quarantine;"
 TXT   default._domainkey.example.com → "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA..."
 ```
 
-## Development Phases
+### Initial Setup
+
+#### HostAdmin Account Creation
+On first startup, Frímerki should:
+1. Create the global database (`frimerki_global.db`) if it doesn't exist
+2. Check if any HostAdmin accounts exist in the global Users table
+3. If no HostAdmin accounts exist, prompt for initial admin account creation:
+   - Username (e.g., `admin`)
+   - Full email will be `{username}@frimerki.local` (e.g., `admin@frimerki.local`)
+   - Password (with confirmation)
+   - Full Name (optional)
+4. Create the first HostAdmin account with secure password hashing
+
+#### Subsequent HostAdmin Management
+- Additional HostAdmin accounts can be created through the API by existing HostAdmins
+- HostAdmin accounts use the reserved domain `frimerki.local` to distinguish from regular domain users
+- Authentication checks the global database for `@frimerki.local` emails, domain databases for others
+
+#### Domain Database Creation Strategy
+When creating new domains, the system follows this simple logic:
+
+**Default Behavior - Dedicated Database:**
+```json
+{
+  "domain": "newdomain.com"
+  // Creates: frimerki_domain_newdomain_com.db (auto-generated name)
+  // Always creates the database
+}
+```
+
+**Shared Database - Existing:**
+```json
+{
+  "domain": "smalldomain.com",
+  "databaseName": "shared_small_domains"
+  // Uses existing database, fails if not found
+}
+```
+
+**Shared Database - Create New:**
+```json
+{
+  "domain": "startup.com",
+  "databaseName": "shared_tech_startups",
+  "createDatabase": true
+  // Creates database, fails if it already exists
+}
+```
+
+**Database Creation Process:**
+1. If no `databaseName` specified: auto-generate dedicated database name
+2. If `databaseName` specified: check if database exists
+3. If database doesn't exist and `createDatabase` is true: create it
+4. If database doesn't exist and `createDatabase` is false/missing: return error
+5. If database exists and `createDatabase` is true: return error (conflict)
+6. Add domain record to DomainRegistry with database mapping
+7. Create DomainSettings record in target database
+8. Initialize default folders and system settings
+9. Update domain resolution cache## Development Phases
 
 ### Phase 1: Core Infrastructure
 1. Project setup and configuration

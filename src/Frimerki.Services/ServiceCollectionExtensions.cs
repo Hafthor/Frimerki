@@ -1,3 +1,4 @@
+using Frimerki.Data;
 using Frimerki.Services.Authentication;
 using Frimerki.Services.Common;
 using Frimerki.Services.Domain;
@@ -15,6 +16,10 @@ public static class ServiceCollectionExtensions {
     public static IServiceCollection AddFrimerkiServices(this IServiceCollection services) {
         // Common services
         services.AddSingleton<INowProvider, SystemNowProvider>();
+
+        // Multi-database infrastructure
+        services.AddSingleton<IDomainDbContextFactory, DomainDbContextFactory>();
+        services.AddScoped<IDomainRegistryService, DomainRegistryService>();
 
         // Server management services
         services.AddScoped<IServerService, ServerService>();

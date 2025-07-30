@@ -2,14 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.Entities;
 
-public class Domain {
+public class DomainSettings {
     public int Id { get; set; }
 
     [Required]
     [MaxLength(255)]
     public string Name { get; set; } = "";
-
-    public bool IsActive { get; set; } = true;
 
     public int? CatchAllUserId { get; set; }
 

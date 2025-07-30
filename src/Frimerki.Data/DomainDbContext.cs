@@ -1,15 +1,20 @@
 using Frimerki.Models.Entities;
-
 using Microsoft.EntityFrameworkCore;
 
 namespace Frimerki.Data;
 
-public class EmailDbContext : DbContext {
-    public EmailDbContext(DbContextOptions<EmailDbContext> options) : base(options) {
+/// <summary>
+/// Domain-specific database context for a single domain's data
+/// </summary>
+public class DomainDbContext : DbContext {
+    public string DomainName { get; }
+
+    public DomainDbContext(DbContextOptions<DomainDbContext> options, string domainName) : base(options) {
+        DomainName = domainName;
     }
 
     public DbSet<User> Users { get; set; }
-    public DbSet<DomainSettings> Domains { get; set; }
+    public DbSet<DomainSettings> DomainSettings { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<Folder> Folders { get; set; }
     public DbSet<UserMessage> UserMessages { get; set; }
@@ -24,15 +29,13 @@ public class EmailDbContext : DbContext {
         // Configure User entity
         modelBuilder.Entity<User>(entity => {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Username, e.DomainId }).IsUnique();
-            entity.HasOne(e => e.Domain)
-                  .WithMany(d => d.Users)
-                  .HasForeignKey(e => e.DomainId)
-                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.Username).IsUnique(); // Simplified since only one domain per DB
+            // Note: Domain relationship removed since each DB contains only one domain
         });
 
         // Configure DomainSettings entity
         modelBuilder.Entity<DomainSettings>(entity => {
+            entity.ToTable("Domains"); // Use legacy table name for compatibility
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Name).IsUnique();
             entity.HasOne(e => e.CatchAllUser)
@@ -112,21 +115,15 @@ public class EmailDbContext : DbContext {
         // Configure UidValiditySequence entity
         modelBuilder.Entity<UidValiditySequence>(entity => {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.DomainId, e.Value }).IsUnique();
-            entity.HasOne(e => e.Domain)
-                  .WithMany(d => d.UidValiditySequences)
-                  .HasForeignKey(e => e.DomainId)
-                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.Value).IsUnique(); // Simplified since only one domain per DB
+            // Note: Domain relationship removed since each DB contains only one domain
         });
 
         // Configure DkimKey entity
         modelBuilder.Entity<DkimKey>(entity => {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.DomainId, e.Selector }).IsUnique();
-            entity.HasOne(e => e.Domain)
-                  .WithMany(d => d.DkimKeys)
-                  .HasForeignKey(e => e.DomainId)
-                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.Selector).IsUnique(); // Simplified since only one domain per DB
+            // Note: Domain relationship removed since each DB contains only one domain
         });
     }
 }

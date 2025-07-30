@@ -4,6 +4,7 @@ using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.DTOs.Folder;
 using Frimerki.Models.Entities;
+using Frimerki.Services;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -15,20 +16,38 @@ namespace Frimerki.Tests.Integration;
 public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly string _databaseName;
+    private readonly string _globalDatabaseName;
+    private readonly string _domainDatabaseName;
 
     public PatchEndpointsTests(WebApplicationFactory<Program> factory) {
-        _databaseName = "TestDatabase_" + Guid.NewGuid();
+        _globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
+        _domainDatabaseName = "DomainTestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
             builder.ConfigureServices(services => {
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
-                if (descriptor != null) {
-                    services.Remove(descriptor);
+                // Remove existing DbContext registrations
+                var emailDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
+                if (emailDescriptor != null) {
+                    services.Remove(emailDescriptor);
                 }
 
+                var globalDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<GlobalDbContext>));
+                if (globalDescriptor != null) {
+                    services.Remove(globalDescriptor);
+                }
+
+                // Add in-memory databases for testing
+                services.AddDbContext<GlobalDbContext>(options => {
+                    options.UseInMemoryDatabase(_globalDatabaseName);
+                });
+
                 services.AddDbContext<EmailDbContext>(options => {
-                    options.UseInMemoryDatabase(_databaseName);
+                    options.UseInMemoryDatabase(_domainDatabaseName);
+                });
+
+                // Override the domain DB context factory for testing
+                services.AddSingleton<IDomainDbContextFactory>(provider => {
+                    return new TestDomainDbContextFactory(_domainDatabaseName);
                 });
             });
         });
@@ -40,17 +59,30 @@ public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 
     private void SeedTestData() {
         using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+        var globalContext = scope.ServiceProvider.GetRequiredService<GlobalDbContext>();
+        var emailContext = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
 
-        var domain = new Domain {
+        // Add domain to global registry
+        var domainRegistry = new DomainRegistry {
             Id = 1,
             Name = "example.com",
+            DatabaseName = _domainDatabaseName,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
-        context.Domains.Add(domain);
-        context.SaveChanges();
+
+        globalContext.DomainRegistry.Add(domainRegistry);
+        globalContext.SaveChanges();
+
+        // Add domain settings to domain-specific database
+        var domain = new DomainSettings {
+            Id = 1,
+            Name = "example.com",
+            CreatedAt = DateTime.UtcNow
+        };
+        emailContext.Domains.Add(domain);
+        emailContext.SaveChanges();
 
         // Create test user with proper password hashing
         var userRequest = new CreateUserRequest {

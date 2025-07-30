@@ -4,7 +4,9 @@ namespace Frimerki.Models.DTOs;
 
 public class DomainResponse {
     public string Name { get; set; } = "";
+    public string DatabaseName { get; set; } = "";
     public bool IsActive { get; set; }
+    public bool IsDedicated { get; set; }
     public string? CatchAllUser { get; set; }
     public DateTime CreatedAt { get; set; }
     public int UserCount { get; set; }
@@ -19,6 +21,11 @@ public class DomainRequest {
     [RegularExpression(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
         ErrorMessage = "Invalid domain name format")]
     public string Name { get; set; } = "";
+
+    [StringLength(255)]
+    public string? DatabaseName { get; set; }
+
+    public bool CreateDatabase { get; set; } = false;
 
     public bool IsActive { get; set; } = true;
 
@@ -67,4 +74,39 @@ public class DomainListResponse {
     public List<DomainResponse> Domains { get; set; } = [];
     public int TotalCount { get; set; }
     public bool CanManageAll { get; set; }
+}
+
+public class CreateDomainResponse {
+    public string Name { get; set; } = "";
+    public string DatabaseName { get; set; } = "";
+    public bool IsActive { get; set; }
+    public bool IsDedicated { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public bool DatabaseCreated { get; set; }
+    public InitialSetupInfo InitialSetup { get; set; } = new();
+}
+
+public class InitialSetupInfo {
+    public bool AdminUserCreated { get; set; }
+    public bool DefaultFoldersCreated { get; set; }
+    public bool DkimKeysGenerated { get; set; }
+}
+
+public class DatabaseListResponse {
+    public List<DatabaseInfo> Databases { get; set; } = [];
+    public long TotalSize { get; set; }
+    public int TotalDomains { get; set; }
+    public int TotalUsers { get; set; }
+    public int TotalMessages { get; set; }
+}
+
+public class DatabaseInfo {
+    public string Name { get; set; } = "";
+    public string FilePath { get; set; } = "";
+    public long FileSize { get; set; }
+    public List<string> Domains { get; set; } = [];
+    public int TotalUsers { get; set; }
+    public int TotalMessages { get; set; }
+    public bool IsDedicated { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

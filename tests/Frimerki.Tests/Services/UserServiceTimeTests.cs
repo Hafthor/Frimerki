@@ -30,7 +30,7 @@ public class UserServiceTimeTests {
     }
 
     private void SeedTestData() {
-        var domain = new Domain {
+        var domain = new DomainSettings {
             Id = 1,
             Name = "example.com",
             CreatedAt = _nowProvider.UtcNow
