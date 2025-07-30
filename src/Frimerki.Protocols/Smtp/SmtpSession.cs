@@ -333,6 +333,7 @@ public partial class SmtpSession : IDisposable {
 
     private async Task SendResponseAsync(string response) {
         await _writer.WriteLineAsync(response);
+        await _writer.FlushAsync(); // Ensure data is immediately sent
         _logger.LogDebug("SMTP > {Response}", response);
     }
 
