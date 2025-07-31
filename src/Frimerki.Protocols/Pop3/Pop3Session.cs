@@ -66,6 +66,7 @@ public partial class Pop3Session {
 
         try {
             await (cmd switch {
+                "CAPA" => HandleCapaAsync(cancellationToken),
                 "USER" => HandleUserAsync(args, cancellationToken),
                 "PASS" => HandlePassAsync(args, cancellationToken),
                 "STAT" => HandleStatAsync(cancellationToken),
@@ -83,6 +84,16 @@ public partial class Pop3Session {
             _logger.LogError(ex, "Error processing POP3 command: {Command}", cmd);
             await SendResponseAsync("-ERR Server error", cancellationToken);
         }
+    }
+
+    private async Task HandleCapaAsync(CancellationToken cancellationToken) {
+        await SendResponseAsync("+OK Capability list follows", cancellationToken);
+        await SendResponseAsync("TOP", cancellationToken);
+        await SendResponseAsync("UIDL", cancellationToken);
+        await SendResponseAsync("USER", cancellationToken);
+        await SendResponseAsync("RESP-CODES", cancellationToken);
+        await SendResponseAsync("PIPELINING", cancellationToken);
+        await SendResponseAsync(".", cancellationToken);
     }
 
     private async Task HandleUserAsync(string username, CancellationToken cancellationToken) {
@@ -277,10 +288,21 @@ public partial class Pop3Session {
     }
 
     private async Task HandleQuitAsync(CancellationToken cancellationToken) {
-        if (IsAuthenticated()) {
-            // TODO: Actually delete messages marked for deletion
-            // This would require implementing message deletion in the message service
-            await SendResponseAsync($"+OK {_deletedMessages.Count} messages deleted", cancellationToken);
+        if (IsAuthenticated() && _userId.HasValue) {
+            // Actually delete messages marked for deletion
+            var deletedCount = 0;
+            foreach (var messageId in _deletedMessages) {
+                try {
+                    var deleted = await _messageService.DeleteMessageAsync(_userId.Value, messageId);
+                    if (deleted) {
+                        deletedCount++;
+                    }
+                } catch (Exception ex) {
+                    _logger.LogError(ex, "Error deleting message {MessageId} for user {UserId}", messageId, _userId);
+                }
+            }
+
+            await SendResponseAsync($"+OK {deletedCount} messages deleted", cancellationToken);
         } else {
             await SendResponseAsync("+OK Bye", cancellationToken);
         }

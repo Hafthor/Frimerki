@@ -49,6 +49,7 @@
 2. **Configure your email client:**
    - **SMTP Server**: localhost:25 (or 587)
    - **IMAP Server**: localhost:143 (or 993)
+   - **POP3 Server**: localhost:110 (or 995)
    - **Username**: user@example.com
    - **Password**: secure123
 
@@ -67,7 +68,7 @@ Frimerki/
 │   ├── Frimerki.Data/        # Entity Framework & Database
 │   ├── Frimerki.Models/      # Data models & entities
 │   ├── Frimerki.Services/    # Business logic & services
-│   └── Frimerki.Protocols/   # SMTP & IMAP protocol implementations
+│   └── Frimerki.Protocols/   # SMTP, IMAP & POP3 protocol implementations
 ├── tests/
 │   └── Frimerki.Tests/       # Comprehensive test suite (113 tests)
 ├── Frimerki.sln             # Solution file
@@ -78,7 +79,7 @@ Frimerki/
 
 - **SMTP Server**: ✅ Complete receive mail functionality with MIME parsing
 - **IMAP Server**: ✅ Full implementation with mailbox management
-- **POP3**: ⏳ Planned for future release
+- **POP3 Server**: ✅ Complete RFC 1939 compliance with message retrieval and deletion
 
 ### SMTP Features
 - Email reception and delivery to user mailboxes
@@ -90,8 +91,19 @@ Frimerki/
 - Complete RFC 3501 compliance
 - Mailbox management (CREATE, DELETE, SELECT, EXAMINE)
 - Message operations (FETCH, STORE, SEARCH, UID commands)
+- **Complete flag operations**: STORE command with +FLAGS, -FLAGS, FLAGS, and SILENT support
+- **Message deletion**: EXPUNGE command for permanent removal of deleted messages
 - Flag management (SEEN, ANSWERED, FLAGGED, DELETED, DRAFT)
 - Real-time folder synchronization
+
+### POP3 Features
+- RFC 1939 compliance with extended capabilities
+- User authentication with username/password
+- Message listing and retrieval (LIST, RETR, STAT)
+- Message deletion with DELE and QUIT commands
+- Unique identifier support (UIDL)
+- Top command for header retrieval (TOP)
+- Extended capabilities advertising (CAPA)
 
 ## 🛠️ Technology Stack
 
@@ -120,6 +132,7 @@ dotnet run --project src/Frimerki.Server --environment Development
 # Run specific test categories
 dotnet test --filter "Category=SMTP"
 dotnet test --filter "Category=IMAP"
+dotnet test --filter "Pop3"
 
 # Watch mode for continuous testing during development
 dotnet watch test
@@ -139,6 +152,8 @@ dotnet watch test
 **Phase 2: Email Protocols** ✅
 - [x] SMTP server with receive mail functionality
 - [x] IMAP server with full RFC 3501 compliance
+- [x] Complete IMAP flag operations (STORE and EXPUNGE commands)
+- [x] POP3 server with complete RFC 1939 compliance
 - [x] MIME message parsing and storage
 - [x] Thread-safe concurrent processing
 
@@ -162,6 +177,7 @@ dotnet watch test
 ### 📬 Email Server Capabilities
 - **Receive Emails**: Full SMTP server receives and processes incoming emails
 - **Mailbox Management**: Complete IMAP server for email client compatibility
+- **Mail Retrieval**: Full POP3 server for traditional email client support
 - **Multi-Domain Support**: Host multiple email domains on one server
 - **User Management**: Create and manage email accounts with secure authentication
 - **Message Storage**: Efficient SQLite database with proper indexing

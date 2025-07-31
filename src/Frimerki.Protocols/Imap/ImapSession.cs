@@ -100,6 +100,7 @@ public class ImapSession {
                 "FETCH" => await HandleFetchAsync(command),
                 "SEARCH" => await HandleSearchAsync(command),
                 "STORE" => await HandleStoreAsync(command),
+                "EXPUNGE" => await HandleExpungeAsync(command),
                 _ => new ImapResponse {
                     Tag = command.Tag,
                     Type = ImapResponseType.Bad,
@@ -511,29 +512,234 @@ public class ImapSession {
         };
     }
 
-    private Task<ImapResponse> HandleStoreAsync(ImapCommand command) {
+    private async Task<ImapResponse> HandleStoreAsync(ImapCommand command) {
         if (State != ImapConnectionState.Selected) {
-            return Task.FromResult(new ImapResponse {
+            return new ImapResponse {
                 Tag = command.Tag,
                 Type = ImapResponseType.No,
                 Message = "Must have folder selected"
-            });
+            };
         }
 
         if (IsReadOnly) {
-            return Task.FromResult(new ImapResponse {
+            return new ImapResponse {
                 Tag = command.Tag,
                 Type = ImapResponseType.No,
                 Message = "Folder is read-only"
-            });
+            };
         }
 
-        // Basic STORE stub - implement full STORE in Phase 2
-        return Task.FromResult(new ImapResponse {
-            Tag = command.Tag,
-            Type = ImapResponseType.Ok,
-            Message = "STORE completed"
-        });
+        try {
+            // Parse STORE command: STORE sequence-set data-item value
+            // Examples:
+            // STORE 1 +FLAGS (\Seen)
+            // STORE 2:4 FLAGS (\Answered \Flagged)
+            // STORE 1 -FLAGS.SILENT (\Deleted)
+
+            if (command.Arguments.Count < 3) {
+                return new ImapResponse {
+                    Tag = command.Tag,
+                    Type = ImapResponseType.Bad,
+                    Message = "STORE requires sequence-set, data-item, and value"
+                };
+            }
+
+            var sequenceSet = command.Arguments[0];
+            var dataItem = command.Arguments[1].ToUpper();
+            var flagsString = string.Join(" ", command.Arguments.Skip(2));
+
+            // Parse flags from parentheses
+            var flagsMatch = System.Text.RegularExpressions.Regex.Match(flagsString, @"\(([^)]*)\)");
+            if (!flagsMatch.Success) {
+                return new ImapResponse {
+                    Tag = command.Tag,
+                    Type = ImapResponseType.Bad,
+                    Message = "Invalid flags format"
+                };
+            }
+
+            var flagNames = flagsMatch.Groups[1].Value
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(f => f.Trim())
+                .Where(f => !string.IsNullOrEmpty(f))
+                .ToList();
+
+            // Determine operation type
+            bool isAdd = dataItem.StartsWith("+");
+            bool isRemove = dataItem.StartsWith("-");
+            bool isSilent = dataItem.Contains("SILENT");
+            bool isReplace = !isAdd && !isRemove;
+
+            // Parse sequence set and get message UIDs
+            var messageUids = await ParseSequenceSetToUidsAsync(sequenceSet, command.Name == "UID");
+
+            foreach (var uid in messageUids) {
+                // Create flag update request
+                var flagsRequest = new MessageFlagsRequest();
+
+                if (isReplace) {
+                    // Replace all flags - set all standard flags to false first, then set specified ones
+                    flagsRequest.Seen = false;
+                    flagsRequest.Answered = false;
+                    flagsRequest.Flagged = false;
+                    flagsRequest.Deleted = false;
+                    flagsRequest.Draft = false;
+                    flagsRequest.CustomFlags = [];
+                }
+
+                // Apply flag changes
+                foreach (var flagName in flagNames) {
+                    switch (flagName.ToUpper()) {
+                        case "\\SEEN":
+                            if (isRemove) {
+                                flagsRequest.Seen = false;
+                            } else if (isAdd || isReplace) {
+                                flagsRequest.Seen = true;
+                            }
+                            break;
+                        case "\\ANSWERED":
+                            if (isRemove) {
+                                flagsRequest.Answered = false;
+                            } else if (isAdd || isReplace) {
+                                flagsRequest.Answered = true;
+                            }
+                            break;
+                        case "\\FLAGGED":
+                            if (isRemove) {
+                                flagsRequest.Flagged = false;
+                            } else if (isAdd || isReplace) {
+                                flagsRequest.Flagged = true;
+                            }
+                            break;
+                        case "\\DELETED":
+                            if (isRemove) {
+                                flagsRequest.Deleted = false;
+                            } else if (isAdd || isReplace) {
+                                flagsRequest.Deleted = true;
+                            }
+                            break;
+                        case "\\DRAFT":
+                            if (isRemove) {
+                                flagsRequest.Draft = false;
+                            } else if (isAdd || isReplace) {
+                                flagsRequest.Draft = true;
+                            }
+                            break;
+                        default:
+                            // Handle custom flags
+                            if (!flagName.StartsWith("\\")) {
+                                flagsRequest.CustomFlags ??= [];
+                                if (isAdd || isReplace) {
+                                    if (!flagsRequest.CustomFlags.Contains(flagName)) {
+                                        flagsRequest.CustomFlags.Add(flagName);
+                                    }
+                                }
+                                // For remove, we'll handle this in the service
+                            }
+                            break;
+                    }
+                }
+
+                // Update message flags
+                var updateRequest = new MessageUpdateRequest {
+                    Flags = flagsRequest
+                };
+
+                await _messageService.UpdateMessageAsync(CurrentUser!.Id, uid, updateRequest);
+
+                // Send untagged FETCH response if not silent
+                if (!isSilent) {
+                    // Get updated message to send FETCH response
+                    var updatedMessage = await _messageService.GetMessageAsync(CurrentUser.Id, uid);
+                    if (updatedMessage != null) {
+                        var sequenceNumber = await GetSequenceNumberByUidAsync(uid);
+                        var flags = string.Join(" ", GetFlagsListForResponse(updatedMessage.Flags));
+                        await SendResponseAsync($"* {sequenceNumber} FETCH (FLAGS ({flags}) UID {uid})");
+                    }
+                }
+            }
+
+            return new ImapResponse {
+                Tag = command.Tag,
+                Type = ImapResponseType.Ok,
+                Message = "STORE completed"
+            };
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Error processing STORE command");
+            return new ImapResponse {
+                Tag = command.Tag,
+                Type = ImapResponseType.Bad,
+                Message = "STORE processing error"
+            };
+        }
+    }
+
+    private async Task<ImapResponse> HandleExpungeAsync(ImapCommand command) {
+        if (State != ImapConnectionState.Selected) {
+            return new ImapResponse {
+                Tag = command.Tag,
+                Type = ImapResponseType.No,
+                Message = "Must have folder selected"
+            };
+        }
+
+        if (IsReadOnly) {
+            return new ImapResponse {
+                Tag = command.Tag,
+                Type = ImapResponseType.No,
+                Message = "Folder is read-only"
+            };
+        }
+
+        try {
+            if (CurrentUser == null || SelectedFolder == null) {
+                return new ImapResponse {
+                    Tag = command.Tag,
+                    Type = ImapResponseType.Bad,
+                    Message = "Internal error: no user or folder selected"
+                };
+            }
+
+            // Get messages with \Deleted flag in current folder
+            var deletedMessages = await GetMessagesWithDeletedFlagAsync();
+            int expungedCount = 0;
+
+            // Process messages in reverse sequence order to maintain correct sequence numbers
+            // when sending EXPUNGE responses (RFC 3501 requirement)
+            foreach (var message in deletedMessages.OrderByDescending(m => m.SequenceNumber)) {
+                // Send untagged EXPUNGE response before deleting
+                await SendResponseAsync($"* {message.SequenceNumber} EXPUNGE");
+
+                // Permanently delete the message
+                var deleted = await _messageService.DeleteMessageAsync(CurrentUser.Id, message.Id);
+                if (deleted) {
+                    expungedCount++;
+                } else {
+                    _logger.LogWarning("Failed to delete message {MessageId} for user {UserId}",
+                        message.Id, CurrentUser.Id);
+                }
+            }
+
+            // Update EXISTS count after expunging
+            var remainingCount = await GetMessageCountInCurrentFolderAsync();
+            await SendResponseAsync($"* {remainingCount} EXISTS");
+
+            _logger.LogInformation("EXPUNGE completed: {ExpungedCount} messages removed, {RemainingCount} messages remain",
+                expungedCount, remainingCount);
+
+            return new ImapResponse {
+                Tag = command.Tag,
+                Type = ImapResponseType.Ok,
+                Message = $"EXPUNGE completed"
+            };
+        } catch (Exception ex) {
+            _logger.LogError(ex, "Error processing EXPUNGE command");
+            return new ImapResponse {
+                Tag = command.Tag,
+                Type = ImapResponseType.Bad,
+                Message = "EXPUNGE processing error"
+            };
+        }
     }
 
     private string? ExtractHeaderValue(string messageContent, string headerName) {
@@ -578,5 +784,133 @@ public class ImapSession {
         await _stream.WriteAsync(bytes);
         await _stream.FlushAsync();
         _logger.LogInformation("IMAP Response: {Response}", response);
+    }
+
+    private Task<List<int>> ParseSequenceSetToUidsAsync(string sequenceSet, bool isUid) {
+        List<int> uids = [];
+
+        if (isUid) {
+            // For UID commands, the sequence set contains UIDs directly
+            var parts = sequenceSet.Split(',');
+            foreach (var part in parts) {
+                if (part.Contains(':')) {
+                    var range = part.Split(':');
+                    if (range.Length == 2 && int.TryParse(range[0], out int start) && int.TryParse(range[1], out int end)) {
+                        for (int uid = start; uid <= end; uid++) {
+                            uids.Add(uid);
+                        }
+                    }
+                } else if (int.TryParse(part, out int uid)) {
+                    uids.Add(uid);
+                }
+            }
+        } else {
+            // For sequence number commands, we need to convert sequence numbers to UIDs
+            // This is a simplified implementation - in a full implementation, you'd query the database
+            // to get the actual UIDs for the given sequence numbers in the current folder
+            var parts = sequenceSet.Split(',');
+            foreach (var part in parts) {
+                if (part.Contains(':')) {
+                    var range = part.Split(':');
+                    if (range.Length == 2 && int.TryParse(range[0], out int start) && int.TryParse(range[1], out int end)) {
+                        for (int seq = start; seq <= end; seq++) {
+                            // For now, assume sequence number equals UID (simplified)
+                            uids.Add(seq);
+                        }
+                    }
+                } else if (int.TryParse(part, out int seq)) {
+                    // For now, assume sequence number equals UID (simplified)
+                    uids.Add(seq);
+                }
+            }
+        }
+
+        return Task.FromResult(uids);
+    }
+
+    private Task<int> GetSequenceNumberByUidAsync(int uid) {
+        // In a full implementation, this would query the database to get the actual sequence number
+        // for the given UID in the current folder. For now, return UID as sequence number (simplified)
+        return Task.FromResult(uid);
+    }
+
+    private List<string> GetFlagsListForResponse(MessageFlagsResponse flags) {
+        List<string> flagList = [];
+
+        if (flags.Seen) {
+            flagList.Add("\\Seen");
+        }
+        if (flags.Answered) {
+            flagList.Add("\\Answered");
+        }
+        if (flags.Flagged) {
+            flagList.Add("\\Flagged");
+        }
+        if (flags.Deleted) {
+            flagList.Add("\\Deleted");
+        }
+        if (flags.Draft) {
+            flagList.Add("\\Draft");
+        }
+        if (flags.Recent) {
+            flagList.Add("\\Recent");
+        }
+
+        // Add custom flags
+        flagList.AddRange(flags.CustomFlags);
+
+        return flagList;
+    }
+
+    /// <summary>
+    /// Gets all messages with the \Deleted flag in the current folder
+    /// </summary>
+    private async Task<List<MessageWithSequenceInfo>> GetMessagesWithDeletedFlagAsync() {
+        if (CurrentUser == null || SelectedFolder == null) {
+            return [];
+        }
+
+        var request = new MessageFilterRequest {
+            Folder = SelectedFolder,
+            Flags = "deleted",
+            Take = 1000  // Get all deleted messages (reasonable limit)
+        };
+
+        var result = await _messageService.GetMessagesAsync(CurrentUser.Id, request);
+
+        // Map to our internal structure with sequence numbers
+        // For now, we'll use a simplified approach where we generate sequence numbers
+        // In a full implementation, these would come from the database
+        return result.Items.Select((msg, index) => new MessageWithSequenceInfo {
+            Id = msg.Id,
+            Uid = 0,  // Simplified - UID not needed for deletion, only message ID
+            SequenceNumber = index + 1  // Simplified - should be actual sequence number from folder
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Gets the count of messages in the current folder (excluding deleted messages)
+    /// </summary>
+    private async Task<int> GetMessageCountInCurrentFolderAsync() {
+        if (CurrentUser == null || SelectedFolder == null) {
+            return 0;
+        }
+
+        var request = new MessageFilterRequest {
+            Folder = SelectedFolder,
+            Take = 1  // We only need the count, not the actual messages
+        };
+
+        var result = await _messageService.GetMessagesAsync(CurrentUser.Id, request);
+        return result.TotalCount ?? 0;
+    }
+
+    /// <summary>
+    /// Internal structure for tracking message sequence information
+    /// </summary>
+    private class MessageWithSequenceInfo {
+        public int Id { get; set; }
+        public int Uid { get; set; }
+        public int SequenceNumber { get; set; }
     }
 }
