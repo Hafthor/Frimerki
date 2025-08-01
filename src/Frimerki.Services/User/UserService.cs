@@ -23,9 +23,9 @@ public partial class UserService : IUserService {
         _logger = logger;
     }
 
-    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) {
-        _logger.LogInformation("Getting users list - Page: {Page}, PageSize: {PageSize}, Domain: {Domain}",
-            page, pageSize, domainFilter ?? "All");
+    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null) {
+        _logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
+            skip, take, domainFilter ?? "All");
 
         var query = _context.Users
             .Include(u => u.Domain)
@@ -36,13 +36,12 @@ public partial class UserService : IUserService {
         }
 
         var totalCount = await query.CountAsync();
-        var skip = (page - 1) * pageSize;
 
         var users = await query
             .OrderBy(u => u.Domain.Name)
             .ThenBy(u => u.Username)
             .Skip(skip)
-            .Take(pageSize)
+            .Take(take)
             .ToListAsync();
 
         List<UserResponse> userResponses = [];
@@ -55,7 +54,7 @@ public partial class UserService : IUserService {
         return new PaginatedInfo<UserResponse> {
             Items = userResponses,
             Skip = skip,
-            Take = pageSize,
+            Take = take,
             TotalCount = totalCount
         };
     }

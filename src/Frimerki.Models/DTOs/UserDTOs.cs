@@ -29,7 +29,8 @@ public class UserStatsResponse {
 public class UserRequest {
     [Required]
     [StringLength(255, MinimumLength = 1)]
-    [RegularExpression(@"^[a-zA-Z0-9._-]+$", ErrorMessage = "Username can only contain letters, numbers, dots, hyphens, and underscores")]
+    [RegularExpression(Constants.ValidUsernameRegex,
+        ErrorMessage = "Username can only contain letters, numbers, dots, hyphens, and underscores")]
     public string Username { get; set; } = "";
 
     [Required]
@@ -44,7 +45,7 @@ public class UserRequest {
     public string? FullName { get; set; }
 
     [Required]
-    [RegularExpression("^(User|DomainAdmin|HostAdmin)$", ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]
+    [RegularExpression(Constants.ValidUserRoleRegex, ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]
     public string Role { get; set; } = "User";
 
     public bool CanReceive { get; set; } = true;
@@ -79,7 +80,8 @@ public class UserPasswordUpdateRequest {
 public class CreateUserRequest {
     [Required]
     [StringLength(255, MinimumLength = 1)]
-    [RegularExpression(@"^[a-zA-Z0-9._-]+$", ErrorMessage = "Username can only contain letters, numbers, dots, hyphens, and underscores")]
+    [RegularExpression(Constants.ValidUsernameRegex,
+        ErrorMessage = "Username can only contain letters, numbers, dots, hyphens, and underscores")]
     public string Username { get; set; } = "";
 
     [Required]
@@ -94,7 +96,7 @@ public class CreateUserRequest {
     public string? FullName { get; set; }
 
     [Required]
-    [RegularExpression("^(User|DomainAdmin|HostAdmin)$", ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]
+    [RegularExpression(Constants.ValidUserRoleRegex, ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]
     public string Role { get; set; } = "User";
 
     public bool CanReceive { get; set; } = true;

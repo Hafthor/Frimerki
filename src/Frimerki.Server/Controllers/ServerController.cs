@@ -1,8 +1,6 @@
 using System.Reflection;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Server;
-
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Frimerki.Server.Controllers;
@@ -93,20 +91,20 @@ public class ServerController : ControllerBase {
     /// Get server logs (HostAdmin only)
     /// </summary>
     [HttpGet("logs")]
-    public async Task<ActionResult<ServerLogsResponse>> GetServerLogs(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 100,
+    public async Task<ActionResult<PaginatedInfo<ServerLogEntry>>> GetServerLogs(
+        [FromQuery] int skip = 1,
+        [FromQuery] int take = 100,
         [FromQuery] string? level = null) {
         try {
-            if (page < 1) {
-                page = 1;
+            if (skip < 0) {
+                skip = 0;
             }
 
-            if (pageSize is < 1 or > 1000) {
-                pageSize = 100;
+            if (take is < 1 or > 1000) {
+                take = 100;
             }
 
-            var logs = await _serverService.GetServerLogsAsync(page, pageSize, level);
+            var logs = await _serverService.GetServerLogsAsync(skip, take, level);
             return Ok(logs);
         } catch (Exception ex) {
             _logger.LogError(ex, "Error retrieving server logs");

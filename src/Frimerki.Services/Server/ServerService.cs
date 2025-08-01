@@ -1,11 +1,8 @@
 using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Text.Json;
-
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
-
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -16,7 +13,7 @@ public interface IServerService {
     Task<ServerStatusResponse> GetServerStatusAsync();
     Task<ServerHealthResponse> GetServerHealthAsync();
     Task<ServerMetricsResponse> GetServerMetricsAsync();
-    Task<ServerLogsResponse> GetServerLogsAsync(int page = 1, int pageSize = 100, string? level = null);
+    Task<PaginatedInfo<ServerLogEntry>> GetServerLogsAsync(int skip = 0, int take = 100, string? level = null);
     Task<ServerSettingsResponse> GetServerSettingsAsync();
     Task UpdateServerSettingsAsync(ServerSettingsRequest request);
     Task<BackupResponse> CreateBackupAsync(BackupRequest request);
@@ -96,7 +93,7 @@ public class ServerService : IServerService {
     public async Task<ServerMetricsResponse> GetServerMetricsAsync() {
         var systemMetrics = GetSystemMetrics();
         var emailMetrics = await GetEmailMetricsAsync();
-        var databaseMetrics = await GetDatabaseMetricsAsync();
+        var databaseMetrics = GetDatabaseMetrics();
 
         return new ServerMetricsResponse {
             System = systemMetrics,
@@ -105,14 +102,14 @@ public class ServerService : IServerService {
         };
     }
 
-    public Task<ServerLogsResponse> GetServerLogsAsync(int page = 1, int pageSize = 100, string? level = null) {
+    public Task<PaginatedInfo<ServerLogEntry>> GetServerLogsAsync(int skip = 0, int take = 100, string? level = null) {
         // For now, return empty logs - this would need integration with Serilog
         // In a real implementation, you'd read from the log files or database
-        return Task.FromResult(new ServerLogsResponse {
-            Logs = new List<ServerLogEntry>(),
+        return Task.FromResult(new PaginatedInfo<ServerLogEntry> {
+            Items = new List<ServerLogEntry>(),
             TotalCount = 0,
-            PageSize = pageSize,
-            CurrentPage = page
+            Skip = skip,
+            Take = take
         });
     }
 
@@ -214,30 +211,30 @@ public class ServerService : IServerService {
     private ServerServices GetServicesStatus() {
         return new ServerServices {
             SMTP = new ServiceStatus {
-                IsRunning = true, // Would check actual service status
-                Port = 587,
-                SslEnabled = true,
+                IsRunning = bool.Parse(_configuration["Server:EnableSMTP"] ?? "true"),
+                Port = int.Parse(_configuration["SMTP:Port"] ?? "25"),
+                SslEnabled = bool.Parse(_configuration["SMTP:EnableSSL"] ?? "false"),
                 ActiveConnections = 0,
                 LastStarted = _startTime
             },
             IMAP = new ServiceStatus {
-                IsRunning = true,
-                Port = 993,
-                SslEnabled = true,
+                IsRunning = bool.Parse(_configuration["Server:EnableIMAP"] ?? "true"),
+                Port = int.Parse(_configuration["IMAP:Port"] ?? "143"),
+                SslEnabled = bool.Parse(_configuration["IMAP:EnableSSL"] ?? "false"),
                 ActiveConnections = 0,
                 LastStarted = _startTime
             },
             POP3 = new ServiceStatus {
-                IsRunning = true,
-                Port = 995,
-                SslEnabled = true,
+                IsRunning = bool.Parse(_configuration["Server:EnablePOP3"] ?? "true"),
+                Port = int.Parse(_configuration["POP3:Port"] ?? "110"),
+                SslEnabled = bool.Parse(_configuration["POP3:EnableSSL"] ?? "false"),
                 ActiveConnections = 0,
                 LastStarted = _startTime
             },
             WebAPI = new ServiceStatus {
                 IsRunning = true,
-                Port = 5000,
-                SslEnabled = false,
+                Port = int.Parse(_configuration["Kestrel:Endpoints:Http:Url"]?.Split(':').LastOrDefault() ?? _configuration["ASPNETCORE_URLS"]?.Split(':').LastOrDefault() ?? "5000"),
+                SslEnabled = _configuration["Kestrel:Endpoints:Https"] != null || (_configuration["ASPNETCORE_URLS"]?.Contains("https") ?? false),
                 ActiveConnections = 0,
                 LastStarted = _startTime
             }
@@ -327,15 +324,16 @@ public class ServerService : IServerService {
     private SystemMetrics GetSystemMetrics() {
         using var process = Process.GetCurrentProcess();
         var memoryUsed = process.WorkingSet64;
+        var diskInfo = GetDiskInfo();
 
         return new SystemMetrics {
             CpuUsagePercent = GetCpuUsage(),
             MemoryUsagePercent = GetMemoryUsage(),
             MemoryUsedBytes = memoryUsed,
             MemoryTotalBytes = GetTotalMemory(),
-            DiskUsagePercent = GetDiskUsage(),
-            DiskUsedBytes = GetDiskUsed(),
-            DiskTotalBytes = GetDiskTotal(),
+            DiskUsagePercent = (diskInfo?.TotalSize - diskInfo?.AvailableFreeSpace + 0.0) / diskInfo?.TotalSize,
+            DiskUsedBytes = diskInfo?.TotalSize - diskInfo?.AvailableFreeSpace,
+            DiskTotalBytes = diskInfo?.TotalSize,
             ActiveThreads = process.Threads.Count
         };
     }
@@ -356,9 +354,24 @@ public class ServerService : IServerService {
         };
     }
 
-    private async Task<DatabaseMetrics> GetDatabaseMetricsAsync() {
-        var dbPath = _configuration.GetConnectionString("DefaultConnection")?.Replace("Data Source=", "") ?? "emailserver.db";
-        var dbSize = File.Exists(dbPath) ? new FileInfo(dbPath).Length : 0;
+    private DatabaseMetrics GetDatabaseMetrics() {
+        long dbSize = 0;
+
+        try {
+            // Get the actual database file path from Entity Framework
+            var connectionString = _dbContext.Database.GetConnectionString();
+            if (!string.IsNullOrEmpty(connectionString)) {
+                // Parse SQLite connection string properly
+                var builder = new SqliteConnectionStringBuilder(connectionString);
+                var dbPath = builder.DataSource;
+
+                if (!string.IsNullOrEmpty(dbPath) && File.Exists(dbPath)) {
+                    dbSize = new FileInfo(dbPath).Length;
+                }
+            }
+        } catch (Exception ex) {
+            _logger.LogWarning(ex, "Could not determine database size");
+        }
 
         return new DatabaseMetrics {
             SizeBytes = dbSize,
@@ -404,35 +417,88 @@ public class ServerService : IServerService {
     }
 
     private long GetTotalMemory() {
-        // Simplified - would use proper system memory detection
-        return 8L * 1024 * 1024 * 1024; // 8GB for demo
-    }
-
-    private double GetDiskUsage() {
         try {
-            var driveInfo = new DriveInfo(Directory.GetCurrentDirectory());
-            var used = driveInfo.TotalSize - driveInfo.AvailableFreeSpace;
-            return (double)used / driveInfo.TotalSize * 100;
+            if (OperatingSystem.IsLinux()) {
+                // On Linux, read from /proc/meminfo
+                if (File.Exists("/proc/meminfo")) {
+                    var memInfo = File.ReadAllText("/proc/meminfo");
+                    var memTotalLine = memInfo.Split('\n')
+                        .FirstOrDefault(line => line.StartsWith("MemTotal:", StringComparison.OrdinalIgnoreCase));
+
+                    if (memTotalLine != null) {
+                        var parts = memTotalLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 && long.TryParse(parts[1], out var memKB)) {
+                            return memKB * 1024; // Convert KB to bytes
+                        }
+                    }
+                }
+            } else if (OperatingSystem.IsMacOS()) {
+                // On macOS, use sysctl to get total memory
+                try {
+                    using var process = new Process();
+                    process.StartInfo = new ProcessStartInfo {
+                        FileName = "sysctl",
+                        Arguments = "-n hw.memsize",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    };
+
+                    process.Start();
+                    var output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    if (long.TryParse(output.Trim(), out var memBytes)) {
+                        return memBytes;
+                    }
+                } catch {
+                    // Fall through to default
+                }
+            } else if (OperatingSystem.IsWindows()) {
+                // On Windows, use wmic to get total physical memory
+                try {
+                    using var process = new Process();
+                    process.StartInfo = new ProcessStartInfo {
+                        FileName = "wmic",
+                        Arguments = "computersystem get TotalPhysicalMemory /value",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    };
+
+                    process.Start();
+                    var output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    // Parse the output - it will be in format "TotalPhysicalMemory=<value>"
+                    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    var memoryLine = lines.FirstOrDefault(line => line.StartsWith("TotalPhysicalMemory=", StringComparison.OrdinalIgnoreCase));
+
+                    if (memoryLine != null) {
+                        var memoryValue = memoryLine.Split('=')[1].Trim();
+                        if (long.TryParse(memoryValue, out var memBytes)) {
+                            return memBytes;
+                        }
+                    }
+                } catch {
+                    // Fall through to default
+                }
+            }
+
+            // Fallback: Use GC.GetTotalMemory as an estimate (this is managed memory, not total system memory)
+            // This is at least a real value from the current process rather than a hardcoded guess
+            return GC.GetTotalMemory(false);
         } catch {
-            return 0;
+            // Final fallback if even GC calls fail
+            return GC.GetTotalMemory(false);
         }
     }
 
-    private long GetDiskUsed() {
+    private DriveInfo? GetDiskInfo() {
         try {
-            var driveInfo = new DriveInfo(Directory.GetCurrentDirectory());
-            return driveInfo.TotalSize - driveInfo.AvailableFreeSpace;
+            return new DriveInfo(Directory.GetCurrentDirectory());
         } catch {
-            return 0;
-        }
-    }
-
-    private long GetDiskTotal() {
-        try {
-            var driveInfo = new DriveInfo(Directory.GetCurrentDirectory());
-            return driveInfo.TotalSize;
-        } catch {
-            return 0;
+            return null;
         }
     }
 }

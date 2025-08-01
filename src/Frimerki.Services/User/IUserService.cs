@@ -3,7 +3,7 @@ using Frimerki.Models.DTOs;
 namespace Frimerki.Services.User;
 
 public interface IUserService {
-    Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null);
+    Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null);
     Task<UserResponse?> GetUserByEmailAsync(string email);
     Task<UserResponse> CreateUserAsync(CreateUserRequest request);
     Task<UserResponse?> UpdateUserAsync(string email, UserUpdateRequest request);

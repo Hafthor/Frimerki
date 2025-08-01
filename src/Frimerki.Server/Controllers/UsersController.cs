@@ -1,10 +1,7 @@
 using System.Security.Claims;
-
 using Frimerki.Models.DTOs;
 using Frimerki.Services.User;
-
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Server.Controllers;
 
@@ -24,21 +21,21 @@ public class UsersController : ControllerBase {
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<PaginatedInfo<UserResponse>>> GetUsers(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50,
         [FromQuery] string? domain = null) {
         try {
-            if (page < 1) {
-                page = 1;
+            if (skip < 0) {
+                skip = 0;
             }
-            if (pageSize is < 1 or > 100) {
-                pageSize = 50;
+            if (take is < 1 or > 100) {
+                take = 50;
             }
 
-            _logger.LogInformation("Getting users list - Page: {Page}, PageSize: {PageSize}, Domain: {Domain}",
-                page, pageSize, domain ?? "All");
+            _logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
+                skip, take, domain ?? "All");
 
-            var result = await _userService.GetUsersAsync(page, pageSize, domain);
+            var result = await _userService.GetUsersAsync(skip, take, domain);
             return Ok(result);
         } catch (Exception ex) {
             _logger.LogError(ex, "Error getting users list");
@@ -92,14 +89,14 @@ public class UsersController : ControllerBase {
             if (isAdmin || isOwnAccount) {
                 // Return full user details for admins or own account
                 return Ok(user);
-            } else {
-                // Return minimal info for non-admin users accessing other accounts
-                var minimalResponse = new UserMinimalResponse {
-                    Email = user.Email,
-                    Username = user.Username
-                };
-                return Ok(minimalResponse);
             }
+
+            // Return minimal info for non-admin users accessing other accounts
+            var minimalResponse = new UserMinimalResponse {
+                Email = user.Email,
+                Username = user.Username
+            };
+            return Ok(minimalResponse);
         } catch (Exception ex) {
             _logger.LogError(ex, "Error getting user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });

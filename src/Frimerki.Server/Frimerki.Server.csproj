@@ -12,9 +12,8 @@
     <FileVersion>1.0.0.0</FileVersion>
     <Version>1.0.0-alpha</Version>
     <Product>Frímerki Email Server</Product>
-    <Description>Lightweight, self-contained email server with SMTP and IMAP support</Description>
-    <Company>Frímerki Project</Company>
-    <Copyright>Copyright © 2025 Frímerki Project</Copyright>
+    <Description>Lightweight, self-contained email server with SMTP, POP3 and IMAP support</Description>
+    <Copyright>Copyright © 2025 by Hafthor Stefansson</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

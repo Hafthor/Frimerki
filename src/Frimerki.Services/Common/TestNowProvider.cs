@@ -31,31 +31,7 @@ public class TestNowProvider : INowProvider {
     /// Advances the current time by the specified amount.
     /// </summary>
     /// <param name="timeSpan">The amount of time to advance.</param>
-    public void Advance(TimeSpan timeSpan) {
+    public void Add(TimeSpan timeSpan) {
         _utcNow = _utcNow.Add(timeSpan);
-    }
-
-    /// <summary>
-    /// Advances the current time by the specified number of days.
-    /// </summary>
-    /// <param name="days">The number of days to advance.</param>
-    public void AdvanceDays(int days) {
-        _utcNow = _utcNow.AddDays(days);
-    }
-
-    /// <summary>
-    /// Advances the current time by the specified number of hours.
-    /// </summary>
-    /// <param name="hours">The number of hours to advance.</param>
-    public void AdvanceHours(int hours) {
-        _utcNow = _utcNow.AddHours(hours);
-    }
-
-    /// <summary>
-    /// Advances the current time by the specified number of minutes.
-    /// </summary>
-    /// <param name="minutes">The number of minutes to advance.</param>
-    public void AdvanceMinutes(int minutes) {
-        _utcNow = _utcNow.AddMinutes(minutes);
     }
 }

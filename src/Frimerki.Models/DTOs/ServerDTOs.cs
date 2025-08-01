@@ -63,9 +63,9 @@ public class SystemMetrics {
     public double MemoryUsagePercent { get; set; }
     public long MemoryUsedBytes { get; set; }
     public long MemoryTotalBytes { get; set; }
-    public double DiskUsagePercent { get; set; }
-    public long DiskUsedBytes { get; set; }
-    public long DiskTotalBytes { get; set; }
+    public double? DiskUsagePercent { get; set; }
+    public long? DiskUsedBytes { get; set; }
+    public long? DiskTotalBytes { get; set; }
     public int ActiveThreads { get; set; }
 }
 
@@ -93,13 +93,6 @@ public class ServerLogEntry {
     public string Message { get; set; } = "";
     public string? Exception { get; set; }
     public Dictionary<string, object>? Properties { get; set; }
-}
-
-public class ServerLogsResponse {
-    public List<ServerLogEntry> Logs { get; set; } = [];
-    public int TotalCount { get; set; }
-    public int PageSize { get; set; }
-    public int CurrentPage { get; set; }
 }
 
 public class ServerSettingsRequest {

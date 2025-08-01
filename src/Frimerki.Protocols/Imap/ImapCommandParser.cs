@@ -27,27 +27,21 @@ public class ImapCommandParser {
                 inQuotes = !inQuotes;
             } else if (inQuotes) {
                 currentPart.Append(ch);
-            } else {
-                switch (ch) {
-                    case ' ':
-                        if (currentPart.Length > 0) {
-                            parts.Add(currentPart.ToString());
-                            currentPart.Clear();
-                        }
-                        break;
-                    case '{':
-                        // Handle literal syntax {length}
-                        var closeBrace = trimmed.IndexOf('}', i);
-                        if (closeBrace > i && int.TryParse(trimmed[(i + 1)..closeBrace], out literalLength)) {
-                            i = closeBrace;
-                        } else {
-                            currentPart.Append(ch);
-                        }
-                        break;
-                    default:
-                        currentPart.Append(ch);
-                        break;
+            } else if (ch == ' ') {
+                if (currentPart.Length > 0) {
+                    parts.Add(currentPart.ToString());
+                    currentPart.Clear();
                 }
+            } else if (ch == '{') {
+                // Handle literal syntax {length}
+                var closeBrace = trimmed.IndexOf('}', i);
+                if (closeBrace > i && int.TryParse(trimmed[(i + 1)..closeBrace], out literalLength)) {
+                    i = closeBrace;
+                } else {
+                    currentPart.Append(ch);
+                }
+            } else {
+                currentPart.Append(ch);
             }
         }
 
@@ -77,34 +71,5 @@ public class ImapCommandParser {
         }
 
         return quotedString[1..^1];
-    }
-
-    /// <summary>
-    /// Parses a sequence set (e.g., "1,3:5,7:*")
-    /// </summary>
-    public List<uint> ParseSequenceSet(string sequenceSet, uint maxSequence) {
-        List<uint> result = [];
-        var parts = sequenceSet.Split(',');
-
-        foreach (var part in parts) {
-            if (part.Contains(':')) {
-                var range = part.Split(':');
-                if (range.Length == 2) {
-                    var start = range[0] == "*" ? maxSequence : uint.Parse(range[0]);
-                    var end = range[1] == "*" ? maxSequence : uint.Parse(range[1]);
-
-                    for (uint i = Math.Min(start, end); i <= Math.Max(start, end) && i <= maxSequence; i++) {
-                        result.Add(i);
-                    }
-                }
-            } else {
-                var num = part == "*" ? maxSequence : uint.TryParse(part, out uint partNum) ? partNum : maxSequence;
-                if (num <= maxSequence) {
-                    result.Add(num);
-                }
-            }
-        }
-
-        return result.Distinct().Order().ToList();
     }
 }

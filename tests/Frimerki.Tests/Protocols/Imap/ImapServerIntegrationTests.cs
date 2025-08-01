@@ -347,7 +347,7 @@ public class TestUserService : IUserService {
         return Task.FromResult<User?>(null);
     }
 
-    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) =>
+    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null) =>
         throw new NotImplementedException();
 
     public Task<UserResponse?> GetUserByEmailAsync(string email) =>

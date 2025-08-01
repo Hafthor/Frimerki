@@ -18,8 +18,7 @@ public class DomainResponse {
 public class DomainRequest {
     [Required]
     [StringLength(255)]
-    [RegularExpression(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
-        ErrorMessage = "Invalid domain name format")]
+    [RegularExpression(Constants.ValidDomainRegex, ErrorMessage = "Invalid domain name format")]
     public string Name { get; set; } = "";
 
     [StringLength(255)]
@@ -35,8 +34,7 @@ public class DomainRequest {
 
 public class DomainUpdateRequest {
     [StringLength(255)]
-    [RegularExpression(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
-        ErrorMessage = "Invalid domain name format")]
+    [RegularExpression(Constants.ValidDomainRegex, ErrorMessage = "Invalid domain name format")]
     public string? Name { get; set; }
 
     public bool? IsActive { get; set; }
@@ -62,8 +60,7 @@ public class DkimKeyResponse {
 
 public class GenerateDkimKeyRequest {
     [StringLength(63)]
-    [RegularExpression(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$",
-        ErrorMessage = "Invalid DKIM selector format")]
+    [RegularExpression(Constants.ValidDkimRegex, ErrorMessage = "Invalid DKIM selector format")]
     public string Selector { get; set; } = "default";
 
     [Range(1024, 4096)]

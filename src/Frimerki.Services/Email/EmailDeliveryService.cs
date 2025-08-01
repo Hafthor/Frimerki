@@ -108,14 +108,6 @@ public class EmailDeliveryService {
             var uid = await GetNextUidAsync(inboxFolder);
             var messageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>";
 
-            // Extract message content
-            var subject = mimeMessage.Subject ?? "";
-            var textBody = mimeMessage.TextBody ?? "";
-            var htmlBody = mimeMessage.HtmlBody;
-
-            // Build headers from the raw message
-            var headers = ExtractHeaders(rawMessageData);
-
             // Create the message entity
             var message = new Frimerki.Models.Entities.Message {
                 HeaderMessageId = messageId,
@@ -123,10 +115,10 @@ public class EmailDeliveryService {
                 ToAddress = toAddress,
                 CcAddress = ExtractAddresses(mimeMessage.Cc),
                 BccAddress = ExtractAddresses(mimeMessage.Bcc),
-                Subject = subject,
-                Body = textBody,
-                BodyHtml = htmlBody,
-                Headers = headers,
+                Subject = mimeMessage.Subject ?? "",
+                Body = mimeMessage.TextBody ?? "",
+                BodyHtml = mimeMessage.HtmlBody,
+                Headers = ExtractHeaders(rawMessageData),
                 MessageSize = rawMessageData.Length,
                 SentDate = mimeMessage.Date.DateTime,
                 ReceivedAt = _nowProvider.UtcNow,

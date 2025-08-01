@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Frimerki.Models;
 using Frimerki.Services.Domain;
 
 namespace Frimerki.Server.Middleware;
@@ -11,7 +12,7 @@ public class DomainContextMiddleware {
     private readonly ILogger<DomainContextMiddleware> _logger;
 
     // Regex to extract email addresses from various contexts
-    private static readonly Regex EmailRegex = new(@"([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+    private static readonly Regex EmailRegex = new(Constants.ValidEmailRegex,
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public DomainContextMiddleware(

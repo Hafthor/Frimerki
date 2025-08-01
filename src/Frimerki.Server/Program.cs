@@ -93,7 +93,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<EmailHub>("/hubs/email");
 
-// Fallback to serve the hello world page at root
+// Fallback to serve the hello world skip at root
 app.MapFallbackToFile("index.html");
 
 try {

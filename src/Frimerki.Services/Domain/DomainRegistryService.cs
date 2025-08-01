@@ -15,8 +15,6 @@ public interface IDomainRegistryService {
     Task<List<DomainRegistry>> GetAllDomainsAsync();
     Task<bool> DomainExistsAsync(string domainName);
     Task SetDomainActiveAsync(string domainName, bool isActive);
-    Task<bool> DatabaseExistsAsync(string databaseName);
-    Task<List<string>> GetExistingDatabasesAsync();
 }
 
 public class DomainRegistryService : IDomainRegistryService {
@@ -116,16 +114,8 @@ public class DomainRegistryService : IDomainRegistryService {
         }
     }
 
-    public async Task<bool> DatabaseExistsAsync(string databaseName) {
+    private async Task<bool> DatabaseExistsAsync(string databaseName) {
         return await _globalContext.DomainRegistry
             .AnyAsync(d => d.DatabaseName == databaseName);
-    }
-
-    public async Task<List<string>> GetExistingDatabasesAsync() {
-        return await _globalContext.DomainRegistry
-            .Select(d => d.DatabaseName)
-            .Distinct()
-            .OrderBy(name => name)
-            .ToListAsync();
     }
 }

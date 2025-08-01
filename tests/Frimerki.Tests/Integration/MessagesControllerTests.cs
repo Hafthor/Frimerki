@@ -254,7 +254,7 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
         Assert.NotNull(result);
         Assert.Equal(0, result.Skip);
         Assert.Equal(10, result.Take);
-        Assert.Null(result.NextUrl); // Only 1 message, so no next page
+        Assert.Null(result.NextUrl); // Only 1 message, so no next skip
     }
 
     [Fact]

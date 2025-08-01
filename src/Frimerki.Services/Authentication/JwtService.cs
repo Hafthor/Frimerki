@@ -2,9 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-
 using Frimerki.Models.DTOs;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -14,7 +12,6 @@ namespace Frimerki.Services.Authentication;
 public interface IJwtService {
     string GenerateAccessToken(UserSessionInfo user);
     string GenerateRefreshToken();
-    ClaimsPrincipal? ValidateToken(string token);
     DateTime GetTokenExpiration(bool rememberMe = false);
 }
 
@@ -31,7 +28,7 @@ public class JwtService : IJwtService {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetJwtSecret()));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new List<Claim> {
+        List<Claim> claims = [
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Email, user.Email),
@@ -40,7 +37,7 @@ public class JwtService : IJwtService {
             new("domain_name", user.DomainName),
             new("can_receive", user.CanReceive.ToString()),
             new("can_login", user.CanLogin.ToString())
-        };
+        ];
 
         if (!string.IsNullOrEmpty(user.FullName)) {
             claims.Add(new Claim(ClaimTypes.GivenName, user.FullName));
@@ -64,43 +61,17 @@ public class JwtService : IJwtService {
         return Convert.ToBase64String(randomBytes);
     }
 
-    public ClaimsPrincipal? ValidateToken(string token) {
-        try {
-            JwtSecurityTokenHandler tokenHandler = new();
-            var key = Encoding.UTF8.GetBytes(GetJwtSecret());
-
-            var validationParameters = new TokenValidationParameters {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = true,
-                ValidIssuer = _configuration["Jwt:Issuer"] ?? "Frimerki",
-                ValidateAudience = true,
-                ValidAudience = _configuration["Jwt:Audience"] ?? "Frimerki",
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            };
-
-            var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-            return principal;
-        } catch (Exception ex) {
-            _logger.LogWarning(ex, "Token validation failed");
-            return null;
-        }
-    }
-
     public DateTime GetTokenExpiration(bool rememberMe = false) {
-        var expirationHours = rememberMe ? 24 * 30 : 8; // 30 days if remember me, 8 hours otherwise
-        return DateTime.UtcNow.AddHours(expirationHours);
+        // 30 days if remember me, 8 hours otherwise
+        var expirationHours = rememberMe ? TimeSpan.FromDays(30) : TimeSpan.FromHours(8);
+        return DateTime.UtcNow.Add(expirationHours);
     }
 
     private string GetJwtSecret() {
         var secret = _configuration["Jwt:Secret"];
         if (string.IsNullOrEmpty(secret)) {
             // Generate a random secret for development
-            var bytes = new byte[32];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(bytes);
-            secret = Convert.ToBase64String(bytes);
+            secret = GenerateRefreshToken();
             _logger.LogWarning("JWT secret not configured, using generated secret. This should be set in production.");
         }
         return secret;

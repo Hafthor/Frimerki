@@ -330,7 +330,7 @@ public class MockUserServiceForEmailController : IUserService {
     }
 
     // Implement other IUserService methods as needed for testing
-    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domainFilter = null) =>
+    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null) =>
         Task.FromResult(new PaginatedInfo<UserResponse> { Items = [], TotalCount = 0 });
 
     public Task<UserResponse> CreateUserAsync(CreateUserRequest request) =>

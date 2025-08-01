@@ -1,9 +1,7 @@
 using System.Security.Claims;
-
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Email;
 using Frimerki.Services.User;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

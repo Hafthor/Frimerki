@@ -18,7 +18,7 @@ public class HealthController : ControllerBase {
     static HealthController() {
         var assembly = Assembly.GetEntryAssembly();
         Version = assembly?.GetName().Version?.ToString() ?? "Unknown";
-        ProductName = assembly?.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? "Frímerki";
+        ProductName = assembly?.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? "Frimerki";
         Description = assembly?.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description ?? "Lightweight Email Server";
     }
 
@@ -31,7 +31,7 @@ public class HealthController : ControllerBase {
     public IActionResult GetHealth() {
         var response = new {
             Status = "Healthy",
-            Server = "Frímerki Email Server",
+            Server = "Frimerki Email Server",
             Version = Version,
             Timestamp = _nowProvider.UtcNow,
             Framework = ".NET 8"

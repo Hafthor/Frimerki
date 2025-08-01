@@ -1,10 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
-
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -98,7 +96,6 @@ public class DomainService : IDomainService {
             throw new ArgumentException($"Domain '{domainName}' not found");
         }
 
-        var userCount = domain.Users?.Count ?? 0;
         var storageUsed = await CalculateDomainStorageAsync(domain.Id);
         var activeDkimKey = domain.DkimKeys?.FirstOrDefault(k => k.IsActive);
 
@@ -107,19 +104,18 @@ public class DomainService : IDomainService {
             IsActive = await GetDomainIsActiveAsync(domain.Name),
             DatabaseName = "", // Will be populated from registry if needed
             IsDedicated = false, // Will be calculated if needed
-            CatchAllUser = domain.CatchAllUser != null
-                ? $"{domain.CatchAllUser.Username}@{domain.Name}"
-                : null,
+            CatchAllUser = domain.CatchAllUser == null ? null :
+                $"{domain.CatchAllUser.Username}@{domain.Name}",
             CreatedAt = domain.CreatedAt,
-            UserCount = userCount,
+            UserCount = domain.Users?.Count ?? 0,
             StorageUsed = storageUsed,
             HasDkim = activeDkimKey != null,
-            DkimKey = activeDkimKey != null ? new DkimKeyInfo {
+            DkimKey = activeDkimKey == null ? null : new DkimKeyInfo {
                 Selector = activeDkimKey.Selector,
                 PublicKey = activeDkimKey.PublicKey,
                 IsActive = activeDkimKey.IsActive,
                 CreatedAt = activeDkimKey.CreatedAt
-            } : null
+            }
         };
     }
 
@@ -383,8 +379,7 @@ public class DomainService : IDomainService {
             var length = Math.Min(64, base64String.Length - i);
             result.AppendLine(base64String.Substring(i, length));
         }
-        result.Append("-----END PRIVATE KEY-----");
-        return result.ToString();
+        return result.Append("-----END PRIVATE KEY-----").ToString();
     }
 
     private async Task<bool> GetDomainIsActiveAsync(string domainName) {

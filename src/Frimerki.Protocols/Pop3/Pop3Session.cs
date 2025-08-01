@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Message;
 using Frimerki.Services.Session;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Protocols.Pop3;
@@ -32,25 +31,45 @@ public partial class Pop3Session {
 
     public async Task HandleAsync(TcpClient client, CancellationToken cancellationToken) {
         try {
-            using (_stream = client.GetStream())
-            using (_reader = new StreamReader(_stream, Encoding.ASCII))
-            using (_writer = new StreamWriter(_stream, Encoding.ASCII) { AutoFlush = true }) {
-                await SendResponseAsync("+OK Frimerki POP3 Server Ready", cancellationToken);
+            _stream = client.GetStream();
+            _reader = new StreamReader(_stream, Encoding.ASCII);
+            _writer = new StreamWriter(_stream, Encoding.ASCII) { AutoFlush = true };
 
-                while (!cancellationToken.IsCancellationRequested) {
-                    var line = await _reader.ReadLineAsync(cancellationToken);
-                    if (line == null) {
-                        break;
-                    }
+            await SendResponseAsync("+OK Frimerki POP3 Server Ready", cancellationToken);
 
-                    _logger.LogDebug("POP3 Command: {Command}", line);
-                    await ProcessCommandAsync(line, cancellationToken);
+            while (!cancellationToken.IsCancellationRequested) {
+                var line = await _reader.ReadLineAsync(cancellationToken);
+                if (line == null) {
+                    break;
                 }
+
+                _logger.LogDebug("POP3 Command: {Command}", line);
+                await ProcessCommandAsync(line, cancellationToken);
             }
         } catch (OperationCanceledException) {
             // Expected when cancellation token is triggered
         } catch (Exception ex) {
             _logger.LogError(ex, "POP3 session error");
+        } finally {
+            // Clean up resources
+            try {
+                _writer?.Dispose();
+            } catch {
+                // Ignore disposal errors
+            }
+            _writer = null;
+            try {
+                _reader?.Dispose();
+            } catch {
+                // Ignore disposal errors
+            }
+            _reader = null;
+            try {
+                _stream?.Dispose();
+            } catch {
+                // Ignore disposal errors
+            }
+            _stream = null;
         }
     }
 
@@ -146,7 +165,7 @@ public partial class Pop3Session {
             return;
         }
 
-        var request = new Frimerki.Models.DTOs.MessageFilterRequest {
+        var request = new MessageFilterRequest {
             Folder = "INBOX",
             Skip = 0,
             Take = 1000 // POP3 typically loads all messages
@@ -180,27 +199,34 @@ public partial class Pop3Session {
         }
 
         if (string.IsNullOrWhiteSpace(args)) {
-            // List all messages
-            var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
-            await SendResponseAsync($"+OK {visibleMessages.Count} messages ({visibleMessages.Sum(m => m.Size)} octets)", cancellationToken);
-
-            foreach (var msg in visibleMessages) {
-                await SendResponseAsync($"{msg.Index} {msg.Size}", cancellationToken);
-            }
-            await SendResponseAsync(".", cancellationToken);
+            await ListAllMessagesAsync(cancellationToken);
         } else {
-            // List specific message
-            if (int.TryParse(args, out var msgIndex)) {
-                var message = _messages.FirstOrDefault(m => m.Index == msgIndex);
-                if (message == null || _deletedMessages.Contains(msgIndex)) {
-                    await SendResponseAsync("-ERR No such message", cancellationToken);
-                } else {
-                    await SendResponseAsync($"+OK {msgIndex} {message.Size}", cancellationToken);
-                }
-            } else {
-                await SendResponseAsync("-ERR Invalid message number", cancellationToken);
-            }
+            await ListSpecificMessageAsync(args, cancellationToken);
         }
+    }
+
+    private async Task ListSpecificMessageAsync(string args, CancellationToken cancellationToken) {
+        if (!int.TryParse(args, out var msgIndex)) {
+            await SendResponseAsync("-ERR Invalid message number", cancellationToken);
+            return;
+        }
+
+        var message = _messages.FirstOrDefault(m => m.Index == msgIndex);
+        if (message == null || _deletedMessages.Contains(msgIndex)) {
+            await SendResponseAsync("-ERR No such message", cancellationToken);
+        } else {
+            await SendResponseAsync($"+OK {msgIndex} {message.Size}", cancellationToken);
+        }
+    }
+
+    private async Task ListAllMessagesAsync(CancellationToken cancellationToken) {
+        var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
+        await SendResponseAsync($"+OK {visibleMessages.Count} messages ({visibleMessages.Sum(m => m.Size)} octets)", cancellationToken);
+
+        foreach (var msg in visibleMessages) {
+            await SendResponseAsync($"{msg.Index} {msg.Size}", cancellationToken);
+        }
+        await SendResponseAsync(".", cancellationToken);
     }
 
     private async Task HandleRetrAsync(string args, CancellationToken cancellationToken) {
@@ -315,27 +341,36 @@ public partial class Pop3Session {
         }
 
         if (string.IsNullOrWhiteSpace(args)) {
-            // List all message UIDs
-            var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
-            await SendResponseAsync($"+OK {visibleMessages.Count} messages", cancellationToken);
-
-            foreach (var msg in visibleMessages) {
-                await SendResponseAsync($"{msg.Index} {msg.Uid}", cancellationToken);
-            }
-            await SendResponseAsync(".", cancellationToken);
+            await ListAllMessageUidsAsync(cancellationToken);
         } else {
-            // Get specific message UID
-            if (int.TryParse(args, out var msgIndex)) {
-                var message = _messages.FirstOrDefault(m => m.Index == msgIndex);
-                if (message == null || _deletedMessages.Contains(msgIndex)) {
-                    await SendResponseAsync("-ERR No such message", cancellationToken);
-                } else {
-                    await SendResponseAsync($"+OK {msgIndex} {message.Uid}", cancellationToken);
-                }
-            } else {
-                await SendResponseAsync("-ERR Invalid message number", cancellationToken);
-            }
+            await GetSpecificMessageUidAsync(args, cancellationToken);
         }
+    }
+
+    private async Task GetSpecificMessageUidAsync(string args, CancellationToken cancellationToken) {
+        // Get specific message UID
+        if (!int.TryParse(args, out var msgIndex)) {
+            await SendResponseAsync("-ERR Invalid message number", cancellationToken);
+            return;
+        }
+
+        var message = _messages.FirstOrDefault(m => m.Index == msgIndex);
+        if (message == null || _deletedMessages.Contains(msgIndex)) {
+            await SendResponseAsync("-ERR No such message", cancellationToken);
+        } else {
+            await SendResponseAsync($"+OK {msgIndex} {message.Uid}", cancellationToken);
+        }
+    }
+
+    private async Task ListAllMessageUidsAsync(CancellationToken cancellationToken) {
+        // List all message UIDs
+        var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
+        await SendResponseAsync($"+OK {visibleMessages.Count} messages", cancellationToken);
+
+        foreach (var msg in visibleMessages) {
+            await SendResponseAsync($"{msg.Index} {msg.Uid}", cancellationToken);
+        }
+        await SendResponseAsync(".", cancellationToken);
     }
 
     private async Task HandleTopAsync(string args, CancellationToken cancellationToken) {

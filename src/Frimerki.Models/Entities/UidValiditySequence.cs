@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace Frimerki.Models.Entities;
 
 public class UidValiditySequence {

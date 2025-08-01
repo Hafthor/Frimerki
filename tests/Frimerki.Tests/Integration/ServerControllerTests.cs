@@ -141,19 +141,19 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task GetServerLogs_ReturnsLogData() {
         // Act
-        var response = await _client.GetAsync("/api/server/logs?page=1&pageSize=10");
+        var response = await _client.GetAsync("/api/server/logs?skip=20&take=10");
 
         // Assert
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
-        var logs = JsonSerializer.Deserialize<ServerLogsResponse>(content, new JsonSerializerOptions {
+        var logs = JsonSerializer.Deserialize<PaginatedInfo<ServerLogEntry>>(content, new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true
         });
 
         Assert.NotNull(logs);
-        Assert.NotNull(logs.Logs);
-        Assert.Equal(1, logs.CurrentPage);
-        Assert.Equal(10, logs.PageSize);
+        Assert.NotNull(logs.Items);
+        Assert.Equal(20, logs.Skip);
+        Assert.Equal(10, logs.Take);
     }
 
     [Fact]

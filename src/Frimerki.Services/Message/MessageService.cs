@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Linq.Expressions;
 using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
@@ -29,7 +30,8 @@ public class MessageService : IMessageService {
             [AnsweredFlag] = req => req.Answered,
             [FlaggedFlag] = req => req.Flagged,
             [DeletedFlag] = req => req.Deleted,
-            [DraftFlag] = req => req.Draft
+            [DraftFlag] = req => req.Draft,
+            //[RecentFlag] = req => req.Recent, // Not included on purpose?
         }.ToFrozenDictionary();
 
     public MessageService(EmailDbContext context, INowProvider nowProvider, ILogger<MessageService> logger) {
@@ -401,94 +403,107 @@ public class MessageService : IMessageService {
 
     // Helper methods
     private IQueryable<UserMessage> ApplyFlagFiltering(IQueryable<UserMessage> query, int userId, string flags) {
-        return flags.ToLower() switch {
-            "read" or "seen" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == SeenFlag && mf.IsSet)),
-            "unread" or "unseen" => query.Where(um => !um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == SeenFlag && mf.IsSet)),
-            "flagged" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == FlaggedFlag && mf.IsSet)),
-            "answered" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == AnsweredFlag && mf.IsSet)),
-            "draft" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == DraftFlag && mf.IsSet)),
-            "deleted" => query.Where(um => um.Message.MessageFlags
-                .Any(mf => mf.UserId == userId && mf.FlagName == DeletedFlag && mf.IsSet)),
-            _ => query
+        (string? name, bool set) flag = flags.ToLower() switch {
+            "read" or "seen" => (SeenFlag, true),
+            "unread" or "unseen" => (SeenFlag, false),
+            "flagged" => (FlaggedFlag, true),
+            "answered" => (AnsweredFlag, true),
+            "draft" => (DraftFlag, true),
+            "deleted" => (DeletedFlag, true),
+            _ => (null, true)
         };
+        if (flag.name == null) {
+            return query;
+        }
+        return query.Where(um => um.Message.MessageFlags
+            .Any(mf => mf.UserId == userId && mf.FlagName == flag.name && mf.IsSet) == flag.set);
     }
 
     private IQueryable<UserMessage> ApplySorting(IQueryable<UserMessage> query, string sortBy, string sortOrder) {
         var isDescending = sortOrder.Equals("desc", StringComparison.OrdinalIgnoreCase);
 
         return sortBy.ToLower() switch {
-            "subject" => isDescending
-                ? query.OrderByDescending(um => um.Message.Subject)
-                : query.OrderBy(um => um.Message.Subject),
-            "sender" or "from" => isDescending
-                ? query.OrderByDescending(um => um.Message.FromAddress)
-                : query.OrderBy(um => um.Message.FromAddress),
-            "size" => isDescending
-                ? query.OrderByDescending(um => um.Message.MessageSize)
-                : query.OrderBy(um => um.Message.MessageSize),
-            _ => isDescending // default to date
-                ? query.OrderByDescending(um => um.Message.SentDate ?? um.Message.ReceivedAt)
-                : query.OrderBy(um => um.Message.SentDate ?? um.Message.ReceivedAt)
+            "subject" => OrderBy(um => um.Message.Subject),
+            "sender" or "from" => OrderBy(um => um.Message.FromAddress),
+            "size" => OrderBy(um => um.Message.MessageSize),
+            _ => OrderBy(um => um.Message.SentDate ?? um.Message.ReceivedAt) // default to date
         };
+
+        IOrderedQueryable<UserMessage> OrderBy<T>(Expression<Func<UserMessage, T>> func) =>
+            isDescending ? query.OrderByDescending(func) : query.OrderBy(func);
     }
 
     private string BuildNextUrl(MessageFilterRequest request, int nextSkip) {
-        var queryParams = new List<string> { $"skip={nextSkip}", $"take={request.Take}" };
+        Dictionary<string, string> query = new() {
+            ["skip"] = $"{nextSkip}",
+            ["take"] = $"{request.Take}",
+        };
 
         if (!string.IsNullOrEmpty(request.Q)) {
-            queryParams.Add($"q={Uri.EscapeDataString(request.Q)}");
+            query["q"] = request.Q;
         }
 
         if (!string.IsNullOrEmpty(request.Folder)) {
-            queryParams.Add($"folder={Uri.EscapeDataString(request.Folder)}");
+            query["folder"] = request.Folder;
         }
 
         if (request.FolderId.HasValue) {
-            queryParams.Add($"folderId={request.FolderId.Value}");
+            query["folderId"] = $"{request.FolderId.Value}";
         }
 
         if (!string.IsNullOrEmpty(request.Flags)) {
-            queryParams.Add($"flags={Uri.EscapeDataString(request.Flags)}");
+            query["flags"] = request.Flags;
         }
 
         if (!string.IsNullOrEmpty(request.From)) {
-            queryParams.Add($"from={Uri.EscapeDataString(request.From)}");
+            query["from"] = request.From;
         }
 
         if (!string.IsNullOrEmpty(request.To)) {
-            queryParams.Add($"to={Uri.EscapeDataString(request.To)}");
+            query["to"] = request.To;
         }
 
         if (request.Since.HasValue) {
-            queryParams.Add($"since={request.Since.Value:yyyy-MM-dd}");
+            query["since"] = FormatDateTime(request.Since.Value);
         }
 
         if (request.Before.HasValue) {
-            queryParams.Add($"before={request.Before.Value:yyyy-MM-dd}");
+            query["before"] = FormatDateTime(request.Before.Value);
         }
 
         if (request.MinSize.HasValue) {
-            queryParams.Add($"minSize={request.MinSize.Value}");
+            query["minSize"] = $"{request.MinSize.Value}";
         }
 
         if (request.MaxSize.HasValue) {
-            queryParams.Add($"maxSize={request.MaxSize.Value}");
+            query["maxSize"] = $"{request.MaxSize.Value}";
         }
 
         if (request.SortBy != "date") {
-            queryParams.Add($"sortBy={Uri.EscapeDataString(request.SortBy)}");
+            query["sortBy"] = request.SortBy;
         }
 
         if (request.SortOrder != "desc") {
-            queryParams.Add($"sortOrder={Uri.EscapeDataString(request.SortOrder)}");
+            query["sortOrder"] = request.SortOrder;
         }
 
-        return $"/api/messages?{string.Join("&", queryParams)}";
+        return $"/api/messages?{string.Join("&", query.Select(q => q.Key + "=" + Uri.EscapeDataString(q.Value)))}";
+    }
+
+    private string? FormatDateTime(DateTime? dt) {
+        return dt.HasValue ? FormatDateTime(dt.Value) : null;
+    }
+
+    private string FormatDateTime(DateTime dt) {
+        if (dt.Microsecond != 0) {
+            return $"{dt:yyyy-MM-ddTHH:mm:ss.tttttt}";
+        } else if (dt.Second != 0) {
+            return $"{dt:yyyy-MM-ddTHH:mm:ss}";
+        } else if (dt.Minute != 0 || dt.Hour != 0) {
+            return $"{dt:yyyy-MM-ddTHH:mm}";
+        } else {
+            return $"{dt:yyyy-MM-dd}";
+        }
     }
 
     private Dictionary<string, object> BuildAppliedFilters(MessageFilterRequest request) {
@@ -500,8 +515,8 @@ public class MessageService : IMessageService {
         AddStringFilter(filters, "flags", request.Flags);
         AddStringFilter(filters, "from", request.From);
         AddStringFilter(filters, "to", request.To);
-        AddFilter(filters, "since", request.Since?.ToString("yyyy-MM-dd"));
-        AddFilter(filters, "before", request.Before?.ToString("yyyy-MM-dd"));
+        AddFilter(filters, "since", FormatDateTime(request.Since));
+        AddFilter(filters, "before", FormatDateTime(request.Before));
         AddFilter(filters, "minSize", request.MinSize);
         AddFilter(filters, "maxSize", request.MaxSize);
 
@@ -601,7 +616,7 @@ public class MessageService : IMessageService {
             .Where(u => u.Id == userId)
             .FirstOrDefaultAsync();
 
-        return user != null ? $"{user.Username}@{user.Domain.Name}" : "unknown@localhost";
+        return user != null ? $"{user.Username}@{user.Domain.Name}" : $"unknown{userId}@localhost";
     }
 
     private async Task<int> GetNextUidAsync() {

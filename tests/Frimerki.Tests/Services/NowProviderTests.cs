@@ -30,34 +30,6 @@ public class NowProviderTests {
     }
 
     [Fact]
-    public void TestNowProvider_AdvanceDays_UpdatesTime() {
-        // Arrange
-        var initialTime = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc);
-        var provider = new TestNowProvider(initialTime);
-
-        // Act
-        provider.AdvanceDays(5);
-
-        // Assert
-        var expectedTime = initialTime.AddDays(5);
-        Assert.Equal(expectedTime, provider.UtcNow);
-    }
-
-    [Fact]
-    public void TestNowProvider_AdvanceHours_UpdatesTime() {
-        // Arrange
-        var initialTime = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc);
-        var provider = new TestNowProvider(initialTime);
-
-        // Act
-        provider.AdvanceHours(3);
-
-        // Assert
-        var expectedTime = initialTime.AddHours(3);
-        Assert.Equal(expectedTime, provider.UtcNow);
-    }
-
-    [Fact]
     public void TestNowProvider_AdvanceTimeSpan_UpdatesTime() {
         // Arrange
         var initialTime = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc);
@@ -65,7 +37,7 @@ public class NowProviderTests {
         var timeToAdvance = TimeSpan.FromMinutes(45);
 
         // Act
-        provider.Advance(timeToAdvance);
+        provider.Add(timeToAdvance);
 
         // Assert
         var expectedTime = initialTime.Add(timeToAdvance);

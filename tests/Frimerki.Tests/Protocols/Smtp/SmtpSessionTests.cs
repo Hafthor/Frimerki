@@ -78,7 +78,7 @@ public class SmtpSessionTests : IDisposable {
         var greeting = await reader.ReadLineAsync();
 
         // Assert
-        Assert.Contains("220 frímerki.local ESMTP Frímerki Mail Server", greeting);
+        Assert.Contains("220 frimerki.local ESMTP Frimerki Mail Server", greeting);
 
         // Send QUIT to end session gracefully
         await writer.WriteLineAsync("QUIT");
@@ -111,7 +111,7 @@ public class SmtpSessionTests : IDisposable {
         var response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
-        Assert.Contains("250 frímerki.local Hello, pleased to meet you", response);
+        Assert.Contains("250 frimerki.local Hello, pleased to meet you", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
@@ -149,7 +149,7 @@ public class SmtpSessionTests : IDisposable {
         var fullResponse = string.Join("\n", responses);
 
         // Assert
-        Assert.Contains("250-frímerki.local Hello, pleased to meet you", fullResponse);
+        Assert.Contains("250-frimerki.local Hello, pleased to meet you", fullResponse);
         Assert.Contains("250-AUTH PLAIN LOGIN", fullResponse);
         Assert.Contains("250-8BITMIME", fullResponse);
         Assert.Contains("250 ENHANCEDSTATUSCODES", fullResponse);
@@ -503,7 +503,7 @@ public class SmtpSessionTests : IDisposable {
         var line4 = await reader.ReadLineAsync(cts.Token);
 
         // Assert that we got the expected HELP response
-        Assert.Contains("214-This is Frímerki Mail Server", line1);
+        Assert.Contains("214-This is Frimerki Mail Server", line1);
         Assert.Contains("214-Commands supported:", line2);
         Assert.Contains("214-  HELO EHLO AUTH MAIL RCPT DATA RSET NOOP QUIT HELP", line3);
         Assert.Contains("214 End of HELP info", line4);

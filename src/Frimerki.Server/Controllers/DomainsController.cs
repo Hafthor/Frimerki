@@ -1,7 +1,5 @@
-using System.Text.RegularExpressions;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Domain;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Frimerki.Server.Controllers;
@@ -9,7 +7,7 @@ namespace Frimerki.Server.Controllers;
 [ApiController]
 [Route("api/domains")]
 // TODO: Add proper authorization when authentication is implemented
-public partial class DomainsController : ControllerBase {
+public class DomainsController : ControllerBase {
     private readonly IDomainService _domainService;
     private readonly ILogger<DomainsController> _logger;
 
@@ -185,20 +183,5 @@ public partial class DomainsController : ControllerBase {
             _logger.LogError(ex, "Error generating DKIM key for domain {DomainName}", domainName);
             return StatusCode(500, new { error = "Failed to generate DKIM key" });
         }
-    }
-
-    [GeneratedRegex(@"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$")]
-    private static partial Regex DomainPartRegex();
-
-    private static bool IsValidDomainName(string domainName) {
-        if (string.IsNullOrWhiteSpace(domainName) || domainName.Length > 255) {
-            return false;
-        }
-
-        var parts = domainName.Split('.');
-        return parts.All(part =>
-            !string.IsNullOrEmpty(part) &&
-            part.Length <= 63 &&
-            DomainPartRegex().IsMatch(part));
     }
 }

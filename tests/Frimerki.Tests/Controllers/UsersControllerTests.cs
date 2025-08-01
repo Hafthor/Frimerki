@@ -60,13 +60,13 @@ public class UsersControllerTests {
     }
 
     [Fact]
-    public async Task GetUsers_InvalidPageSize_CorrectsTo50() {
+    public async Task GetUsers_InvalidTakeSize_CorrectsTo50() {
         // Arrange
         var expectedResponse = new PaginatedInfo<UserResponse> { Items = [], Skip = 0, Take = 50, TotalCount = 0 };
         _mockUserService.SetUsersResponse(expectedResponse);
 
         // Act
-        var result = await _controller.GetUsers(1, 150, null);
+        var result = await _controller.GetUsers(0, 150, null);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -434,11 +434,11 @@ public class MockUserServiceForController : IUserService {
     public void SetUserResponse(UserResponse response) => _userResponse = response;
     public void SetUserStatsResponse(UserStatsResponse response) => _userStatsResponse = response;
 
-    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int page = 1, int pageSize = 50, string? domain = null) {
+    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domain = null) {
         if (ShouldThrowOnGetUsers) {
             throw new Exception("Service error");
         }
-        return Task.FromResult(_usersResponse ?? new PaginatedInfo<UserResponse> { Items = [], Skip = (page - 1) * pageSize, Take = pageSize, TotalCount = 0 });
+        return Task.FromResult(_usersResponse ?? new PaginatedInfo<UserResponse> { Items = [], Skip = (skip - 1) * take, Take = take, TotalCount = 0 });
     }
 
     public Task<UserResponse> CreateUserAsync(CreateUserRequest request) {

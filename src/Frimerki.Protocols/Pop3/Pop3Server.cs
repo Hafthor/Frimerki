@@ -73,6 +73,4 @@ public class Pop3Server : BackgroundService {
             _logger.LogInformation("POP3 server stopped");
         }
     }
-
-    public override void Dispose() => base.Dispose();
 }

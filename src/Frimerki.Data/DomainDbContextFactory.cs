@@ -10,7 +10,6 @@ namespace Frimerki.Data;
 public interface IDomainDbContextFactory {
     DomainDbContext CreateDbContext(string domainName);
     Task<DomainDbContext> CreateDbContextAsync(string domainName);
-    string GetDatabasePath(string domainName);
     Task EnsureDatabaseExistsAsync(string domainName);
 }
 
@@ -31,7 +30,7 @@ public class DomainDbContextFactory : IDomainDbContextFactory {
         Directory.CreateDirectory(_databaseDirectory);
     }
 
-    public string GetDatabasePath(string domainName) {
+    private string GetDatabasePath(string domainName) {
         // Sanitize domain name for file system
         var sanitizedDomain = string.Join("_", domainName.Split(Path.GetInvalidFileNameChars()));
         return Path.Combine(_databaseDirectory, $"domain_{sanitizedDomain}.db");
@@ -52,23 +51,24 @@ public class DomainDbContextFactory : IDomainDbContextFactory {
 
     public async Task EnsureDatabaseExistsAsync(string domainName) {
         var dbPath = GetDatabasePath(domainName);
-
-        if (!File.Exists(dbPath)) {
-            _logger.LogInformation("Creating new domain database for {DomainName} at {DatabasePath}", domainName, dbPath);
-
-            using var context = CreateDbContext(domainName);
-            await context.Database.EnsureCreatedAsync();
-
-            // Create the domain record in the domain-specific database
-            var domain = new Models.Entities.DomainSettings {
-                Name = domainName,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            context.DomainSettings.Add(domain);
-            await context.SaveChangesAsync();
-
-            _logger.LogInformation("Domain database created successfully for {DomainName}", domainName);
+        if (File.Exists(dbPath)) {
+            return;
         }
+
+        _logger.LogInformation("Creating new domain database for {DomainName} at {DatabasePath}", domainName, dbPath);
+
+        using var context = CreateDbContext(domainName);
+        await context.Database.EnsureCreatedAsync();
+
+        // Create the domain record in the domain-specific database
+        var domain = new Models.Entities.DomainSettings {
+            Name = domainName,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.DomainSettings.Add(domain);
+        await context.SaveChangesAsync();
+
+        _logger.LogInformation("Domain database created successfully for {DomainName}", domainName);
     }
 }

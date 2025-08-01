@@ -1,6 +1,6 @@
 # Frímerki Email Server
 
-**Frímerki** (Icelandic for "postage stamp", pronounced [ˈfrɪːmɛr̥kɪ] or FREE-mer-kih) is a lightweight, self-contained email server built with C# and .NET 8. Designed for minimal hardware requirements and maximum efficiency.
+**Frímerki** is a lightweight, self-contained email server built with C# and .NET 8. Designed for minimal hardware requirements and maximum efficiency.
 
 ## 🚀 Quick Start
 
@@ -203,7 +203,7 @@ dotnet watch test
 
 ## 🌟 Why Frímerki?
 
-- **Production Ready**: Complete email server with SMTP and IMAP support
+- **Production Ready**: Complete email server with SMTP, POP3 and IMAP support
 - **Lightweight**: Minimal dependencies, runs on modest hardware
 - **Self-contained**: Single binary deployment with embedded SQLite database
 - **Modern**: Built with .NET 8 and latest C# 12 features
@@ -214,4 +214,4 @@ dotnet watch test
 
 ---
 
-**Etymology**: *Frímerki* is the Icelandic word for "postage stamp" - small, essential, and designed to deliver messages reliably across any distance.
+**Etymology**: *Frímerki* (pronounced [ˈfrɪːmɛr̥kɪ] or FREE-mer-kih) is the Icelandic word for "postage stamp" - small, essential, and designed to deliver messages reliably across any distance.

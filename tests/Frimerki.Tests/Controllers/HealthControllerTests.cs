@@ -46,7 +46,7 @@ public class HealthControllerTests {
         Assert.NotNull(frameworkProperty);
 
         Assert.Equal("Healthy", statusProperty.GetValue(response));
-        Assert.Equal("Frímerki Email Server", serverProperty.GetValue(response));
+        Assert.Equal("Frimerki Email Server", serverProperty.GetValue(response));
         Assert.Equal(".NET 8", frameworkProperty.GetValue(response));
         Assert.Equal(testTime, timestampProperty.GetValue(response));
     }

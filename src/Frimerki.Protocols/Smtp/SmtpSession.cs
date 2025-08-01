@@ -1,11 +1,9 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
-
 using Frimerki.Models.Entities;
 using Frimerki.Services.Email;
 using Frimerki.Services.User;
-
 using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Protocols.Smtp;
@@ -14,10 +12,10 @@ namespace Frimerki.Protocols.Smtp;
 /// Handles individual SMTP client sessions following RFC 5321
 /// </summary>
 public partial class SmtpSession : IDisposable {
-    private readonly TcpClient _client;
-    private readonly NetworkStream _stream;
-    private readonly StreamReader _reader;
-    private readonly StreamWriter _writer;
+    private TcpClient _client;
+    private NetworkStream _stream;
+    private StreamReader _reader;
+    private StreamWriter _writer;
     private readonly IUserService _userService;
     private readonly EmailDeliveryService _emailDeliveryService;
     private readonly ILogger _logger;
@@ -47,7 +45,7 @@ public partial class SmtpSession : IDisposable {
     public async Task HandleAsync(CancellationToken cancellationToken) {
         try {
             // Send greeting
-            await SendResponseAsync("220 frímerki.local ESMTP Frímerki Mail Server");
+            await SendResponseAsync("220 frimerki.local ESMTP Frimerki Mail Server");
             _state = SmtpSessionState.Connected;
 
             string? line;
@@ -102,7 +100,7 @@ public partial class SmtpSession : IDisposable {
         }
 
         _state = SmtpSessionState.Helo;
-        await SendResponseAsync("250 frímerki.local Hello, pleased to meet you");
+        await SendResponseAsync("250 frimerki.local Hello, pleased to meet you");
     }
 
     private async Task HandleEhloAsync(string hostname) {
@@ -112,7 +110,7 @@ public partial class SmtpSession : IDisposable {
         }
 
         _state = SmtpSessionState.Ehlo;
-        await SendResponseAsync("250-frímerki.local Hello, pleased to meet you");
+        await SendResponseAsync("250-frimerki.local Hello, pleased to meet you");
         await SendResponseAsync("250-AUTH PLAIN LOGIN");
         await SendResponseAsync("250-8BITMIME");
         await SendResponseAsync("250 ENHANCEDSTATUSCODES");
@@ -320,12 +318,12 @@ public partial class SmtpSession : IDisposable {
     }
 
     private async Task HandleQuitAsync() {
-        await SendResponseAsync("221 frímerki.local Service closing transmission channel");
+        await SendResponseAsync("221 frimerki.local Service closing transmission channel");
         _state = SmtpSessionState.Quit;
     }
 
     private async Task HandleHelpAsync() {
-        await SendResponseAsync("214-This is Frímerki Mail Server");
+        await SendResponseAsync("214-This is Frimerki Mail Server");
         await SendResponseAsync("214-Commands supported:");
         await SendResponseAsync("214-  HELO EHLO AUTH MAIL RCPT DATA RSET NOOP QUIT HELP");
         await SendResponseAsync("214 End of HELP info");
@@ -338,10 +336,31 @@ public partial class SmtpSession : IDisposable {
     }
 
     public void Dispose() {
-        _writer?.Dispose();
-        _reader?.Dispose();
-        _stream?.Dispose();
-        _client?.Dispose();
+        // Clean up resources
+        try {
+            _writer?.Dispose();
+        } catch {
+            // Ignore disposal errors
+        }
+        _writer = null;
+        try {
+            _reader?.Dispose();
+        } catch {
+            // Ignore disposal errors
+        }
+        _reader = null;
+        try {
+            _stream?.Dispose();
+        } catch {
+            // Ignore disposal errors
+        }
+        _stream = null;
+        try {
+            _client?.Dispose();
+        } catch {
+            // Ignore disposal errors
+        }
+        _client = null;
     }
 }
 

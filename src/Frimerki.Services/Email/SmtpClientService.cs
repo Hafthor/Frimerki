@@ -44,8 +44,8 @@ public class SmtpClientService {
             message.BodyEncoding = Encoding.UTF8;
 
             // Add headers
-            message.Headers.Add("X-Mailer", "Frímerki Email Server");
-            message.Headers.Add("Message-ID", $"<{Guid.NewGuid()}@frímerki.local>");
+            message.Headers.Add("X-Mailer", "Frimerki Email Server");
+            message.Headers.Add("Message-ID", $"<{Guid.NewGuid()}@frimerki.local>");
 
             // Handle attachments if any
             if (request.Attachments?.Count > 0) {
