@@ -5,6 +5,7 @@ using Frimerki.Models.DTOs;
 using Frimerki.Server;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace Frimerki.Tests.Integration;
@@ -14,7 +15,16 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
     private readonly HttpClient _client;
 
     public ServerControllerTests(WebApplicationFactory<Program> factory) {
-        _factory = factory;
+        _factory = factory.WithWebHostBuilder(builder => {
+            builder.ConfigureServices(services => {
+                // Remove default email server hosted services to prevent port conflicts
+                var hostedServices = services.Where(d => d.ServiceType == typeof(IHostedService) &&
+                    (d.ImplementationType?.Name.Contains("Server") == true)).ToList();
+                foreach (var service in hostedServices) {
+                    services.Remove(service);
+                }
+            });
+        });
         _client = _factory.CreateClient();
     }
 

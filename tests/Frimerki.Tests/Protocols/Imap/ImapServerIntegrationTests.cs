@@ -6,11 +6,13 @@ using Frimerki.Protocols.Imap;
 using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
 using Frimerki.Services.User;
+using Frimerki.Tests.Utilities;
 using MailKit;
 using MailKit.Net.Imap;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -69,40 +71,51 @@ public class XUnitLogger : ILogger {
 public class ImapServerIntegrationTests : IAsyncDisposable {
     private readonly ITestOutputHelper _output;
     private readonly IServiceProvider _serviceProvider;
-    private readonly EmailDbContext _context;
     private readonly ImapServer _imapServer;
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly Task _serverTask;
-    private const int TestPort = 8993; // Use different port for testing
+    private readonly int _testPort; // Dynamic port assignment
 
     public ImapServerIntegrationTests(ITestOutputHelper output) {
         _output = output;
+        _testPort = TestPortProvider.GetNextPort(); // Get unique port for this test instance
         _cancellationTokenSource = new CancellationTokenSource();
+
+        // Setup mock services
+        var mockUserService = new Mock<IUserService>();
+        var mockFolderService = new Mock<IFolderService>();
+        var mockMessageService = new Mock<IMessageService>();
+
+        // Setup test user authentication
+        mockUserService
+            .Setup(x => x.AuthenticateUserEntityAsync("testuser", "testpass"))
+            .ReturnsAsync(new User {
+                Id = 1,
+                Username = "testuser",
+                DomainId = 1,
+                PasswordHash = "hash",
+                Salt = "salt",
+                CanLogin = true
+            });
+
+        mockUserService
+            .Setup(x => x.AuthenticateUserEntityAsync("testuser", "wrongpass"))
+            .ReturnsAsync((User?)null);
 
         // Setup test services
         var services = new ServiceCollection();
         services.AddLogging(builder => {
             builder.AddProvider(new XUnitLoggerProvider(output));
         });
-
-        // Add in-memory database for testing
-        services.AddDbContext<EmailDbContext>(options =>
-            options.UseInMemoryDatabase($"TestDb_{Guid.NewGuid()}"));
-
-        // Add required services (mocked for testing)
-        services.AddScoped<IUserService, TestUserService>();
-        services.AddScoped<IFolderService, TestFolderService>();
-        services.AddScoped<IMessageService, TestMessageService>();
+        services.AddSingleton(mockUserService.Object);
+        services.AddSingleton(mockFolderService.Object);
+        services.AddSingleton(mockMessageService.Object);
 
         _serviceProvider = services.BuildServiceProvider();
-        _context = _serviceProvider.GetRequiredService<EmailDbContext>();
-
-        // Setup test data
-        SetupTestData();
 
         // Start IMAP server on test port
         var logger = _serviceProvider.GetRequiredService<ILogger<ImapServer>>();
-        _imapServer = new ImapServer(logger, _serviceProvider, TestPort);
+        _imapServer = new ImapServer(logger, _serviceProvider, _testPort);
 
         _serverTask = Task.Run(async () => {
             try {
@@ -113,23 +126,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
         });
 
         // Wait a moment for server to start
-        Thread.Sleep(100);
-    }
-
-    private void SetupTestData() {
-        // Add test user
-        var testUser = new User {
-            Id = 1,
-            Username = "testuser",
-            DomainId = 1,
-            PasswordHash = "$2a$11$test.hash.for.password", // This should match "testpass" when properly hashed
-            Salt = "testsalt",
-            CanLogin = true,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _context.Users.Add(testUser);
-        _context.SaveChanges();
+        Thread.Sleep(500);
     }
 
     [Fact]
@@ -137,7 +134,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
         using var client = new ImapClient();
 
         // Test connection
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         Assert.True(client.IsConnected);
         Assert.False(client.IsAuthenticated);
@@ -149,7 +146,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CanGetCapabilities() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Check capabilities
         var capabilities = client.Capabilities;
@@ -162,7 +159,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CanAuthenticateWithValidCredentials() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Test authentication with valid credentials
         await client.AuthenticateAsync("testuser", "testpass");
@@ -176,7 +173,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CannotAuthenticateWithInvalidCredentials() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Test authentication with invalid credentials
         await Assert.ThrowsAnyAsync<Exception>(async () => {
@@ -192,7 +189,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CanSelectInbox() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Select INBOX
@@ -209,7 +206,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CanExamineInbox() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Examine INBOX (read-only)
@@ -226,7 +223,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CanListFolders() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // List folders
@@ -242,7 +239,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_CanHandleNoop() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Test NOOP command
@@ -259,7 +256,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_HandlesLogoutGracefully() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         Assert.True(client.IsAuthenticated);
@@ -279,7 +276,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
             tasks.Add(Task.Run(async () => {
                 using var client = new ImapClient();
 
-                await client.ConnectAsync("localhost", TestPort, false);
+                await client.ConnectAsync("localhost", _testPort, false);
                 await client.AuthenticateAsync("testuser", "testpass");
 
                 var inbox = await client.GetFolderAsync("INBOX");
@@ -299,7 +296,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     public async Task ImapClient_RejectsCommandsBeforeAuthentication() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Should not be able to select folder before authentication
         await Assert.ThrowsAnyAsync<Exception>(async () => {
@@ -321,7 +318,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
 
         _imapServer?.Dispose();
         _cancellationTokenSource.Dispose();
-        await _context.DisposeAsync();
+
         if (_serviceProvider is IAsyncDisposable asyncDisposable) {
             await asyncDisposable.DisposeAsync();
         } else if (_serviceProvider is IDisposable disposable) {
@@ -378,6 +375,9 @@ public class TestUserService : IUserService {
         throw new NotImplementedException();
 
     public Task<bool> ValidateEmailFormatAsync(string email) =>
+        throw new NotImplementedException();
+
+    public Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) =>
         throw new NotImplementedException();
 }
 

@@ -6,6 +6,7 @@ using Frimerki.Protocols.Imap;
 using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
 using Frimerki.Services.User;
+using Frimerki.Tests.Utilities;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Security;
@@ -26,10 +27,11 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     private readonly ImapServer _imapServer;
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly Task _serverTask;
-    private const int TestPort = 8993; // Use different port for testing
+    private readonly int _testPort; // Dynamic port assignment
 
     public ImapMailKitIntegrationTests(ITestOutputHelper output) {
         _output = output;
+        _testPort = TestPortProvider.GetNextPort(); // Get unique port for this test instance
         _cancellationTokenSource = new CancellationTokenSource();
 
         // Setup mock services
@@ -73,7 +75,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
 
         // Start IMAP server on test port
         var logger = _serviceProvider.GetRequiredService<ILogger<ImapServer>>();
-        _imapServer = new ImapServer(logger, _serviceProvider, TestPort);
+        _imapServer = new ImapServer(logger, _serviceProvider, _testPort);
 
         _serverTask = Task.Run(async () => {
             try {
@@ -92,7 +94,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
         using var client = new ImapClient();
 
         // Test connection
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         Assert.True(client.IsConnected);
         Assert.False(client.IsAuthenticated);
@@ -104,7 +106,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanGetCapabilities() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Check capabilities
         var capabilities = client.Capabilities;
@@ -117,7 +119,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanAuthenticateWithValidCredentials() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Test authentication with valid credentials
         await client.AuthenticateAsync("testuser", "testpass");
@@ -131,7 +133,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CannotAuthenticateWithInvalidCredentials() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Test authentication with invalid credentials
         await Assert.ThrowsAnyAsync<Exception>(async () => {
@@ -147,7 +149,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanSelectInbox() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Select INBOX
@@ -164,7 +166,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanExamineInbox() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Examine INBOX (read-only)
@@ -181,7 +183,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanListFolders() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // List folders
@@ -197,7 +199,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanHandleNoop() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Test NOOP command
@@ -214,7 +216,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_HandlesLogoutGracefully() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         Assert.True(client.IsAuthenticated);
@@ -234,7 +236,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
             tasks.Add(Task.Run(async () => {
                 using var client = new ImapClient();
 
-                await client.ConnectAsync("localhost", TestPort, false);
+                await client.ConnectAsync("localhost", _testPort, false);
                 await client.AuthenticateAsync("testuser", "testpass");
 
                 var inbox = await client.GetFolderAsync("INBOX");
@@ -254,7 +256,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_RejectsCommandsBeforeAuthentication() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // Should not be able to select folder before authentication
         await Assert.ThrowsAsync<ServiceNotAuthenticatedException>(async () => {
@@ -269,7 +271,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_ValidatesImapProtocolCompliance() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
 
         // MailKit will validate that our server sends proper IMAP responses
         var capabilities = client.Capabilities;
@@ -284,7 +286,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     public async Task MailKit_CanAppendDraftMessage() {
         using var client = new ImapClient();
 
-        await client.ConnectAsync("localhost", TestPort, false);
+        await client.ConnectAsync("localhost", _testPort, false);
         await client.AuthenticateAsync("testuser", "testpass");
 
         // Create a simple draft message

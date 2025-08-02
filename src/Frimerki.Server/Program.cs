@@ -65,6 +65,9 @@ builder.Services.AddDbContext<GlobalDbContext>(options =>
 builder.Services.AddDbContext<EmailDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Configure Account Lockout
+builder.Services.Configure<Frimerki.Models.Configuration.AccountLockoutOptions>(
+    builder.Configuration.GetSection("AccountLockout"));
 
 builder.Services
     .AddFrimerkiServices() // Add Frimerki services
@@ -74,6 +77,9 @@ builder.Services
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+// Add global exception handler first
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
 if (app.Environment.IsDevelopment()) {
     app.UseSwagger();
     app.UseSwaggerUI();

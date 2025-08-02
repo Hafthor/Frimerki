@@ -82,6 +82,7 @@ public class SmtpSessionTests : IDisposable {
 
         // Send QUIT to end session gracefully
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
 
         await handleTask;
     }
@@ -115,6 +116,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -156,6 +158,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -199,6 +202,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -241,6 +245,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -299,6 +304,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -337,6 +343,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -379,6 +386,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -408,6 +416,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -440,6 +449,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -472,6 +482,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await handleTask;
     }
 
@@ -510,6 +521,7 @@ public class SmtpSessionTests : IDisposable {
 
         // Send QUIT to end session gracefully
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
 
         await handleTask;
     }

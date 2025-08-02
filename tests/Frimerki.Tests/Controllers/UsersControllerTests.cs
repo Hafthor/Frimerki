@@ -523,4 +523,8 @@ public class MockUserServiceForController : IUserService {
     public Task<bool> ValidateEmailFormatAsync(string email) {
         return Task.FromResult(email.Contains('@') && email.Contains('.'));
     }
+
+    public Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) {
+        return Task.FromResult((false, (DateTime?)null));
+    }
 }

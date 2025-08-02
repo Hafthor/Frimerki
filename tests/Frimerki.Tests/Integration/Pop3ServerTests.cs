@@ -3,6 +3,7 @@ using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Pop3;
+using Frimerki.Tests.Utilities;
 using MailKit.Net.Pop3;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,13 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
                 var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
                 if (descriptor != null) {
                     services.Remove(descriptor);
+                }
+
+                // Remove default email server hosted services to prevent port conflicts
+                var hostedServices = services.Where(d => d.ServiceType == typeof(IHostedService) &&
+                    (d.ImplementationType?.Name.Contains("Server") == true)).ToList();
+                foreach (var service in hostedServices) {
+                    services.Remove(service);
                 }
 
                 // Add in-memory database for testing
@@ -92,7 +100,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var serviceProvider = scope.ServiceProvider;
 
         // Start POP3 server on a test port
-        var testPort = GetAvailablePort();
+        var testPort = TestPortProvider.GetNextPort();
         var pop3Server = new Pop3Server(
             loggerFactory.CreateLogger<Pop3Server>(),
             serviceProvider,
@@ -150,7 +158,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
         var serviceProvider = scope.ServiceProvider;
 
-        var testPort = GetAvailablePort();
+        var testPort = TestPortProvider.GetNextPort();
         var pop3Server = new Pop3Server(
             loggerFactory.CreateLogger<Pop3Server>(),
             serviceProvider,
@@ -187,7 +195,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
         var serviceProvider = scope.ServiceProvider;
 
-        var testPort = GetAvailablePort();
+        var testPort = TestPortProvider.GetNextPort();
         var pop3Server = new Pop3Server(
             loggerFactory.CreateLogger<Pop3Server>(),
             serviceProvider,
@@ -246,7 +254,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
         var serviceProvider = scope.ServiceProvider;
 
-        var testPort = GetAvailablePort();
+        var testPort = TestPortProvider.GetNextPort();
         var pop3Server = new Pop3Server(
             loggerFactory.CreateLogger<Pop3Server>(),
             serviceProvider,
@@ -295,7 +303,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
         var serviceProvider = scope.ServiceProvider;
 
-        var testPort = GetAvailablePort();
+        var testPort = TestPortProvider.GetNextPort();
         var pop3Server = new Pop3Server(
             loggerFactory.CreateLogger<Pop3Server>(),
             serviceProvider,
@@ -342,7 +350,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
         var serviceProvider = scope.ServiceProvider;
 
-        var testPort = GetAvailablePort();
+        var testPort = TestPortProvider.GetNextPort();
         var pop3Server = new Pop3Server(
             loggerFactory.CreateLogger<Pop3Server>(),
             serviceProvider,
@@ -414,12 +422,4 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         }
     }
 
-    private static int GetAvailablePort() {
-        // Simple way to get an available port for testing
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
 }

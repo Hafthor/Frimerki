@@ -32,6 +32,11 @@ public class User {
 
     public DateTime? LastLogin { get; set; }
 
+    // Account lockout properties
+    public int FailedLoginAttempts { get; set; } = 0;
+    public DateTime? LockoutEnd { get; set; }
+    public DateTime? LastFailedLogin { get; set; }
+
     // Navigation properties
     public DomainSettings Domain { get; set; } = null!;
     public ICollection<Folder> Folders { get; set; } = new List<Folder>();

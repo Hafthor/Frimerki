@@ -31,7 +31,7 @@ public class MessagesController : ControllerBase {
             return Ok(result);
         } catch (Exception ex) {
             _logger.LogError(ex, "Error getting messages");
-            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         }
     }
 
@@ -52,7 +52,7 @@ public class MessagesController : ControllerBase {
             return Ok(message);
         } catch (Exception ex) {
             _logger.LogError(ex, "Error getting message {MessageId}", id);
-            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         }
     }
 
@@ -76,10 +76,10 @@ public class MessagesController : ControllerBase {
             return BadRequest(new { error = ex.Message });
         } catch (InvalidOperationException ex) {
             _logger.LogError(ex, "Error creating message");
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         } catch (Exception ex) {
             _logger.LogError(ex, "Unexpected error creating message");
-            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         }
     }
 
@@ -107,7 +107,7 @@ public class MessagesController : ControllerBase {
             return BadRequest(new { error = ex.Message });
         } catch (Exception ex) {
             _logger.LogError(ex, "Error updating message {MessageId}", id);
-            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         }
     }
 
@@ -135,7 +135,7 @@ public class MessagesController : ControllerBase {
             return BadRequest(new { error = ex.Message });
         } catch (Exception ex) {
             _logger.LogError(ex, "Error patching message {MessageId}", id);
-            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         }
     }
 
@@ -156,7 +156,7 @@ public class MessagesController : ControllerBase {
             return NoContent();
         } catch (Exception ex) {
             _logger.LogError(ex, "Error deleting message {MessageId}", id);
-            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            return StatusCode(500, new { error = "Internal server error" });
         }
     }
 

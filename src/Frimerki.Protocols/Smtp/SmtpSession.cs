@@ -12,6 +12,8 @@ namespace Frimerki.Protocols.Smtp;
 /// Handles individual SMTP client sessions following RFC 5321
 /// </summary>
 public partial class SmtpSession : IDisposable {
+    private static readonly UTF8Encoding Utf8NoBom = new(false);
+
     private TcpClient _client;
     private NetworkStream _stream;
     private StreamReader _reader;
@@ -35,8 +37,8 @@ public partial class SmtpSession : IDisposable {
     public SmtpSession(TcpClient client, IUserService userService, EmailDeliveryService emailDeliveryService, ILogger logger) {
         _client = client;
         _stream = client.GetStream();
-        _reader = new StreamReader(_stream, Encoding.UTF8);
-        _writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+        _reader = new StreamReader(_stream, Utf8NoBom);
+        _writer = new StreamWriter(_stream, Utf8NoBom) { AutoFlush = true };
         _userService = userService;
         _emailDeliveryService = emailDeliveryService;
         _logger = logger;
@@ -143,7 +145,7 @@ public partial class SmtpSession : IDisposable {
         }
 
         try {
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(credentials));
+            var decoded = Utf8NoBom.GetString(Convert.FromBase64String(credentials));
             var parts = decoded.Split('\0');
 
             if (parts.Length >= 3) {
@@ -183,8 +185,8 @@ public partial class SmtpSession : IDisposable {
         }
 
         try {
-            var decodedUsername = Encoding.UTF8.GetString(Convert.FromBase64String(username));
-            var decodedPassword = Encoding.UTF8.GetString(Convert.FromBase64String(password));
+            var decodedUsername = Utf8NoBom.GetString(Convert.FromBase64String(username));
+            var decodedPassword = Utf8NoBom.GetString(Convert.FromBase64String(password));
 
             var user = await _userService.AuthenticateUserEntityAsync(decodedUsername, decodedPassword);
             if (user != null) {

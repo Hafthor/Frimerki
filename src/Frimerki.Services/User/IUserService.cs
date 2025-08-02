@@ -15,4 +15,5 @@ public interface IUserService {
     Task<Frimerki.Models.Entities.User?> AuthenticateUserEntityAsync(string email, string password);
     Task<Frimerki.Models.Entities.User?> GetUserEntityByEmailAsync(string email);
     Task<bool> ValidateEmailFormatAsync(string email);
+    Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email);
 }

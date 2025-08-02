@@ -362,4 +362,7 @@ public class MockUserServiceForEmailController : IUserService {
 
     public Task<bool> ValidateEmailFormatAsync(string email) =>
         Task.FromResult(true);
+
+    public Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) =>
+        Task.FromResult((false, (DateTime?)null));
 }

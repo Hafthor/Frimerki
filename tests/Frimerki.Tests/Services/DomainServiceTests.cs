@@ -663,7 +663,7 @@ public class DomainServiceTests : IDisposable {
             CreatedAt = DateTime.UtcNow
         };
 
-        var users = new List<User> {
+        var users = new List<Frimerki.Models.Entities.User> {
             new() { Id = 1, Username = "user1", DomainId = 1, PasswordHash = "hash1", CreatedAt = DateTime.UtcNow },
             new() { Id = 2, Username = "user2", DomainId = 1, PasswordHash = "hash2", CreatedAt = DateTime.UtcNow },
             new() { Id = 3, Username = "user3", DomainId = 2, PasswordHash = "hash3", CreatedAt = DateTime.UtcNow }
@@ -766,7 +766,7 @@ public class DomainServiceTests : IDisposable {
             CreatedAt = DateTime.UtcNow
         };
 
-        var users = new List<User> {
+        var users = new List<Frimerki.Models.Entities.User> {
             new() { Id = 1, Username = "user1", DomainId = 1, PasswordHash = "hash1", CreatedAt = DateTime.UtcNow },
             new() { Id = 2, Username = "user2", DomainId = 1, PasswordHash = "hash2", CreatedAt = DateTime.UtcNow },
             new() { Id = 3, Username = "user3", DomainId = 2, PasswordHash = "hash3", CreatedAt = DateTime.UtcNow }

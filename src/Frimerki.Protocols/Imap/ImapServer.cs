@@ -56,14 +56,18 @@ public class ImapServer : BackgroundService {
 
                     // Handle client connection in background task
                     _ = Task.Run(async () => {
-                        using var scope = _serviceProvider.CreateScope();
-                        var sessionLogger = scope.ServiceProvider.GetRequiredService<ILogger<ImapSession>>();
-                        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-                        var folderService = scope.ServiceProvider.GetRequiredService<IFolderService>();
-                        var messageService = scope.ServiceProvider.GetRequiredService<IMessageService>();
+                        try {
+                            using var scope = _serviceProvider.CreateScope();
+                            var sessionLogger = scope.ServiceProvider.GetRequiredService<ILogger<ImapSession>>();
+                            var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+                            var folderService = scope.ServiceProvider.GetRequiredService<IFolderService>();
+                            var messageService = scope.ServiceProvider.GetRequiredService<IMessageService>();
 
-                        var session = new ImapSession(client, sessionLogger, userService, folderService, messageService);
-                        await session.HandleSessionAsync();
+                            var session = new ImapSession(client, sessionLogger, userService, folderService, messageService);
+                            await session.HandleSessionAsync();
+                        } catch (Exception ex) {
+                            _logger.LogError(ex, "Error handling IMAP client session");
+                        }
                     }, stoppingToken);
 
                 } catch (ObjectDisposedException) {

@@ -423,6 +423,7 @@ public partial class Pop3Session {
     private async Task SendResponseAsync(string response, CancellationToken cancellationToken) {
         if (_writer != null) {
             await _writer.WriteLineAsync(response.AsMemory(), cancellationToken);
+            await _writer.FlushAsync(cancellationToken);
             _logger.LogDebug("POP3 Response: {Response}", response);
         }
     }

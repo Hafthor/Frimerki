@@ -6,6 +6,7 @@ using Frimerki.Protocols.Smtp;
 using Frimerki.Services;
 using Frimerki.Services.Email;
 using Frimerki.Services.User;
+using Frimerki.Tests.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,18 +25,15 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
     private readonly SmtpServer _smtpServer;
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly Task _serverTask;
-    private const int BaseTestPort = 2525;
-    private static int _testCounter = 0;
     private readonly int _testPort;
 
     public SmtpReceiveMailTests(ITestOutputHelper output) {
         _output = output;
         _cancellationTokenSource = new CancellationTokenSource();
 
-        // Create unique database name and port per test instance
-        var testId = Interlocked.Increment(ref _testCounter);
-        _testPort = BaseTestPort + testId;
-        var dbName = $"SmtpTestDb_{testId}_{Guid.NewGuid():N}";
+        // Get unique port and database name per test instance
+        _testPort = TestPortProvider.GetNextPort();
+        var dbName = $"SmtpTestDb_{_testPort}_{Guid.NewGuid():N}";
 
         // Setup services
         var services = new ServiceCollection();
@@ -179,6 +177,7 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
 
         // Send QUIT
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         var quitResponse = await reader.ReadLineAsync();
         Assert.NotNull(quitResponse);
         Assert.StartsWith("221", quitResponse);
@@ -263,6 +262,7 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
 
         // Send QUIT
         await writer.WriteLineAsync("QUIT");
+        await writer.FlushAsync();
         await reader.ReadLineAsync();
 
         // Wait a moment for processing

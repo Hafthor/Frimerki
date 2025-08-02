@@ -21,6 +21,9 @@ public class ImapSession {
     private readonly IMessageService _messageService;
     private readonly ImapCommandParser _parser;
 
+    // UTF-8 encoding without BOM for IMAP protocol compliance
+    private static readonly UTF8Encoding Utf8NoBom = new(false);
+
     public ImapConnectionState State { get; private set; } = ImapConnectionState.NotAuthenticated;
     public string? AuthenticatedUser { get; private set; }
     public User? CurrentUser { get; private set; }
@@ -45,18 +48,21 @@ public class ImapSession {
     public async Task HandleSessionAsync() {
         try {
             // Send greeting
-            await SendResponseAsync("* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN UIDPLUS] Frímerki IMAP Server ready");
+            await SendResponseAsync("* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN UIDPLUS] Frimerki IMAP Server ready");
 
             while (_client.Connected && State != ImapConnectionState.Logout) {
                 var buffer = new byte[8192];
                 var bytesRead = await _stream.ReadAsync(buffer);
 
                 if (bytesRead == 0) {
+                    _logger.LogInformation("IMAP: Client disconnected (no more data)");
                     break;
                 }
 
-                var commandLine = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
-                await ProcessCommandAsync(commandLine);
+                var commandLine = Utf8NoBom.GetString(buffer, 0, bytesRead).Trim();
+                if (!string.IsNullOrEmpty(commandLine)) {
+                    await ProcessCommandAsync(commandLine);
+                }
             }
         } catch (Exception ex) {
             _logger.LogError(ex, "Error in IMAP session");
@@ -195,12 +201,12 @@ public class ImapSession {
             // Read the authentication data from the client
             var buffer = new byte[1024];
             var bytesRead = await _stream.ReadAsync(buffer);
-            var authData = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+            var authData = Utf8NoBom.GetString(buffer, 0, bytesRead).Trim();
 
             try {
                 // Decode base64 authentication data
                 var decodedBytes = Convert.FromBase64String(authData);
-                var decoded = Encoding.UTF8.GetString(decodedBytes);
+                var decoded = Utf8NoBom.GetString(decodedBytes);
 
                 // PLAIN format: \0username\0password
                 var parts = decoded.Split('\0');
@@ -241,7 +247,7 @@ public class ImapSession {
     }
 
     private async Task<ImapResponse> HandleLogoutAsync(ImapCommand command) {
-        await SendResponseAsync("* BYE LOGOUT Frímerki IMAP Server logging out");
+        await SendResponseAsync("* BYE LOGOUT Frimerki IMAP Server logging out");
         State = ImapConnectionState.Logout;
 
         return new ImapResponse {
@@ -395,7 +401,7 @@ public class ImapSession {
                         totalRead += bytesRead;
                     }
 
-                    var messageContent = Encoding.UTF8.GetString(buffer, 0, totalRead);
+                    var messageContent = Utf8NoBom.GetString(buffer, 0, totalRead);
                     _logger.LogDebug("APPEND: Received message content of length {Length}", messageContent.Length);
 
                     try {
@@ -780,7 +786,7 @@ public class ImapSession {
     }
 
     private async Task SendResponseAsync(string response) {
-        var bytes = Encoding.UTF8.GetBytes(response + "\r\n");
+        var bytes = Utf8NoBom.GetBytes(response + "\r\n");
         await _stream.WriteAsync(bytes);
         await _stream.FlushAsync();
         _logger.LogInformation("IMAP Response: {Response}", response);

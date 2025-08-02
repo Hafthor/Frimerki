@@ -1,11 +1,13 @@
 using System.Security.Claims;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.User;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Frimerki.Server.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase {
     private readonly IUserService _userService;

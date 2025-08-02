@@ -65,7 +65,7 @@ public class ServerController : ControllerBase {
                     new() {
                         Name = "System",
                         Status = "Critical",
-                        Message = ex.Message,
+                        Message = "Health check failed",
                         ResponseTimeMs = 0
                     }
                 }

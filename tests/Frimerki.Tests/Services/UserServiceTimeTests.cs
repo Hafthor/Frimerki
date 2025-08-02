@@ -1,10 +1,12 @@
 using Frimerki.Data;
+using Frimerki.Models.Configuration;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Services.Common;
 using Frimerki.Services.User;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -24,7 +26,12 @@ public class UserServiceTimeTests {
         _context = new EmailDbContext(options);
         _mockLogger = new Mock<ILogger<UserService>>();
         _nowProvider = new TestNowProvider();
-        _userService = new UserService(_context, _nowProvider, _mockLogger.Object);
+
+        var lockoutOptions = new AccountLockoutOptions();
+        var mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();
+        mockLockoutOptions.Setup(x => x.Value).Returns(lockoutOptions);
+
+        _userService = new UserService(_context, _nowProvider, _mockLogger.Object, mockLockoutOptions.Object);
 
         SeedTestData();
     }

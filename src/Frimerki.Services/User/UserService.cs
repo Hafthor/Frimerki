@@ -3,12 +3,14 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using Frimerki.Data;
+using Frimerki.Models.Configuration;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Services.Common;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Frimerki.Services.User;
 
@@ -16,11 +18,13 @@ public partial class UserService : IUserService {
     private readonly EmailDbContext _context;
     private readonly INowProvider _nowProvider;
     private readonly ILogger<UserService> _logger;
+    private readonly AccountLockoutOptions _lockoutOptions;
 
-    public UserService(EmailDbContext context, INowProvider nowProvider, ILogger<UserService> logger) {
+    public UserService(EmailDbContext context, INowProvider nowProvider, ILogger<UserService> logger, IOptions<AccountLockoutOptions> lockoutOptions) {
         _context = context;
         _nowProvider = nowProvider;
         _logger = logger;
+        _lockoutOptions = lockoutOptions.Value;
     }
 
     public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null) {
@@ -190,7 +194,8 @@ public partial class UserService : IUserService {
         user.PasswordHash = newPasswordHash;
         user.Salt = newSalt;
 
-        await _context.SaveChangesAsync();
+        // Reset failed login attempts when password is changed
+        await ResetFailedLoginAttemptsAsync(user);
 
         _logger.LogInformation("Password updated successfully for user: {Email}", email);
         return true;
@@ -244,17 +249,29 @@ public partial class UserService : IUserService {
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
         if (user == null || !user.CanLogin) {
+            _logger.LogWarning("Authentication failed for {Email}: User not found or cannot login", email);
+            return null;
+        }
+
+        // Check if account is locked
+        if (IsAccountLocked(user)) {
+            _logger.LogWarning("Authentication failed for {Email}: Account is locked until {LockoutEnd}",
+                email, user.LockoutEnd);
             return null;
         }
 
         if (!VerifyPassword(password, user.PasswordHash, user.Salt)) {
+            _logger.LogWarning("Authentication failed for {Email}: Invalid password", email);
+            await RecordFailedLoginAttemptAsync(user);
             return null;
         }
 
-        // Update last login
+        // Successful login - reset failed attempts and update last login
+        await ResetFailedLoginAttemptsAsync(user);
         user.LastLogin = _nowProvider.UtcNow;
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("Authentication successful for {Email}", email);
         var stats = await GetUserStatsInternalAsync(user.Id);
         return MapToUserResponse(user, stats);
     }
@@ -267,17 +284,29 @@ public partial class UserService : IUserService {
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
         if (user == null || !user.CanLogin) {
+            _logger.LogWarning("Authentication failed for {Email}: User not found or cannot login", email);
+            return null;
+        }
+
+        // Check if account is locked
+        if (IsAccountLocked(user)) {
+            _logger.LogWarning("Authentication failed for {Email}: Account is locked until {LockoutEnd}",
+                email, user.LockoutEnd);
             return null;
         }
 
         if (!VerifyPassword(password, user.PasswordHash, user.Salt)) {
+            _logger.LogWarning("Authentication failed for {Email}: Invalid password", email);
+            await RecordFailedLoginAttemptAsync(user);
             return null;
         }
 
-        // Update last login
+        // Successful login - reset failed attempts and update last login
+        await ResetFailedLoginAttemptsAsync(user);
         user.LastLogin = _nowProvider.UtcNow;
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("Authentication successful for {Email}", email);
         return user;
     }
 
@@ -294,6 +323,19 @@ public partial class UserService : IUserService {
 
     public Task<bool> ValidateEmailFormatAsync(string email) {
         return Task.FromResult(EmailValidationRegex().IsMatch(email));
+    }
+
+    public async Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) {
+        var user = await _context.Users
+            .Include(u => u.Domain)
+            .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
+
+        if (user == null) {
+            return (false, null);
+        }
+
+        bool isLocked = IsAccountLocked(user);
+        return (isLocked, user.LockoutEnd);
     }
 
     private async Task<UserStatsResponse> GetUserStatsInternalAsync(int userId) {
@@ -382,5 +424,59 @@ public partial class UserService : IUserService {
             counter++;
         }
         return $"{number:n1} {suffixes[counter]}";
+    }
+
+    private bool IsAccountLocked(Frimerki.Models.Entities.User user) {
+        if (!_lockoutOptions.Enabled || user.LockoutEnd == null) {
+            return false;
+        }
+
+        var now = _nowProvider.UtcNow;
+        if (user.LockoutEnd > now) {
+            return true;
+        }
+
+        // Lockout period has expired, reset the user
+        user.LockoutEnd = null;
+        user.FailedLoginAttempts = 0;
+        return false;
+    }
+
+    private async Task RecordFailedLoginAttemptAsync(Frimerki.Models.Entities.User user) {
+        if (!_lockoutOptions.Enabled) {
+            return;
+        }
+
+        var now = _nowProvider.UtcNow;
+
+        // Reset failed attempts if the reset window has passed
+        if (user.LastFailedLogin.HasValue &&
+            now.Subtract(user.LastFailedLogin.Value).TotalMinutes > _lockoutOptions.ResetWindowMinutes) {
+            user.FailedLoginAttempts = 0;
+        }
+
+        user.FailedLoginAttempts++;
+        user.LastFailedLogin = now;
+
+        // Lock account if threshold reached
+        if (user.FailedLoginAttempts >= _lockoutOptions.MaxFailedAttempts) {
+            user.LockoutEnd = now.AddMinutes(_lockoutOptions.LockoutDurationMinutes);
+            _logger.LogWarning("Account locked for user {Email} after {Attempts} failed attempts. Lockout ends at {LockoutEnd}",
+                $"{user.Username}@{user.Domain.Name}", user.FailedLoginAttempts, user.LockoutEnd);
+        } else {
+            _logger.LogWarning("Failed login attempt for user {Email}. Attempt {Current}/{Max}",
+                $"{user.Username}@{user.Domain.Name}", user.FailedLoginAttempts, _lockoutOptions.MaxFailedAttempts);
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task ResetFailedLoginAttemptsAsync(Frimerki.Models.Entities.User user) {
+        if (user.FailedLoginAttempts > 0 || user.LockoutEnd.HasValue) {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+            user.LastFailedLogin = null;
+            await _context.SaveChangesAsync();
+        }
     }
 }

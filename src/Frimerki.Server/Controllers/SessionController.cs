@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Session;
+using Frimerki.Services.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +11,12 @@ namespace Frimerki.Server.Controllers;
 [Route("api/[controller]")]
 public class SessionController : ControllerBase {
     private readonly ISessionService _sessionService;
+    private readonly IUserService _userService;
     private readonly ILogger<SessionController> _logger;
 
-    public SessionController(ISessionService sessionService, ILogger<SessionController> logger) {
+    public SessionController(ISessionService sessionService, IUserService userService, ILogger<SessionController> logger) {
         _sessionService = sessionService;
+        _userService = userService;
         _logger = logger;
     }
 
@@ -28,6 +31,18 @@ public class SessionController : ControllerBase {
             }
 
             _logger.LogInformation("Login request for email: {Email}", request.Email);
+
+            // Check if account is locked before attempting authentication
+            var (isLocked, lockoutEnd) = await _userService.GetAccountLockoutStatusAsync(request.Email);
+            if (isLocked && lockoutEnd.HasValue) {
+                _logger.LogWarning("Login blocked for locked account: {Email}, lockout ends: {LockoutEnd}",
+                    request.Email, lockoutEnd);
+                return Unauthorized(new {
+                    error = "Account is temporarily locked due to multiple failed login attempts",
+                    lockoutEnd = lockoutEnd.Value,
+                    message = $"Account locked until {lockoutEnd.Value:yyyy-MM-dd HH:mm:ss} UTC"
+                });
+            }
 
             var result = await _sessionService.LoginAsync(request);
             if (result == null) {

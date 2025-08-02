@@ -36,7 +36,7 @@ public class MessageServiceTests : IDisposable {
             CreatedAt = DateTime.UtcNow
         };
 
-        var user = new User {
+        var user = new Frimerki.Models.Entities.User {
             Id = 1,
             Username = "testuser",
             DomainId = 1,

@@ -10,6 +10,7 @@ using Frimerki.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace Frimerki.Tests.Integration;
@@ -36,6 +37,13 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
                 var globalDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<GlobalDbContext>));
                 if (globalDescriptor != null) {
                     services.Remove(globalDescriptor);
+                }
+
+                // Remove default email server hosted services to prevent port conflicts
+                var hostedServices = services.Where(d => d.ServiceType == typeof(IHostedService) &&
+                    (d.ImplementationType?.Name.Contains("Server") == true)).ToList();
+                foreach (var service in hostedServices) {
+                    services.Remove(service);
                 }
 
                 // Add in-memory databases for testing
