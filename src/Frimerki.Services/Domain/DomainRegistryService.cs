@@ -10,8 +10,8 @@ namespace Frimerki.Services.Domain;
 /// Service for managing domain registration and database creation
 /// </summary>
 public interface IDomainRegistryService {
-    Task<DomainRegistry> RegisterDomainAsync(string domainName, string? databaseName = null, bool createDatabase = false);
-    Task<DomainRegistry?> GetDomainRegistryAsync(string domainName);
+    Task<DomainRegistry> RegisterDomainAsync(string domainName, string databaseName = "", bool createDatabase = false);
+    Task<DomainRegistry> GetDomainRegistryAsync(string domainName);
     Task<List<DomainRegistry>> GetAllDomainsAsync();
     Task<bool> DomainExistsAsync(string domainName);
     Task SetDomainActiveAsync(string domainName, bool isActive);
@@ -34,7 +34,7 @@ public class DomainRegistryService : IDomainRegistryService {
         _logger = logger;
     }
 
-    public async Task<DomainRegistry> RegisterDomainAsync(string domainName, string? databaseName = null, bool createDatabase = false) {
+    public async Task<DomainRegistry> RegisterDomainAsync(string domainName, string databaseName = "", bool createDatabase = false) {
         var normalizedDomain = domainName.ToLower();
 
         // Check if domain already exists
@@ -80,7 +80,7 @@ public class DomainRegistryService : IDomainRegistryService {
         return registry;
     }
 
-    public async Task<DomainRegistry?> GetDomainRegistryAsync(string domainName) {
+    public async Task<DomainRegistry> GetDomainRegistryAsync(string domainName) {
         var normalizedDomain = domainName.ToLower();
         return await _globalContext.DomainRegistry
             .FirstOrDefaultAsync(d => d.Name == normalizedDomain);

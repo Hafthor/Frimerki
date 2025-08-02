@@ -11,7 +11,7 @@ public class UserMessage {
 
     public int Uid { get; set; }
 
-    public int? SequenceNumber { get; set; }
+    public int SequenceNumber { get; set; }
 
     public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
 

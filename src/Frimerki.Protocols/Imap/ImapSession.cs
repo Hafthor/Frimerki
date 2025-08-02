@@ -263,11 +263,12 @@ public partial class ImapSession {
 
     private async Task<ImapResponse> HandleNoopAsync(ImapCommand command) {
         // NOOP is a keepalive command that does nothing
-        return await Task.FromResult(new ImapResponse {
+        await Task.Yield();
+        return new ImapResponse {
             Tag = command.Tag,
             Type = ImapResponseType.Ok,
             Message = "NOOP completed"
-        });
+        };
     }
 
     private async Task<ImapResponse> HandleSelectAsync(ImapCommand command) {
@@ -352,21 +353,23 @@ public partial class ImapSession {
         };
     }
 
-    private Task<ImapResponse> HandleAppendAsync(ImapCommand command) {
+    private async Task<ImapResponse> HandleAppendAsync(ImapCommand command) {
         if (State != ImapConnectionState.Authenticated && State != ImapConnectionState.Selected) {
-            return Task.FromResult(new ImapResponse {
+            await Task.Yield();
+            return new ImapResponse {
                 Tag = command.Tag,
                 Type = ImapResponseType.No,
                 Message = "Must be authenticated"
-            });
+            };
         }
 
         // This handles the basic APPEND case, literal handling is done in HandleAppendCommandWithLiteral
-        return Task.FromResult(new ImapResponse {
+        await Task.Yield();
+        return new ImapResponse {
             Tag = command.Tag,
             Type = ImapResponseType.Bad,
             Message = "APPEND requires literal data"
-        });
+        };
     }
 
     private async Task HandleAppendCommandWithLiteral(string commandLine) {
@@ -486,21 +489,23 @@ public partial class ImapSession {
         }
     }
 
-    private Task<ImapResponse> HandleFetchAsync(ImapCommand command) {
+    private async Task<ImapResponse> HandleFetchAsync(ImapCommand command) {
         if (State != ImapConnectionState.Selected) {
-            return Task.FromResult(new ImapResponse {
+            await Task.Yield();
+            return new ImapResponse {
                 Tag = command.Tag,
                 Type = ImapResponseType.No,
                 Message = "Must have folder selected"
-            });
+            };
         }
 
         // Basic FETCH stub - implement full FETCH in Phase 2
-        return Task.FromResult(new ImapResponse {
+        await Task.Yield();
+        return new ImapResponse {
             Tag = command.Tag,
             Type = ImapResponseType.Ok,
             Message = "FETCH completed"
-        });
+        };
     }
 
     private async Task<ImapResponse> HandleSearchAsync(ImapCommand command) {
@@ -796,7 +801,7 @@ public partial class ImapSession {
         _logger.LogInformation("IMAP Response: {Response}", response);
     }
 
-    private Task<List<int>> ParseSequenceSetToUidsAsync(string sequenceSet, bool isUid) {
+    private async Task<List<int>> ParseSequenceSetToUidsAsync(string sequenceSet, bool isUid) {
         List<int> uids = [];
 
         if (isUid) {
@@ -835,13 +840,15 @@ public partial class ImapSession {
             }
         }
 
-        return Task.FromResult(uids);
+        await Task.Yield();
+        return uids;
     }
 
-    private Task<int> GetSequenceNumberByUidAsync(int uid) {
+    private async Task<int> GetSequenceNumberByUidAsync(int uid) {
         // In a full implementation, this would query the database to get the actual sequence number
         // for the given UID in the current folder. For now, return UID as sequence number (simplified)
-        return Task.FromResult(uid);
+        await Task.Yield();
+        return uid;
     }
 
     private List<string> GetFlagsListForResponse(MessageFlagsResponse flags) {
@@ -912,7 +919,7 @@ public partial class ImapSession {
         };
 
         var result = await _messageService.GetMessagesAsync(CurrentUser.Id, request);
-        return result.TotalCount ?? 0;
+        return result.TotalCount;
     }
 
     /// <summary>

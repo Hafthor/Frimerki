@@ -20,9 +20,9 @@ public class HostAdmin {
     public string PasswordHash { get; set; } = "";
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
-    public DateTime? LastLoginAt { get; set; }
-    public string? Email { get; set; }
-    public string? DisplayName { get; set; }
+    public DateTime LastLoginAt { get; set; }
+    public string Email { get; set; }
+    public string DisplayName { get; set; }
 }
 
 /// <summary>
@@ -31,8 +31,8 @@ public class HostAdmin {
 public class ServerConfiguration {
     public int Id { get; set; }
     public string Key { get; set; } = "";
-    public string? Value { get; set; }
-    public string? Description { get; set; }
+    public string Value { get; set; }
+    public string Description { get; set; }
     public DateTime ModifiedAt { get; set; }
-    public string? ModifiedBy { get; set; }
+    public string ModifiedBy { get; set; }
 }

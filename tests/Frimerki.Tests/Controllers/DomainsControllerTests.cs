@@ -280,7 +280,7 @@ public class MockDomainServiceForController : IDomainService {
     public void SetCreateDomainResponse(CreateDomainResponse response) => _createDomainResponse = response;
     public void SetDkimKeyResponse(DkimKeyResponse response) => _dkimKeyResponse = response;
 
-    public Task<DomainListResponse> GetDomainsAsync(string? userRole = null, int? userDomainId = null) {
+    public Task<DomainListResponse> GetDomainsAsync(string userRole = "", int userDomainId = 0) {
         if (ShouldThrowOnGetDomains) {
             throw new Exception("Service error");
         }

@@ -70,7 +70,7 @@ public class SessionService : ISessionService {
                 CanLogin = user.CanLogin,
                 DomainName = user.Domain.Name,
                 DomainId = user.DomainId,
-                LastLogin = user.LastLogin
+                LastLogin = user.LastLogin ?? DateTime.MinValue
             };
 
             // Generate tokens
@@ -150,7 +150,7 @@ public class SessionService : ISessionService {
                 CanLogin = userInfo.CanLogin,
                 DomainName = userInfo.Domain.Name,
                 DomainId = userInfo.DomainId,
-                LastLogin = userInfo.LastLogin
+                LastLogin = userInfo.LastLogin ?? DateTime.MinValue
             };
 
             // Generate a fresh token (auto-refresh functionality)
@@ -203,7 +203,7 @@ public class SessionService : ISessionService {
                 CanLogin = user.CanLogin,
                 DomainName = user.Domain.Name,
                 DomainId = user.DomainId,
-                LastLogin = user.LastLogin
+                LastLogin = user.LastLogin ?? DateTime.MinValue
             };
 
             // Generate new tokens

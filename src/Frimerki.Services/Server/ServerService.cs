@@ -13,7 +13,7 @@ public interface IServerService {
     Task<ServerStatusResponse> GetServerStatusAsync();
     Task<ServerHealthResponse> GetServerHealthAsync();
     Task<ServerMetricsResponse> GetServerMetricsAsync();
-    Task<PaginatedInfo<ServerLogEntry>> GetServerLogsAsync(int skip = 0, int take = 100, string? level = null);
+    Task<PaginatedInfo<ServerLogEntry>> GetServerLogsAsync(int skip = 0, int take = 100, string level = null);
     Task<ServerSettingsResponse> GetServerSettingsAsync();
     Task UpdateServerSettingsAsync(ServerSettingsRequest request);
     Task<BackupResponse> CreateBackupAsync(BackupRequest request);
@@ -102,18 +102,19 @@ public class ServerService : IServerService {
         };
     }
 
-    public Task<PaginatedInfo<ServerLogEntry>> GetServerLogsAsync(int skip = 0, int take = 100, string? level = null) {
+    public async Task<PaginatedInfo<ServerLogEntry>> GetServerLogsAsync(int skip = 0, int take = 100, string level = null) {
         // For now, return empty logs - this would need integration with Serilog
         // In a real implementation, you'd read from the log files or database
-        return Task.FromResult(new PaginatedInfo<ServerLogEntry> {
+        await Task.Yield();
+        return new PaginatedInfo<ServerLogEntry> {
             Items = new List<ServerLogEntry>(),
             TotalCount = 0,
             Skip = skip,
             Take = take
-        });
+        };
     }
 
-    public Task<ServerSettingsResponse> GetServerSettingsAsync() {
+    public async Task<ServerSettingsResponse> GetServerSettingsAsync() {
         // Return current configuration settings (sanitized)
         var settings = new Dictionary<string, object> {
             ["MaxMessageSize"] = _configuration["Server:MaxMessageSize"] ?? "25MB",
@@ -126,13 +127,14 @@ public class ServerService : IServerService {
             ["MaxFailedLogins"] = int.Parse(_configuration["Security:MaxFailedLogins"] ?? "5")
         };
 
-        return Task.FromResult(new ServerSettingsResponse {
+        await Task.Yield();
+        return new ServerSettingsResponse {
             Settings = settings,
             LastModified = DateTime.UtcNow // In real implementation, track actual modification time
-        });
+        };
     }
 
-    public Task UpdateServerSettingsAsync(ServerSettingsRequest request) {
+    public async Task UpdateServerSettingsAsync(ServerSettingsRequest request) {
         // In a real implementation, you would update the configuration
         // This might involve updating appsettings.json or a database table
         _logger.LogInformation("Server settings update requested");
@@ -142,10 +144,10 @@ public class ServerService : IServerService {
             _logger.LogInformation("Setting {Key} = {Value}", setting.Key, setting.Value);
         }
 
-        return Task.CompletedTask;
+        await Task.Yield();
     }
 
-    public Task<BackupResponse> CreateBackupAsync(BackupRequest request) {
+    public async Task<BackupResponse> CreateBackupAsync(BackupRequest request) {
         var backupId = Guid.NewGuid().ToString();
         var fileName = $"frimerki-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip";
 
@@ -157,17 +159,18 @@ public class ServerService : IServerService {
         // 3. Include logs if requested
         // 4. Compress everything into a zip file
 
-        return Task.FromResult(new BackupResponse {
+        await Task.Yield();
+        return new BackupResponse {
             BackupId = backupId,
             FileName = fileName,
             SizeBytes = 1024 * 1024, // Placeholder size
             CreatedAt = DateTime.UtcNow,
             Status = "Completed",
             DownloadUrl = $"/api/server/backup/{backupId}/download"
-        });
+        };
     }
 
-    public Task<RestoreResponse> RestoreFromBackupAsync(RestoreRequest request) {
+    public async Task<RestoreResponse> RestoreFromBackupAsync(RestoreRequest request) {
         _logger.LogInformation("Restoring from backup {BackupId}", request.BackupId);
 
         // In a real implementation, you would:
@@ -177,12 +180,13 @@ public class ServerService : IServerService {
         // 4. Restore attachments
         // 5. Restart services
 
-        return Task.FromResult(new RestoreResponse {
+        await Task.Yield();
+        return new RestoreResponse {
             Status = "Completed",
             Message = "Backup restored successfully",
             StartedAt = DateTime.UtcNow.AddMinutes(-5),
             CompletedAt = DateTime.UtcNow
-        });
+        };
     }
 
     private async Task<ServerStatistics> GetStatisticsAsync() {
@@ -494,7 +498,7 @@ public class ServerService : IServerService {
         }
     }
 
-    private DriveInfo? GetDiskInfo() {
+    private DriveInfo GetDiskInfo() {
         try {
             return new DriveInfo(Directory.GetCurrentDirectory());
         } catch {

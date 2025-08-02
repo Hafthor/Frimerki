@@ -8,12 +8,12 @@ public class UserMinimalResponse {
 }
 
 public class UserResponse : UserMinimalResponse {
-    public string? FullName { get; set; }
+    public string FullName { get; set; }
     public string Role { get; set; } = "";
     public bool CanReceive { get; set; }
     public bool CanLogin { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime? LastLogin { get; set; }
+    public DateTime LastLogin { get; set; }
     public string DomainName { get; set; } = "";
     public UserStatsResponse Stats { get; set; } = new();
 }
@@ -23,7 +23,7 @@ public class UserStatsResponse {
     public long StorageUsed { get; set; }
     public string StorageUsedFormatted { get; set; } = "";
     public int FolderCount { get; set; }
-    public DateTime? LastActivity { get; set; }
+    public DateTime LastActivity { get; set; }
 }
 
 public class UserRequest {
@@ -42,7 +42,7 @@ public class UserRequest {
     public string Password { get; set; } = "";
 
     [StringLength(255)]
-    public string? FullName { get; set; }
+    public string FullName { get; set; }
 
     [Required]
     [RegularExpression(Constants.ValidUserRoleRegex, ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]
@@ -93,7 +93,7 @@ public class CreateUserRequest {
     public string Password { get; set; } = "";
 
     [StringLength(255)]
-    public string? FullName { get; set; }
+    public string FullName { get; set; }
 
     [Required]
     [RegularExpression(Constants.ValidUserRoleRegex, ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]

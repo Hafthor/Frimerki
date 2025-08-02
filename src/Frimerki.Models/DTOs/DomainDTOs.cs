@@ -7,11 +7,11 @@ public class DomainResponse {
     public string DatabaseName { get; set; } = "";
     public bool IsActive { get; set; }
     public bool IsDedicated { get; set; }
-    public string? CatchAllUser { get; set; }
+    public string CatchAllUser { get; set; }
     public DateTime CreatedAt { get; set; }
     public int UserCount { get; set; }
     public long StorageUsed { get; set; }
-    public DkimKeyInfo? DkimKey { get; set; }
+    public DkimKeyInfo DkimKey { get; set; }
     public bool HasDkim { get; set; }
 }
 
@@ -22,14 +22,14 @@ public class DomainRequest {
     public string Name { get; set; } = "";
 
     [StringLength(255)]
-    public string? DatabaseName { get; set; }
+    public string DatabaseName { get; set; }
 
     public bool CreateDatabase { get; set; } = false;
 
     public bool IsActive { get; set; } = true;
 
     [EmailAddress]
-    public string? CatchAllUser { get; set; }
+    public string CatchAllUser { get; set; }
 }
 
 public class DomainUpdateRequest {

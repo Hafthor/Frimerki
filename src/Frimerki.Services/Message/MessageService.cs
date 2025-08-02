@@ -183,8 +183,8 @@ public class MessageService : IMessageService {
             Attachments = message.Attachments.Select(a => new MessageAttachmentResponse {
                 FileName = a.FileName,
                 ContentType = a.ContentType ?? "application/octet-stream",
-                Size = a.Size ?? 0,
-                SizeFormatted = FormatMessageSize(a.Size ?? 0),
+                Size = a.Size,
+                SizeFormatted = FormatMessageSize(a.Size),
                 Path = a.FilePath ?? ""
             }).ToList(),
             Uid = userMessage.Uid,

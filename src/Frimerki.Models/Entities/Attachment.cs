@@ -12,19 +12,19 @@ public class Attachment {
     public string FileName { get; set; } = "";
 
     [MaxLength(100)]
-    public string? ContentType { get; set; }
+    public string ContentType { get; set; }
 
-    public int? Size { get; set; }
+    public int Size { get; set; }
 
     [Required]
     [MaxLength(36)]
     public string FileGuid { get; set; } = "";
 
     [MaxLength(10)]
-    public string? FileExtension { get; set; }
+    public string FileExtension { get; set; }
 
     [MaxLength(500)]
-    public string? FilePath { get; set; }
+    public string FilePath { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

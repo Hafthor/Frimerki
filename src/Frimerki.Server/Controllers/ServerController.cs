@@ -94,7 +94,7 @@ public class ServerController : ControllerBase {
     public async Task<ActionResult<PaginatedInfo<ServerLogEntry>>> GetServerLogs(
         [FromQuery] int skip = 1,
         [FromQuery] int take = 100,
-        [FromQuery] string? level = null) {
+        [FromQuery] string level = "") {
         try {
             if (skip < 0) {
                 skip = 0;
@@ -239,7 +239,7 @@ public class ServerController : ControllerBase {
     /// Restart server services (HostAdmin only)
     /// </summary>
     [HttpPost("restart")]
-    public async Task<IActionResult> RestartServer([FromQuery] string? service = null) {
+    public async Task<IActionResult> RestartServer([FromQuery] string service = "") {
         try {
             _logger.LogWarning("Server restart requested by admin. Service: {Service}", service ?? "all");
 

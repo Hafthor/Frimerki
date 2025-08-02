@@ -9,7 +9,7 @@ public class FolderRequest {
     [StringLength(1)]
     public string Delimiter { get; set; } = "/";
 
-    public string? Attributes { get; set; }
+    public string Attributes { get; set; }
     public bool Subscribed { get; set; } = true;
 }
 
@@ -27,8 +27,8 @@ public class FolderUpdateRequest {
 public class FolderResponse {
     public string Name { get; set; } = "";
     public string Delimiter { get; set; } = "/";
-    public string? SystemFolderType { get; set; }
-    public string? Attributes { get; set; }
+    public string SystemFolderType { get; set; }
+    public string Attributes { get; set; }
     public int UidNext { get; set; }
     public int UidValidity { get; set; }
     public int Exists { get; set; }
@@ -40,8 +40,8 @@ public class FolderResponse {
 
 public class FolderListResponse {
     public string Name { get; set; } = "";
-    public string? SystemFolderType { get; set; }
-    public string? Attributes { get; set; }
+    public string SystemFolderType { get; set; }
+    public string Attributes { get; set; }
     public bool Subscribed { get; set; }
     public int MessageCount { get; set; }
     public int UnseenCount { get; set; }

@@ -15,9 +15,9 @@ public class Folder {
     public string Delimiter { get; set; } = "/";
 
     [MaxLength(50)]
-    public string? SystemFolderType { get; set; }
+    public string SystemFolderType { get; set; }
 
-    public string? Attributes { get; set; }
+    public string Attributes { get; set; }
 
     public int UidNext { get; set; } = 1;
 

@@ -84,13 +84,13 @@ public class MessageResponse {
     public string Subject { get; set; } = "";
     public string FromAddress { get; set; } = "";
     public string ToAddress { get; set; } = "";
-    public string? CcAddress { get; set; }
-    public string? BccAddress { get; set; }
+    public string CcAddress { get; set; }
+    public string BccAddress { get; set; }
     public DateTime SentDate { get; set; }
     public DateTime ReceivedAt { get; set; }
     public int MessageSize { get; set; }
     public string Body { get; set; } = "";
-    public string? BodyHtml { get; set; }
+    public string BodyHtml { get; set; }
     public string Headers { get; set; } = "";
     public MessageEnvelopeResponse Envelope { get; set; } = new();
     public MessageBodyStructureResponse BodyStructure { get; set; } = new();
@@ -99,8 +99,8 @@ public class MessageResponse {
     public int Uid { get; set; }
     public int UidValidity { get; set; }
     public DateTime InternalDate { get; set; }
-    public string? InReplyTo { get; set; }
-    public string? References { get; set; }
+    public string InReplyTo { get; set; }
+    public string References { get; set; }
     public string Folder { get; set; } = "";
 }
 
@@ -127,13 +127,13 @@ public class MessageEnvelopeResponse {
     public List<MessageAddressResponse> ReplyTo { get; set; } = [];
     public List<MessageAddressResponse> To { get; set; } = [];
     public List<MessageAddressResponse> Cc { get; set; } = [];
-    public List<MessageAddressResponse>? Bcc { get; set; }
-    public string? InReplyTo { get; set; }
+    public List<MessageAddressResponse> Bcc { get; set; }
+    public string InReplyTo { get; set; }
     public string MessageId { get; set; } = "";
 }
 
 public class MessageAddressResponse {
-    public string? Name { get; set; }
+    public string Name { get; set; }
     public string Email { get; set; } = "";
 
     public MessageAddressResponse() { }
@@ -151,12 +151,12 @@ public class MessageAddressResponse {
 public class MessageBodyStructureResponse {
     public string Type { get; set; } = "";
     public string Subtype { get; set; } = "";
-    public List<MessageBodyStructureResponse>? Parts { get; set; }
-    public Dictionary<string, string>? Parameters { get; set; }
-    public string? ContentId { get; set; }
-    public string? ContentDescription { get; set; }
-    public string? ContentTransferEncoding { get; set; }
-    public int? Size { get; set; }
+    public List<MessageBodyStructureResponse> Parts { get; set; }
+    public Dictionary<string, string> Parameters { get; set; }
+    public string ContentId { get; set; }
+    public string ContentDescription { get; set; }
+    public string ContentTransferEncoding { get; set; }
+    public int Size { get; set; }
 }
 
 public class MessageFlagsResponse {

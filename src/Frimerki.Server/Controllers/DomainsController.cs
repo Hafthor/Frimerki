@@ -25,7 +25,7 @@ public class DomainsController : ControllerBase {
             // TODO: Get actual user role and domain from authentication context
             // For now, simulate HostAdmin access (sees all domains)
             var userRole = "HostAdmin"; // This would come from JWT claims
-            var userDomainId = (int?)null; // This would come from JWT claims for DomainAdmin
+            var userDomainId = 0; // This would come from JWT claims for DomainAdmin (0 for HostAdmin)
 
             var domains = await _domainService.GetDomainsAsync(userRole, userDomainId);
             return Ok(domains);

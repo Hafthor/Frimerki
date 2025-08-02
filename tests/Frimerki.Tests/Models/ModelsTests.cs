@@ -229,7 +229,6 @@ public class ModelsTests {
         Assert.Equal("Completed", response.Status);
         Assert.Equal("Restore completed successfully", response.Message);
         Assert.True(response.StartedAt < DateTime.UtcNow);
-        Assert.NotNull(response.CompletedAt);
     }
 
     [Fact]

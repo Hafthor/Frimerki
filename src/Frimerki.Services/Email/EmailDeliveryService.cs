@@ -70,7 +70,7 @@ public class EmailDeliveryService {
         }
     }
 
-    private async Task<MimeMessage?> ParseMimeMessageAsync(string messageData) {
+    private async Task<MimeMessage> ParseMimeMessageAsync(string messageData) {
         try {
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(messageData));
             return await MimeMessage.LoadAsync(stream);
@@ -193,9 +193,9 @@ public class EmailDeliveryService {
         return string.Join("\r\n", headerLines) + "\r\n";
     }
 
-    private string? ExtractAddresses(InternetAddressList? addressList) {
+    private string ExtractAddresses(InternetAddressList addressList) {
         if (!(addressList?.Count > 0)) {
-            return null;
+            return "";
         }
         return string.Join(", ", addressList);
     }

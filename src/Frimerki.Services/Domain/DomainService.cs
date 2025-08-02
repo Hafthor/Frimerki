@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Frimerki.Services.Domain;
 
 public interface IDomainService {
-    Task<DomainListResponse> GetDomainsAsync(string? userRole = null, int? userDomainId = null);
+    Task<DomainListResponse> GetDomainsAsync(string userRole = "", int userDomainId = 0);
     Task<DomainResponse> GetDomainByNameAsync(string domainName);
     Task<CreateDomainResponse> CreateDomainAsync(DomainRequest request);
     Task<DomainResponse> UpdateDomainAsync(string domainName, DomainUpdateRequest request);
@@ -35,12 +35,12 @@ public class DomainService : IDomainService {
         _logger = logger;
     }
 
-    public async Task<DomainListResponse> GetDomainsAsync(string? userRole = null, int? userDomainId = null) {
+    public async Task<DomainListResponse> GetDomainsAsync(string userRole = "", int userDomainId = 0) {
         var query = _dbContext.Domains.AsQueryable();
 
         // Apply role-based filtering
-        if (userRole == "DomainAdmin" && userDomainId.HasValue) {
-            query = query.Where(d => d.Id == userDomainId.Value);
+        if (userRole == "DomainAdmin" && userDomainId > 0) {
+            query = query.Where(d => d.Id == userDomainId);
         }
 
         var domains = await query

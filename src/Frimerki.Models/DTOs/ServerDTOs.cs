@@ -47,7 +47,7 @@ public class ServerHealthResponse {
 public class HealthCheck {
     public string Name { get; set; } = "";
     public string Status { get; set; } = "";
-    public string? Message { get; set; }
+    public string Message { get; set; }
     public long ResponseTimeMs { get; set; }
 }
 
@@ -91,8 +91,8 @@ public class ServerLogEntry {
     public string Level { get; set; } = "";
     public string Logger { get; set; } = "";
     public string Message { get; set; } = "";
-    public string? Exception { get; set; }
-    public Dictionary<string, object>? Properties { get; set; }
+    public string Exception { get; set; }
+    public Dictionary<string, object> Properties { get; set; }
 }
 
 public class ServerSettingsRequest {
@@ -108,7 +108,7 @@ public class ServerSettingsResponse {
 public class BackupRequest {
     public bool IncludeAttachments { get; set; } = true;
     public bool IncludeLogs { get; set; } = false;
-    public string? Description { get; set; }
+    public string Description { get; set; }
 }
 
 public class BackupResponse {
@@ -117,7 +117,7 @@ public class BackupResponse {
     public long SizeBytes { get; set; }
     public DateTime CreatedAt { get; set; }
     public string Status { get; set; } = "";
-    public string? DownloadUrl { get; set; }
+    public string DownloadUrl { get; set; }
 }
 
 public class RestoreRequest {
@@ -133,5 +133,5 @@ public class RestoreResponse {
     public string Status { get; set; } = "";
     public string Message { get; set; } = "";
     public DateTime StartedAt { get; set; }
-    public DateTime? CompletedAt { get; set; }
+    public DateTime CompletedAt { get; set; }
 }

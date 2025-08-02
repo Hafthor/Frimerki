@@ -129,7 +129,7 @@ public partial class UserService : IUserService {
             StorageUsed = 0,
             StorageUsedFormatted = "0 B",
             FolderCount = 6, // Default folders created
-            LastActivity = null
+            LastActivity = DateTime.MinValue
         };
 
         _logger.LogInformation("User created successfully: {Email}", $"{request.Username}@{request.DomainName}");
@@ -364,7 +364,7 @@ public partial class UserService : IUserService {
             StorageUsed = storageUsed,
             StorageUsedFormatted = FormatBytes(storageUsed),
             FolderCount = folderCount,
-            LastActivity = lastActivity == default ? null : lastActivity
+            LastActivity = lastActivity == default ? DateTime.MinValue : lastActivity
         };
     }
 
@@ -391,7 +391,7 @@ public partial class UserService : IUserService {
             CanReceive = user.CanReceive,
             CanLogin = user.CanLogin,
             CreatedAt = user.CreatedAt,
-            LastLogin = user.LastLogin,
+            LastLogin = user.LastLogin ?? DateTime.MinValue,
             DomainName = user.Domain.Name,
             Stats = stats
         };

@@ -25,7 +25,7 @@ public class UsersController : ControllerBase {
     public async Task<ActionResult<PaginatedInfo<UserResponse>>> GetUsers(
         [FromQuery] int skip = 0,
         [FromQuery] int take = 50,
-        [FromQuery] string? domain = null) {
+        [FromQuery] string domain = "") {
         try {
             if (skip < 0) {
                 skip = 0;
