@@ -18,7 +18,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Frimerki.Tests.Protocols;
@@ -360,7 +359,7 @@ public class ConcurrentProtocolTests {
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         var context = new EmailDbContext(options);
-        var nowProvider = new TestNowProvider();
+        var nowProvider = new MockNowProvider();
         var mockEdsLogger = new Mock<ILogger<EmailDeliveryService>>();
         var emailDeliveryService = new EmailDeliveryService(context, mockUserService.Object, nowProvider, mockEdsLogger.Object);
 

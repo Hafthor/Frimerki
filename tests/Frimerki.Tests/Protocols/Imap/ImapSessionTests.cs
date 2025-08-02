@@ -8,24 +8,17 @@ using Frimerki.Services.Message;
 using Frimerki.Services.User;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Protocols.Imap;
 
 public class ImapCommandParserTests {
-    private readonly ImapCommandParser _parser;
-
-    public ImapCommandParserTests() {
-        _parser = new ImapCommandParser();
-    }
-
     [Fact]
     public void ParseCommand_ValidCommand_ReturnsCorrectCommand() {
         // Arrange
         var commandLine = "a1 CAPABILITY";
 
         // Act
-        var command = _parser.ParseCommand(commandLine);
+        var command = ImapCommandParser.ParseCommand(commandLine);
 
         // Assert
         Assert.NotNull(command);
@@ -41,7 +34,7 @@ public class ImapCommandParserTests {
         var commandLine = "a2 LOGIN \"test@example.com\" \"password\"";
 
         // Act
-        var command = _parser.ParseCommand(commandLine);
+        var command = ImapCommandParser.ParseCommand(commandLine);
 
         // Assert
         Assert.NotNull(command);
@@ -58,7 +51,7 @@ public class ImapCommandParserTests {
         var commandLine = "a3 LIST \"\" \"*\"";
 
         // Act
-        var command = _parser.ParseCommand(commandLine);
+        var command = ImapCommandParser.ParseCommand(commandLine);
 
         // Assert
         Assert.NotNull(command);
@@ -74,7 +67,7 @@ public class ImapCommandParserTests {
         var commandLine = "a4 SELECT \"INBOX\"";
 
         // Act
-        var command = _parser.ParseCommand(commandLine);
+        var command = ImapCommandParser.ParseCommand(commandLine);
 
         // Assert
         Assert.NotNull(command);
@@ -90,7 +83,7 @@ public class ImapCommandParserTests {
         var commandLine = "a5 FETCH 1:5 (FLAGS BODY[HEADER])";
 
         // Act
-        var command = _parser.ParseCommand(commandLine);
+        var command = ImapCommandParser.ParseCommand(commandLine);
 
         // Assert
         Assert.NotNull(command);
@@ -105,13 +98,13 @@ public class ImapCommandParserTests {
     [Fact]
     public void ParseCommand_EmptyOrWhitespace_ReturnsNull() {
         // Test empty string
-        Assert.Null(_parser.ParseCommand(""));
+        Assert.Null(ImapCommandParser.ParseCommand(""));
 
         // Test whitespace only
-        Assert.Null(_parser.ParseCommand("   "));
+        Assert.Null(ImapCommandParser.ParseCommand("   "));
 
         // Test null
-        Assert.Null(_parser.ParseCommand(null!));
+        Assert.Null(ImapCommandParser.ParseCommand(null!));
     }
 
     [Fact]
@@ -120,7 +113,7 @@ public class ImapCommandParserTests {
         var commandLine = "a1";
 
         // Act
-        var command = _parser.ParseCommand(commandLine);
+        var command = ImapCommandParser.ParseCommand(commandLine);
 
         // Assert
         Assert.Null(command);
@@ -132,7 +125,7 @@ public class ImapCommandParserTests {
         var quotedString = "\"test@example.com\"";
 
         // Act
-        var unquoted = _parser.UnquoteString(quotedString);
+        var unquoted = ImapCommandParser.UnquoteString(quotedString);
 
         // Assert
         Assert.Equal("test@example.com", unquoted);
@@ -144,7 +137,7 @@ public class ImapCommandParserTests {
         var unquotedString = "test@example.com";
 
         // Act
-        var result = _parser.UnquoteString(unquotedString);
+        var result = ImapCommandParser.UnquoteString(unquotedString);
 
         // Assert
         Assert.Equal("test@example.com", result);
@@ -153,13 +146,13 @@ public class ImapCommandParserTests {
     [Fact]
     public void UnquoteString_EmptyOrMalformed_ReturnsAsIs() {
         // Test empty string
-        Assert.Equal("", _parser.UnquoteString(""));
+        Assert.Equal("", ImapCommandParser.UnquoteString(""));
 
         // Test single quote
-        Assert.Equal("\"", _parser.UnquoteString("\""));
+        Assert.Equal("\"", ImapCommandParser.UnquoteString("\""));
 
         // Test malformed (missing closing quote)
-        Assert.Equal("\"test", _parser.UnquoteString("\"test"));
+        Assert.Equal("\"test", ImapCommandParser.UnquoteString("\"test"));
     }
 }
 

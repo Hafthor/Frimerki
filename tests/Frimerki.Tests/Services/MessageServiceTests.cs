@@ -6,15 +6,14 @@ using Frimerki.Tests.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Services;
 
-public class MessageServiceTests : IDisposable {
+public sealed class MessageServiceTests : IDisposable {
     private readonly EmailDbContext _context;
     private readonly MessageService _messageService;
     private readonly Mock<ILogger<MessageService>> _mockLogger;
-    private readonly TestNowProvider _nowProvider;
+    private readonly MockNowProvider _nowProvider;
 
     public MessageServiceTests() {
         var options = new DbContextOptionsBuilder<EmailDbContext>()
@@ -23,7 +22,7 @@ public class MessageServiceTests : IDisposable {
 
         _context = new EmailDbContext(options);
         _mockLogger = new Mock<ILogger<MessageService>>();
-        _nowProvider = new TestNowProvider();
+        _nowProvider = new MockNowProvider();
         _messageService = new MessageService(_context, _nowProvider, _mockLogger.Object);
 
         SeedTestData();
@@ -92,7 +91,7 @@ public class MessageServiceTests : IDisposable {
             User = user
         };
 
-        var message = new Frimerki.Models.Entities.Message {
+        var message = new Message {
             Id = 1,
             HeaderMessageId = "<test@example.com>",
             FromAddress = "sender@example.com",
@@ -105,8 +104,8 @@ public class MessageServiceTests : IDisposable {
             SentDate = DateTime.UtcNow,
             Uid = 1,
             UidValidity = 1,
-            Envelope = "{\"subject\":\"Test Message\",\"from\":[{\"email\":\"sender@example.com\"}]}",
-            BodyStructure = "{\"type\":\"text\",\"subtype\":\"plain\"}"
+            Envelope = """{"subject":"Test Message","from":[{"email":"sender@example.com"}]}""",
+            BodyStructure = """{"type":"text","subtype":"plain"}"""
         };
 
         var userMessage = new UserMessage {
@@ -204,7 +203,7 @@ public class MessageServiceTests : IDisposable {
         // Arrange
         // Add more test messages to test pagination
         for (int i = 2; i <= 55; i++) {
-            var message = new Frimerki.Models.Entities.Message {
+            var message = new Message {
                 Id = i,
                 HeaderMessageId = $"<test{i}@example.com>",
                 FromAddress = "sender@example.com",
@@ -231,7 +230,7 @@ public class MessageServiceTests : IDisposable {
             _context.Messages.Add(message);
             _context.UserMessages.Add(userMessage);
         }
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         var request = new MessageFilterRequest {
             Skip = 0,
@@ -387,7 +386,5 @@ public class MessageServiceTests : IDisposable {
         Assert.False(result);
     }
 
-    public void Dispose() {
-        _context.Dispose();
-    }
+    public void Dispose() => _context.Dispose();
 }

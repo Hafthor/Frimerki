@@ -1,14 +1,10 @@
-using System;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Frimerki.Models.DTOs;
 using Frimerki.Server.Controllers;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Frimerki.Tests.Controllers;
 
@@ -37,7 +33,7 @@ public class UsersControllerTests {
         _mockUserService.SetUsersResponse(expectedResponse);
 
         // Act
-        var result = await _controller.GetUsers(1, 50, null);
+        var result = await _controller.GetUsers(0, 50, null);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -46,7 +42,7 @@ public class UsersControllerTests {
     }
 
     [Fact]
-    public async Task GetUsers_InvalidPageNumber_CorrectsToPag1() {
+    public async Task GetUsers_InvalidSkipAmount_CorrectsToSkip0() {
         // Arrange
         var expectedResponse = new PaginatedInfo<UserResponse> { Items = [], Skip = 0, Take = 50, TotalCount = 0 };
         _mockUserService.SetUsersResponse(expectedResponse);
@@ -451,25 +447,25 @@ public class MockUserServiceForController : IUserService {
         return Task.FromResult(_userResponse ?? new UserResponse { Email = $"{request.Username}@{request.DomainName}", Username = request.Username });
     }
 
-    public Task<UserResponse?> GetUserByEmailAsync(string email) {
+    public async Task<UserResponse?> GetUserByEmailAsync(string email) {
         if (ShouldReturnNull) {
-            return Task.FromResult<UserResponse?>(null);
+            return null;
         }
-        return Task.FromResult<UserResponse?>(_userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] });
+        return _userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] };
     }
 
-    public Task<UserResponse?> UpdateUserAsync(string email, UserUpdateRequest request) {
+    public async Task<UserResponse?> UpdateUserAsync(string email, UserUpdateRequest request) {
         if (ShouldReturnNull) {
-            return Task.FromResult<UserResponse?>(null);
+            return null;
         }
-        return Task.FromResult<UserResponse?>(_userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] });
+        return _userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] };
     }
 
-    public Task<bool> UpdateUserPasswordAsync(string email, UserPasswordUpdateRequest request) {
+    public async Task<bool> UpdateUserPasswordAsync(string email, UserPasswordUpdateRequest request) {
         if (ShouldThrowUnauthorizedException) {
             throw new UnauthorizedAccessException("Current password is incorrect");
         }
-        return Task.FromResult(PasswordUpdateSuccess);
+        return PasswordUpdateSuccess;
     }
 
     public Task<bool> DeleteUserAsync(string email) {

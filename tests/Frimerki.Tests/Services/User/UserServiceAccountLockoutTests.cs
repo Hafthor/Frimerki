@@ -9,11 +9,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Services.User;
 
-public class UserServiceAccountLockoutTests : IDisposable {
+public sealed class UserServiceAccountLockoutTests : IDisposable {
     private readonly EmailDbContext _context;
     private readonly UserService _userService;
     private readonly Mock<INowProvider> _mockNowProvider;
@@ -55,7 +54,7 @@ public class UserServiceAccountLockoutTests : IDisposable {
         };
 
         // Create test user with properly hashed password for "password123"
-        var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var passwordHash = HashTestPassword("password123", salt);
         var user = new Frimerki.Models.Entities.User {
             Id = 1,
@@ -79,8 +78,8 @@ public class UserServiceAccountLockoutTests : IDisposable {
     [Fact]
     public async Task AuthenticateUserEntityAsync_WithValidCredentials_ResetsFailedAttempts() {
         // Arrange
-        var email = "testuser@example.com";
-        var password = "password123";
+        const string email = "testuser@example.com";
+        const string password = "password123";
 
         // Set up user with some failed attempts
         var user = await _context.Users.Include(u => u.Domain).FirstAsync();
@@ -99,8 +98,8 @@ public class UserServiceAccountLockoutTests : IDisposable {
     [Fact]
     public async Task AuthenticateUserEntityAsync_WithInvalidCredentials_IncrementsFailedAttempts() {
         // Arrange
-        var email = "testuser@example.com";
-        var password = "wrongpassword";
+        const string email = "testuser@example.com";
+        const string password = "wrongpassword";
 
         // Act
         var result = await _userService.AuthenticateUserEntityAsync(email, password);
@@ -116,8 +115,8 @@ public class UserServiceAccountLockoutTests : IDisposable {
     [Fact]
     public async Task AuthenticateUserEntityAsync_ReachingMaxAttempts_LocksAccount() {
         // Arrange
-        var email = "testuser@example.com";
-        var password = "wrongpassword";
+        const string email = "testuser@example.com";
+        const string password = "wrongpassword";
 
         // Set user to have 2 failed attempts (one below max)
         var user = await _context.Users.FirstAsync();
@@ -139,8 +138,8 @@ public class UserServiceAccountLockoutTests : IDisposable {
     [Fact]
     public async Task AuthenticateUserEntityAsync_AccountLocked_RejectsValidCredentials() {
         // Arrange
-        var email = "testuser@example.com";
-        var password = "password123";
+        const string email = "testuser@example.com";
+        const string password = "password123";
 
         // Set up locked account
         var user = await _context.Users.FirstAsync();
@@ -158,8 +157,8 @@ public class UserServiceAccountLockoutTests : IDisposable {
     [Fact]
     public async Task AuthenticateUserEntityAsync_LockoutExpired_AllowsLogin() {
         // Arrange
-        var email = "testuser@example.com";
-        var password = "password123";
+        const string email = "testuser@example.com";
+        const string password = "password123";
 
         // Set up account that was locked but lockout has expired
         var user = await _context.Users.FirstAsync();
@@ -179,7 +178,7 @@ public class UserServiceAccountLockoutTests : IDisposable {
     [Fact]
     public async Task UpdateUserPasswordAsync_ResetsFailedAttempts() {
         // Arrange
-        var email = "testuser@example.com";
+        const string email = "testuser@example.com";
         var user = await _context.Users.FirstAsync();
         user.FailedLoginAttempts = 2;
         user.LockoutEnd = _testTime.AddMinutes(10);
@@ -203,12 +202,9 @@ public class UserServiceAccountLockoutTests : IDisposable {
     }
 
     private string HashTestPassword(string password, string salt) {
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, Convert.FromBase64String(salt), 10000, HashAlgorithmName.SHA256);
-        var hash = pbkdf2.GetBytes(32);
-        return Convert.ToBase64String(hash);
+        using Rfc2898DeriveBytes pbkdf2 = new(password, Convert.FromBase64String(salt), 10000, HashAlgorithmName.SHA256);
+        return Convert.ToBase64String(pbkdf2.GetBytes(32));
     }
 
-    public void Dispose() {
-        _context.Dispose();
-    }
+    public void Dispose() => _context.Dispose();
 }

@@ -1,6 +1,5 @@
 using Frimerki.Server.Middleware;
 using Microsoft.AspNetCore.Http;
-using Xunit;
 
 namespace Frimerki.Tests.Server.Middleware;
 
@@ -23,7 +22,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_ValidDomain_StoresDomainInContext() {
         // Arrange
-        var domain = "example.com";
+        const string domain = "example.com";
 
         // Act
         _httpContext.SetDomain(domain);
@@ -36,7 +35,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void GetDomain_AfterSettingDomain_ReturnsCorrectDomain() {
         // Arrange
-        var domain = "test.org";
+        const string domain = "test.org";
         _httpContext.SetDomain(domain);
 
         // Act
@@ -49,7 +48,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_EmptyString_StoresEmptyString() {
         // Arrange
-        var domain = "";
+        const string domain = "";
 
         // Act
         _httpContext.SetDomain(domain);
@@ -62,7 +61,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_WhitespaceString_StoresWhitespaceString() {
         // Arrange
-        var domain = "   ";
+        const string domain = "   ";
 
         // Act
         _httpContext.SetDomain(domain);
@@ -75,8 +74,8 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_OverwriteExistingDomain_UpdatesToDomain() {
         // Arrange
-        var originalDomain = "original.com";
-        var newDomain = "new.com";
+        const string originalDomain = "original.com";
+        const string newDomain = "new.com";
 
         _httpContext.SetDomain(originalDomain);
 
@@ -132,7 +131,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_MultipleCalls_LastValuePersists() {
         // Arrange
-        var domains = new[] { "first.com", "second.com", "third.com", "final.com" };
+        string[] domains = ["first.com", "second.com", "third.com", "final.com"];
 
         // Act
         foreach (var domain in domains) {
@@ -150,8 +149,8 @@ public class DomainContextExtensionsTests {
         var context1 = new DefaultHttpContext();
         var context2 = new DefaultHttpContext();
 
-        var domain1 = "context1.com";
-        var domain2 = "context2.com";
+        const string domain1 = "context1.com";
+        const string domain2 = "context2.com";
 
         // Act
         context1.SetDomain(domain1);
@@ -166,7 +165,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_WithSpecialCharacters_HandlesCorrectly() {
         // Arrange
-        var domain = "test-domain_with.special-chars.com";
+        const string domain = "test-domain_with.special-chars.com";
 
         // Act
         _httpContext.SetDomain(domain);
@@ -179,7 +178,7 @@ public class DomainContextExtensionsTests {
     [Fact]
     public void SetDomain_WithUnicodeCharacters_HandlesCorrectly() {
         // Arrange
-        var domain = "тест.рф"; // Cyrillic domain
+        const string domain = "тест.рф"; // Cyrillic domain
 
         // Act
         _httpContext.SetDomain(domain);

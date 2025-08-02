@@ -5,8 +5,8 @@ namespace Frimerki.Protocols.Imap;
 /// <summary>
 /// Parses IMAP commands according to RFC 3501 syntax
 /// </summary>
-public class ImapCommandParser {
-    public ImapCommand? ParseCommand(string commandLine) {
+public static class ImapCommandParser {
+    public static ImapCommand? ParseCommand(string commandLine) {
         if (string.IsNullOrWhiteSpace(commandLine)) {
             return null;
         }
@@ -64,7 +64,7 @@ public class ImapCommandParser {
     /// <summary>
     /// Unquotes a quoted string argument
     /// </summary>
-    public string UnquoteString(string quotedString) {
+    public static string UnquoteString(string quotedString) {
         if (string.IsNullOrEmpty(quotedString) ||
             quotedString.Length < 2 || !quotedString.StartsWith('"') || !quotedString.EndsWith('"')) {
             return quotedString;

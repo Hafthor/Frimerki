@@ -3,7 +3,6 @@ using Frimerki.Services.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Services.Authentication;
 

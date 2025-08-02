@@ -1,10 +1,7 @@
-using System;
 using Frimerki.Server.Controllers;
-using Frimerki.Services.Common;
+using Frimerki.Tests.Utilities;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Frimerki.Tests.Controllers;
 
@@ -22,7 +19,7 @@ public class HealthControllerTests {
     public void GetHealth_ReturnsHealthyStatus() {
         // Arrange
         var testTime = new DateTime(2025, 7, 30, 12, 0, 0, DateTimeKind.Utc);
-        _mockNowProvider.SetCurrentTime(testTime);
+        _mockNowProvider.UtcNow = testTime;
 
         // Act
         var result = _controller.GetHealth();
@@ -195,12 +192,3 @@ public class HealthControllerTests {
 }
 
 // Mock implementation of INowProvider for testing
-public class MockNowProvider : INowProvider {
-    private DateTime _currentTime = DateTime.UtcNow;
-
-    public DateTime UtcNow => _currentTime;
-
-    public void SetCurrentTime(DateTime time) {
-        _currentTime = time;
-    }
-}

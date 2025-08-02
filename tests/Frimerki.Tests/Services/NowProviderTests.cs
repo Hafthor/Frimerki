@@ -1,6 +1,5 @@
 using Frimerki.Services.Common;
 using Frimerki.Tests.Utilities;
-using Xunit;
 
 namespace Frimerki.Tests.Services;
 
@@ -21,20 +20,20 @@ public class NowProviderTests {
     }
 
     [Fact]
-    public void TestNowProvider_AllowsControllingTime() {
+    public void MockNowProvider_AllowsControllingTime() {
         // Arrange
         var testTime = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc);
-        var provider = new TestNowProvider(testTime);
+        var provider = new MockNowProvider(testTime);
 
         // Act & Assert
         Assert.Equal(testTime, provider.UtcNow);
     }
 
     [Fact]
-    public void TestNowProvider_AdvanceTimeSpan_UpdatesTime() {
+    public void MockNowProvider_AdvanceTimeSpan_UpdatesTime() {
         // Arrange
         var initialTime = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc);
-        var provider = new TestNowProvider(initialTime);
+        var provider = new MockNowProvider(initialTime);
         var timeToAdvance = TimeSpan.FromMinutes(45);
 
         // Act
@@ -46,11 +45,11 @@ public class NowProviderTests {
     }
 
     [Fact]
-    public void TestNowProvider_SetUtcNow_UpdatesTime() {
+    public void MockNowProvider_SetUtcNow_UpdatesTime() {
         // Arrange
         var initialTime = new DateTime(2024, 1, 15, 10, 30, 0, DateTimeKind.Utc);
         var newTime = new DateTime(2024, 12, 25, 15, 45, 30, DateTimeKind.Utc);
-        var provider = new TestNowProvider(initialTime);
+        var provider = new MockNowProvider(initialTime);
 
         // Act
         provider.UtcNow = newTime;

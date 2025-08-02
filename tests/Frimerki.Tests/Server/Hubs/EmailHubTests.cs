@@ -1,10 +1,6 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Frimerki.Server;
 using Microsoft.AspNetCore.SignalR;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Server.Hubs;
 
@@ -37,12 +33,12 @@ public class EmailHubTests {
     [Fact]
     public async Task JoinFolder_ValidFolderId_AddsConnectionToGroup() {
         // Arrange
-        var folderId = "inbox";
-        var expectedGroupName = "folder_inbox";
-        var connectionId = "test-connection-id";
+        const string folderId = "inbox";
+        const string expectedGroupName = "folder_inbox";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -51,19 +47,19 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.AddToGroupAsync(connectionId, expectedGroupName, default),
+            x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
     [Fact]
     public async Task JoinFolder_EmptyFolderId_AddsConnectionToEmptyGroup() {
         // Arrange
-        var folderId = "";
-        var expectedGroupName = "folder_";
-        var connectionId = "test-connection-id";
+        const string folderId = "";
+        const string expectedGroupName = "folder_";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -72,19 +68,19 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.AddToGroupAsync(connectionId, expectedGroupName, default),
+            x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
     [Fact]
     public async Task JoinFolder_SpecialCharactersInFolderId_HandlesCorrectly() {
         // Arrange
-        var folderId = "INBOX/Sent Items";
-        var expectedGroupName = "folder_INBOX/Sent Items";
-        var connectionId = "test-connection-id";
+        const string folderId = "INBOX/Sent Items";
+        const string expectedGroupName = "folder_INBOX/Sent Items";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -93,19 +89,19 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.AddToGroupAsync(connectionId, expectedGroupName, default),
+            x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
     [Fact]
     public async Task LeaveFolder_ValidFolderId_RemovesConnectionFromGroup() {
         // Arrange
-        var folderId = "sent";
-        var expectedGroupName = "folder_sent";
-        var connectionId = "test-connection-id";
+        const string folderId = "sent";
+        const string expectedGroupName = "folder_sent";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -114,19 +110,19 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default),
+            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
     [Fact]
     public async Task LeaveFolder_EmptyFolderId_RemovesConnectionFromEmptyGroup() {
         // Arrange
-        var folderId = "";
-        var expectedGroupName = "folder_";
-        var connectionId = "test-connection-id";
+        const string folderId = "";
+        const string expectedGroupName = "folder_";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -135,19 +131,19 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default),
+            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
     [Fact]
     public async Task LeaveFolder_SpecialCharactersInFolderId_HandlesCorrectly() {
         // Arrange
-        var folderId = "INBOX/Drafts";
-        var expectedGroupName = "folder_INBOX/Drafts";
-        var connectionId = "test-connection-id";
+        const string folderId = "INBOX/Drafts";
+        const string expectedGroupName = "folder_INBOX/Drafts";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -156,7 +152,7 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default),
+            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
@@ -199,10 +195,10 @@ public class EmailHubTests {
     public async Task JoinFolder_MultipleValidFolderIds_AddsToCorrectGroups(string folderId) {
         // Arrange
         var expectedGroupName = $"folder_{folderId}";
-        var connectionId = "test-connection-id";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -211,7 +207,7 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.AddToGroupAsync(connectionId, expectedGroupName, default),
+            x => x.AddToGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 
@@ -224,10 +220,10 @@ public class EmailHubTests {
     public async Task LeaveFolder_MultipleValidFolderIds_RemovesFromCorrectGroups(string folderId) {
         // Arrange
         var expectedGroupName = $"folder_{folderId}";
-        var connectionId = "test-connection-id";
+        const string connectionId = "test-connection-id";
 
         _mockGroups
-            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default))
+            .Setup(x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
@@ -236,7 +232,7 @@ public class EmailHubTests {
 
         // Assert
         _mockGroups.Verify(
-            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, default),
+            x => x.RemoveFromGroupAsync(connectionId, expectedGroupName, CancellationToken.None),
             Times.Once);
     }
 }

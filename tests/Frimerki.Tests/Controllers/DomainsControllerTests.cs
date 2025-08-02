@@ -1,12 +1,8 @@
-using System;
-using System.Threading.Tasks;
 using Frimerki.Models.DTOs;
 using Frimerki.Server.Controllers;
 using Frimerki.Services.Domain;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Frimerki.Tests.Controllers;
 

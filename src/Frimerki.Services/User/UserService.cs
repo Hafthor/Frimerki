@@ -27,7 +27,7 @@ public partial class UserService : IUserService {
         _lockoutOptions = lockoutOptions.Value;
     }
 
-    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null) {
+    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 0, int take = 50, string? domainFilter = null) {
         _logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
             skip, take, domainFilter ?? "All");
 

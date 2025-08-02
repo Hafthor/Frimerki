@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
-using Xunit;
 
 namespace Frimerki.Tests.Models;
 

@@ -14,10 +14,10 @@ namespace Frimerki.Protocols.Smtp;
 public partial class SmtpSession : IDisposable {
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
-    private TcpClient _client;
-    private NetworkStream _stream;
-    private StreamReader _reader;
-    private StreamWriter _writer;
+    private TcpClient? _client;
+    private NetworkStream? _stream;
+    private StreamReader? _reader;
+    private StreamWriter? _writer;
     private readonly IUserService _userService;
     private readonly EmailDeliveryService _emailDeliveryService;
     private readonly ILogger _logger;
@@ -314,7 +314,7 @@ public partial class SmtpSession : IDisposable {
         _rcptTo.Clear();
         _messageData.Clear();
         _state = _authenticatedUser != null ? SmtpSessionState.Authenticated :
-                 (_state == SmtpSessionState.Ehlo ? SmtpSessionState.Ehlo : SmtpSessionState.Helo);
+                 _state == SmtpSessionState.Ehlo ? SmtpSessionState.Ehlo : SmtpSessionState.Helo;
 
         await SendResponseAsync("250 OK");
     }

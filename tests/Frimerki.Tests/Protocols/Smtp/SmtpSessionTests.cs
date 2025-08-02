@@ -9,7 +9,6 @@ using Frimerki.Services.User;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Protocols.Smtp;
 

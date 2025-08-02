@@ -5,11 +5,10 @@ using Frimerki.Services.Folder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Services;
 
-public class FolderServiceTests : IDisposable {
+public sealed class FolderServiceTests : IDisposable {
     private readonly EmailDbContext _context;
     private readonly FolderService _folderService;
     private readonly Mock<ILogger<FolderService>> _mockLogger;
@@ -47,7 +46,7 @@ public class FolderServiceTests : IDisposable {
             Domain = domain
         };
 
-        var folders = new List<Frimerki.Models.Entities.Folder> {
+        var folders = new List<Folder> {
             new() {
                 Id = 1,
                 UserId = 1,
@@ -278,7 +277,7 @@ public class FolderServiceTests : IDisposable {
     [Fact]
     public async Task DeleteFolderAsync_WithMessages_ThrowsException() {
         // Arrange - Add a message to the folder
-        var message = new Frimerki.Models.Entities.Message {
+        var message = new Message {
             Id = 1,
             HeaderMessageId = "<test@example.com>",
             FromAddress = "sender@example.com",
@@ -300,7 +299,7 @@ public class FolderServiceTests : IDisposable {
 
         _context.Messages.Add(message);
         _context.UserMessages.Add(userMessage);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -326,7 +325,5 @@ public class FolderServiceTests : IDisposable {
         Assert.False(result);
     }
 
-    public void Dispose() {
-        _context.Dispose();
-    }
+    public void Dispose() => _context.Dispose();
 }

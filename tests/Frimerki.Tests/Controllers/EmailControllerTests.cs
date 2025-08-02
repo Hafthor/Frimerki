@@ -6,9 +6,7 @@ using Frimerki.Services.User;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Frimerki.Tests.Controllers;
 
@@ -316,7 +314,7 @@ public class EmailControllerTests {
 
 public class MockUserServiceForEmailController : IUserService {
     private UserResponse? _getUserResult;
-    private bool _throwException = false;
+    private bool _throwException;
 
     public void SetGetUserResult(UserResponse? result) => _getUserResult = result;
     public void SetThrowException(bool throwException) => _throwException = throwException;

@@ -10,7 +10,6 @@ using Frimerki.Tests.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Frimerki.Tests.Protocols.Smtp;

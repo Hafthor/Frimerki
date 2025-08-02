@@ -8,13 +8,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Services;
 
 public class UserServiceTimeTests {
     private readonly EmailDbContext _context;
-    private readonly TestNowProvider _nowProvider;
+    private readonly MockNowProvider _nowProvider;
     private readonly UserService _userService;
     private readonly Mock<ILogger<UserService>> _mockLogger;
 
@@ -25,7 +24,7 @@ public class UserServiceTimeTests {
 
         _context = new EmailDbContext(options);
         _mockLogger = new Mock<ILogger<UserService>>();
-        _nowProvider = new TestNowProvider();
+        _nowProvider = new MockNowProvider();
 
         var lockoutOptions = new AccountLockoutOptions();
         var mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();

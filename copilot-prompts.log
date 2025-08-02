@@ -20545,3 +20545,43 @@ The installation guide emphasizes:
 - **Backup strategies** for the multi-database architecture
 
 The guide follows your coding style preferences with K&R brace style in code examples and maintains brevity while being comprehensive. It's production-ready and includes all the encrypted protocol configuration details you requested.
+
+Hafthor: create a USAGE.md file that explains how a client would configure their mail client to work with a Frimerki mail server. Assume the mail server they're connecting to is @frimerki.net
+
+GitHub Copilot: I'll create a comprehensive USAGE.md file that explains how to configure various email clients to work with a Frimerki mail server. Let me first check the current project structure and then create the file. Now let me check the existing configuration structure to understand the default ports and settings: Perfect! Now I have the port configuration. Let me create a comprehensive USAGE.md file that covers various email clients:
+
+Made changes.
+
+Perfect! I've created a comprehensive USAGE.md file that provides detailed instructions for configuring various email clients to work with a Frímerki mail server. Here's what the guide covers:
+
+## 📋 **Key Features of the USAGE.md Guide**
+
+### **Email Client Coverage**
+- **Apple Mail** (macOS/iOS) - Both automatic and manual setup
+- **Microsoft Outlook** (Windows/macOS) - Multiple versions
+- **Mozilla Thunderbird** (Cross-platform) - Automatic and manual config
+- **Gmail App** (Android/iOS) - IMAP setup
+- **Android Native Email** - Standard Android email app
+- **Windows Mail App** - Windows 10/11 built-in app
+
+### **Technical Configuration Details**
+- **Port Settings**: Complete table of all protocol ports (IMAP 143/993, POP3 110/995, SMTP 25/587/465)
+- **Security Options**: SSL/TLS vs STARTTLS recommendations
+- **Protocol Comparison**: IMAP vs POP3 pros/cons
+- **Server Settings**: Using `mail.frimerki.net` as the example domain
+
+### **Practical Features**
+- **Quick Reference Table**: Summary of all essential settings
+- **Mobile Quick Setup**: Streamlined settings for phones/tablets
+- **Troubleshooting Section**: Common issues and solutions
+- **Connection Testing**: Command-line tools for verification
+- **Security Recommendations**: Best practices for encrypted connections
+
+### **User-Friendly Elements**
+- **Step-by-step instructions** for each email client
+- **Visual formatting** with tables and checkmarks
+- **Security emphasis** promoting encrypted connections
+- **Real-world examples** using `your-username@frimerki.net`
+- **Troubleshooting guide** for common configuration problems
+
+The guide follows your coding preferences with clear structure, concise explanations, and practical examples. It provides everything users need to successfully configure their email clients to work with a Frímerki server! 🚀

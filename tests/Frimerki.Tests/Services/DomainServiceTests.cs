@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
@@ -9,7 +5,6 @@ using Frimerki.Services.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Frimerki.Tests.Services;
 
@@ -854,13 +849,9 @@ public class MockDomainRegistryService : IDomainRegistryService {
             : null);
     }
 
-    public Task<List<DomainRegistry>> GetAllDomainsAsync() {
-        return Task.FromResult(RegisteredDomains);
-    }
+    public async Task<List<DomainRegistry>> GetAllDomainsAsync() => RegisteredDomains;
 
-    public Task<bool> DomainExistsAsync(string domainName) {
-        return Task.FromResult(true); // For testing, assume domain validation passes
-    }
+    public async Task<bool> DomainExistsAsync(string domainName) => true; // For testing, assume domain validation passes
 
     public Task SetDomainActiveAsync(string domainName, bool isActive) {
         var domain = RegisteredDomains.FirstOrDefault(d => d.Name == domainName);
@@ -870,13 +861,9 @@ public class MockDomainRegistryService : IDomainRegistryService {
         return Task.CompletedTask;
     }
 
-    public Task<bool> DatabaseExistsAsync(string databaseName) {
-        return Task.FromResult(false);
-    }
+    public async Task<bool> DatabaseExistsAsync(string databaseName) => false;
 
-    public Task<List<string>> GetExistingDatabasesAsync() {
-        return Task.FromResult(new List<string>());
-    }
+    public async Task<List<string>> GetExistingDatabasesAsync() => [];
 }
 
 public class MockDomainDbContextFactory : IDomainDbContextFactory {
@@ -892,12 +879,9 @@ public class MockDomainDbContextFactory : IDomainDbContextFactory {
         return CreateDbContext(domainName);
     }
 
-    public string GetDatabasePath(string domainName) {
-        return $"/mock/path/domain_{domainName}.db";
-    }
+    public string GetDatabasePath(string domainName) => $"/mock/path/domain_{domainName}.db";
 
-    public Task EnsureDatabaseExistsAsync(string domainName) {
-        // Mock implementation - just return completed task
-        return Task.CompletedTask;
+    public async Task EnsureDatabaseExistsAsync(string domainName) {
+        // Mock implementation - just return
     }
 }

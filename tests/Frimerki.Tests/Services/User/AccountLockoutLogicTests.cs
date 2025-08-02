@@ -1,9 +1,6 @@
 using Frimerki.Models.Configuration;
-using Frimerki.Models.Entities;
 using Frimerki.Services.Common;
-using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Services.User;
 

@@ -53,7 +53,9 @@ public partial class Pop3Session {
         } finally {
             // Clean up resources
             try {
-                _writer?.Dispose();
+                if (_writer != null) {
+                    await _writer.DisposeAsync();
+                }
             } catch {
                 // Ignore disposal errors
             }
@@ -65,7 +67,9 @@ public partial class Pop3Session {
             }
             _reader = null;
             try {
-                _stream?.Dispose();
+                if (_stream != null) {
+                    await _stream.DisposeAsync();
+                }
             } catch {
                 // Ignore disposal errors
             }
@@ -172,12 +176,12 @@ public partial class Pop3Session {
         };
 
         var result = await _messageService.GetMessagesAsync(_userId.Value, request);
-        _messages = result.Items.Select((msg, index) => new MessageInfo {
-            Index = index + 1,
-            MessageId = msg.Id,
-            Size = msg.MessageSize,
-            Uid = msg.Id.ToString()
-        }).ToList();
+        _messages = result.Items.Select((msg, index) => new MessageInfo(
+            Index: index + 1,
+            MessageId: msg.Id,
+            Size: msg.MessageSize,
+            Uid: msg.Id.ToString()
+        )).ToList();
     }
 
     private async Task HandleStatAsync(CancellationToken cancellationToken) {
@@ -290,12 +294,11 @@ public partial class Pop3Session {
             return;
         }
 
-        if (_deletedMessages.Contains(msgIndex)) {
+        if (!_deletedMessages.Add(msgIndex)) {
             await SendResponseAsync("-ERR Message already deleted", cancellationToken);
             return;
         }
 
-        _deletedMessages.Add(msgIndex);
         await SendResponseAsync($"+OK Message {msgIndex} deleted", cancellationToken);
     }
 
@@ -435,10 +438,5 @@ public partial class Pop3Session {
 
     private bool IsAuthenticated() => _userId.HasValue;
 
-    private class MessageInfo {
-        public int Index { get; set; }
-        public int MessageId { get; set; }
-        public int Size { get; set; }
-        public string Uid { get; set; } = "";
-    }
+    private record MessageInfo(int Index, int MessageId, int Size, string Uid = "");
 }

@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Email;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Frimerki.Tests.Services.Email;
 
@@ -290,7 +286,7 @@ public class SmtpClientServiceTests {
         var attachments = new List<MessageAttachmentRequest> {
             new() {
                 Name = "test.txt",
-                Content = System.Text.Encoding.UTF8.GetBytes("Test file content"),
+                Content = "Test file content"u8.ToArray(),
                 ContentType = "text/plain"
             }
         };

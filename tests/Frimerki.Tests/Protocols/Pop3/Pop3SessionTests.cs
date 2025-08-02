@@ -6,7 +6,6 @@ using Frimerki.Services.Message;
 using Frimerki.Services.Session;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Frimerki.Tests.Protocols.Pop3;
 

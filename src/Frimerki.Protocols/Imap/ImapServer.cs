@@ -18,7 +18,7 @@ public class ImapServer : BackgroundService {
     private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
     private TcpListener? _listener;
-    private int _port;
+    private readonly int _port;
 
     public ImapServer(
         ILogger<ImapServer> logger,
@@ -56,7 +56,7 @@ public class ImapServer : BackgroundService {
             while (!stoppingToken.IsCancellationRequested) {
                 try {
                     _logger.LogInformation("IMAP: Waiting for client connections...");
-                    var client = await _listener.AcceptTcpClientAsync();
+                    var client = await _listener.AcceptTcpClientAsync(stoppingToken);
                     _logger.LogInformation("IMAP: Client connected from {ClientEndpoint}", client.Client.RemoteEndPoint);
 
                     // Handle client connection in background task

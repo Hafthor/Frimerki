@@ -39,12 +39,10 @@ public enum ImapResponseType {
 /// <summary>
 /// IMAP response with status and message
 /// </summary>
-public class ImapResponse {
-    public string Tag { get; set; } = "";
-    public ImapResponseType Type { get; set; }
-    public string Message { get; set; } = "";
-    public string? ResponseCode { get; set; }
-
+public record ImapResponse(string Tag = "",
+                        ImapResponseType Type = ImapResponseType.Ok,
+                            string Message = "",
+                            string? ResponseCode = null) {
     public override string ToString() =>
         string.IsNullOrEmpty(ResponseCode)
             ? $"{Tag} {Type.ToString().ToUpper()} {Message}"
@@ -54,7 +52,7 @@ public class ImapResponse {
 /// <summary>
 /// Parsed IMAP command from client
 /// </summary>
-public class ImapCommand {
+public record ImapCommand {
     public string Tag { get; set; } = "";
     public string Name { get; set; } = "";
     public List<string> Arguments { get; set; } = [];

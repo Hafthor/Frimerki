@@ -12,14 +12,13 @@ namespace Frimerki.Protocols.Imap;
 /// <summary>
 /// Handles individual IMAP client connections
 /// </summary>
-public class ImapSession {
-    private readonly TcpClient _client;
+public partial class ImapSession {
+    private TcpClient? _client;
     private readonly NetworkStream _stream;
     private readonly ILogger<ImapSession> _logger;
     private readonly IUserService _userService;
     private readonly IFolderService _folderService;
     private readonly IMessageService _messageService;
-    private readonly ImapCommandParser _parser;
 
     // UTF-8 encoding without BOM for IMAP protocol compliance
     private static readonly UTF8Encoding Utf8NoBom = new(false);
@@ -42,7 +41,6 @@ public class ImapSession {
         _userService = userService;
         _folderService = folderService;
         _messageService = messageService;
-        _parser = new ImapCommandParser();
     }
 
     public async Task HandleSessionAsync() {
@@ -72,10 +70,11 @@ public class ImapSession {
             _logger.LogError(ex, "Error in IMAP session");
         } finally {
             try {
-                _client?.Close();
+                _client?.Dispose();
             } catch {
                 // Ignore cleanup errors
             }
+            _client = null;
         }
     }
 
@@ -84,13 +83,13 @@ public class ImapSession {
             _logger.LogInformation("IMAP Command: {Command}", commandLine);
 
             // Special handling for APPEND command with literals
-            if (commandLine.Contains("APPEND") && commandLine.Contains("{")) {
+            if (commandLine.Contains("APPEND") && commandLine.Contains('{')) {
                 _logger.LogInformation("APPEND: Detected APPEND command with literal");
                 await HandleAppendCommandWithLiteral(commandLine);
                 return;
             }
 
-            var command = _parser.ParseCommand(commandLine);
+            var command = ImapCommandParser.ParseCommand(commandLine);
             if (command == null) {
                 _logger.LogWarning("IMAP: Failed to parse command: {Command}", commandLine);
                 await SendResponseAsync("* BAD Invalid command syntax");
@@ -152,8 +151,8 @@ public class ImapSession {
             };
         }
 
-        var username = _parser.UnquoteString(command.Arguments[0]);
-        var password = _parser.UnquoteString(command.Arguments[1]);
+        var username = ImapCommandParser.UnquoteString(command.Arguments[0]);
+        var password = ImapCommandParser.UnquoteString(command.Arguments[1]);
 
         try {
             var user = await _userService.AuthenticateUserEntityAsync(username, password);
@@ -198,56 +197,57 @@ public class ImapSession {
 
         var mechanism = command.Arguments[0].ToUpperInvariant();
 
-        if (mechanism == "PLAIN") {
-            // Send continuation response
-            await SendResponseAsync("+ ");
-
-            // Read the authentication data from the client
-            var buffer = new byte[1024];
-            var bytesRead = await _stream.ReadAsync(buffer);
-            var authData = Utf8NoBom.GetString(buffer, 0, bytesRead).Trim();
-
-            try {
-                // Decode base64 authentication data
-                var decodedBytes = Convert.FromBase64String(authData);
-                var decoded = Utf8NoBom.GetString(decodedBytes);
-
-                // PLAIN format: \0username\0password
-                var parts = decoded.Split('\0');
-                if (parts.Length >= 3) {
-                    var username = parts[1];
-                    var password = parts[2];
-
-                    // Use the user service to authenticate
-                    var user = await _userService.AuthenticateUserEntityAsync(username, password);
-                    if (user != null) {
-                        AuthenticatedUser = username;
-                        CurrentUser = user;
-                        State = ImapConnectionState.Authenticated;
-
-                        return new ImapResponse {
-                            Tag = command.Tag,
-                            Type = ImapResponseType.Ok,
-                            Message = "AUTHENTICATE completed"
-                        };
-                    }
-                }
-            } catch (Exception ex) {
-                _logger.LogWarning(ex, "Invalid authentication data");
-            }
-
+        if (mechanism != "PLAIN") {
             return new ImapResponse {
                 Tag = command.Tag,
                 Type = ImapResponseType.No,
-                Message = "Authentication failed"
+                Message = "Authentication mechanism not supported"
             };
+        }
+
+        // Send continuation response
+        await SendResponseAsync("+ ");
+
+        // Read the authentication data from the client
+        var buffer = new byte[1024];
+        var bytesRead = await _stream.ReadAsync(buffer);
+        var authData = Utf8NoBom.GetString(buffer, 0, bytesRead).Trim();
+
+        try {
+            // Decode base64 authentication data
+            var decodedBytes = Convert.FromBase64String(authData);
+            var decoded = Utf8NoBom.GetString(decodedBytes);
+
+            // PLAIN format: \0username\0password
+            var parts = decoded.Split('\0');
+            if (parts.Length >= 3) {
+                var username = parts[1];
+                var password = parts[2];
+
+                // Use the user service to authenticate
+                var user = await _userService.AuthenticateUserEntityAsync(username, password);
+                if (user != null) {
+                    AuthenticatedUser = username;
+                    CurrentUser = user;
+                    State = ImapConnectionState.Authenticated;
+
+                    return new ImapResponse {
+                        Tag = command.Tag,
+                        Type = ImapResponseType.Ok,
+                        Message = "AUTHENTICATE completed"
+                    };
+                }
+            }
+        } catch (Exception ex) {
+            _logger.LogWarning(ex, "Invalid authentication data");
         }
 
         return new ImapResponse {
             Tag = command.Tag,
             Type = ImapResponseType.No,
-            Message = "Authentication mechanism not supported"
+            Message = "Authentication failed"
         };
+
     }
 
     private async Task<ImapResponse> HandleLogoutAsync(ImapCommand command) {
@@ -261,9 +261,9 @@ public class ImapSession {
         };
     }
 
-    private Task<ImapResponse> HandleNoopAsync(ImapCommand command) {
+    private async Task<ImapResponse> HandleNoopAsync(ImapCommand command) {
         // NOOP is a keepalive command that does nothing
-        return Task.FromResult(new ImapResponse {
+        return await Task.FromResult(new ImapResponse {
             Tag = command.Tag,
             Type = ImapResponseType.Ok,
             Message = "NOOP completed"
@@ -295,7 +295,7 @@ public class ImapSession {
             };
         }
 
-        var folderName = _parser.UnquoteString(command.Arguments[0]);
+        var folderName = ImapCommandParser.UnquoteString(command.Arguments[0]);
 
         try {
             // Handle standard folders - in full implementation, use folder service
@@ -307,8 +307,8 @@ public class ImapSession {
                 // Send required SELECT responses
                 await SendResponseAsync("* 0 EXISTS");      // Message count
                 await SendResponseAsync("* 0 RECENT");      // Recent message count
-                await SendResponseAsync("* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)");
-                await SendResponseAsync("* OK [PERMANENTFLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft \\*)] Flags permitted");
+                await SendResponseAsync(@"* FLAGS (\Answered \Flagged \Deleted \Seen \Draft)");
+                await SendResponseAsync(@"* OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Flags permitted");
                 await SendResponseAsync("* OK [UIDNEXT 1] Predicted next UID");
                 await SendResponseAsync("* OK [UIDVALIDITY 1] UIDs valid");
 
@@ -433,7 +433,7 @@ public class ImapSession {
                         // Parse flags if present (look for parentheses in command parts)
                         List<string> flags = [];
                         for (int i = 3; i < parts.Length - 1; i++) {
-                            if (parts[i].StartsWith('(') || flags.Any()) {
+                            if (parts[i].StartsWith('(') || flags.Count != 0) {
                                 var flag = parts[i].Trim('(', ')');
                                 if (!string.IsNullOrEmpty(flag)) {
                                     flags.Add(flag);
@@ -445,13 +445,13 @@ public class ImapSession {
                         }
 
                         // If we have flags, update them after creation
-                        if (flags.Any()) {
+                        if (flags.Count != 0) {
                             var flagsRequest = new MessageFlagsRequest {
-                                Seen = flags.Contains("\\Seen"),
-                                Answered = flags.Contains("\\Answered"),
-                                Flagged = flags.Contains("\\Flagged"),
-                                Deleted = flags.Contains("\\Deleted"),
-                                Draft = flags.Contains("\\Draft") || mailbox.Equals("Drafts", StringComparison.OrdinalIgnoreCase)
+                                Seen = flags.Contains(@"\Seen"),
+                                Answered = flags.Contains(@"\Answered"),
+                                Flagged = flags.Contains(@"\Flagged"),
+                                Deleted = flags.Contains(@"\Deleted"),
+                                Draft = flags.Contains(@"\Draft") || mailbox.Equals("Drafts", StringComparison.OrdinalIgnoreCase)
                             };
 
                             var updateRequest = new MessageUpdateRequest {
@@ -470,9 +470,9 @@ public class ImapSession {
                         await SendResponseAsync($"{tag} NO Failed to append message");
                         return;
                     }
-                } else {
-                    _logger.LogWarning("APPEND: Invalid literal size format: {LiteralPart}", lastPart);
                 }
+
+                _logger.LogWarning("APPEND: Invalid literal size format: {LiteralPart}", lastPart);
             } else {
                 _logger.LogWarning("APPEND: No literal size found in command: {Command}", commandLine);
             }
@@ -559,7 +559,7 @@ public class ImapSession {
             var flagsString = string.Join(" ", command.Arguments.Skip(2));
 
             // Parse flags from parentheses
-            var flagsMatch = System.Text.RegularExpressions.Regex.Match(flagsString, @"\(([^)]*)\)");
+            var flagsMatch = FlagMatchRegex().Match(flagsString);
             if (!flagsMatch.Success) {
                 return new ImapResponse {
                     Tag = command.Tag,
@@ -575,8 +575,8 @@ public class ImapSession {
                 .ToList();
 
             // Determine operation type
-            bool isAdd = dataItem.StartsWith("+");
-            bool isRemove = dataItem.StartsWith("-");
+            bool isAdd = dataItem.StartsWith('+');
+            bool isRemove = dataItem.StartsWith('-');
             bool isSilent = dataItem.Contains("SILENT");
             bool isReplace = !isAdd && !isRemove;
 
@@ -637,7 +637,7 @@ public class ImapSession {
                             break;
                         default:
                             // Handle custom flags
-                            if (!flagName.StartsWith("\\")) {
+                            if (!flagName.StartsWith('\\')) {
                                 flagsRequest.CustomFlags ??= [];
                                 if (isAdd || isReplace) {
                                     if (!flagsRequest.CustomFlags.Contains(flagName)) {
@@ -740,7 +740,7 @@ public class ImapSession {
             return new ImapResponse {
                 Tag = command.Tag,
                 Type = ImapResponseType.Ok,
-                Message = $"EXPUNGE completed"
+                Message = "EXPUNGE completed"
             };
         } catch (Exception ex) {
             _logger.LogError(ex, "Error processing EXPUNGE command");
@@ -778,7 +778,7 @@ public class ImapSession {
         return messageContent; // If no headers separator found, treat all as body
     }
 
-    private IReadOnlyList<string> ExtractToRecipientsFromMessage(string messageContent) {
+    private List<string> ExtractToRecipientsFromMessage(string messageContent) {
         var toHeader = ExtractHeaderValue(messageContent, "To");
         if (string.IsNullOrEmpty(toHeader)) {
             return [];
@@ -848,22 +848,22 @@ public class ImapSession {
         List<string> flagList = [];
 
         if (flags.Seen) {
-            flagList.Add("\\Seen");
+            flagList.Add(@"\Seen");
         }
         if (flags.Answered) {
-            flagList.Add("\\Answered");
+            flagList.Add(@"\Answered");
         }
         if (flags.Flagged) {
-            flagList.Add("\\Flagged");
+            flagList.Add(@"\Flagged");
         }
         if (flags.Deleted) {
-            flagList.Add("\\Deleted");
+            flagList.Add(@"\Deleted");
         }
         if (flags.Draft) {
-            flagList.Add("\\Draft");
+            flagList.Add(@"\Draft");
         }
         if (flags.Recent) {
-            flagList.Add("\\Recent");
+            flagList.Add(@"\Recent");
         }
 
         // Add custom flags
@@ -891,11 +891,11 @@ public class ImapSession {
         // Map to our internal structure with sequence numbers
         // For now, we'll use a simplified approach where we generate sequence numbers
         // In a full implementation, these would come from the database
-        return result.Items.Select((msg, index) => new MessageWithSequenceInfo {
-            Id = msg.Id,
-            Uid = 0,  // Simplified - UID not needed for deletion, only message ID
-            SequenceNumber = index + 1  // Simplified - should be actual sequence number from folder
-        }).ToList();
+        return result.Items.Select((msg, index) => new MessageWithSequenceInfo(
+            Id: msg.Id,
+            Uid: 0,  // Simplified - UID not needed for deletion, only message ID
+            SequenceNumber: index + 1  // Simplified - should be actual sequence number from folder
+        )).ToList();
     }
 
     /// <summary>
@@ -918,9 +918,8 @@ public class ImapSession {
     /// <summary>
     /// Internal structure for tracking message sequence information
     /// </summary>
-    private class MessageWithSequenceInfo {
-        public int Id { get; set; }
-        public int Uid { get; set; }
-        public int SequenceNumber { get; set; }
-    }
+    private record MessageWithSequenceInfo(int Id, int Uid, int SequenceNumber);
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\(([^)]*)\)")]
+    private static partial System.Text.RegularExpressions.Regex FlagMatchRegex();
 }
