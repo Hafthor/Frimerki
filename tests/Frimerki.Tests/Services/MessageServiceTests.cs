@@ -1,8 +1,8 @@
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
-using Frimerki.Services.Common;
 using Frimerki.Services.Message;
+using Frimerki.Tests.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;

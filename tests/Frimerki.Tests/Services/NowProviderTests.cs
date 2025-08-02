@@ -1,4 +1,5 @@
 using Frimerki.Services.Common;
+using Frimerki.Tests.Utilities;
 using Xunit;
 
 namespace Frimerki.Tests.Services;

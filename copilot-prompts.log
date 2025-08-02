@@ -20310,3 +20310,79 @@ The problem was **TCP connection reuse** and **Mock object state contamination**
 The key insight was that **test isolation requires both Mock state cleanup AND fresh network resources** - the TCP connection reuse was causing the `HandleNoopCommand_ReturnsOk` test to receive null responses instead of proper "+OK" POP3 protocol responses when run after other tests that had modified the connection state.
 
 Your project now has a fully working test suite with proper isolation! 🚀
+
+Hafthor: can we move the TestNowProvider to the Tests project?
+
+GitHub Copilot: Yes, absolutely! The `TestNowProvider` should be in the Tests project since it's a test utility. Let me move it from the Services project to the Tests project.
+
+First, let me check the Tests project structure to see where to place it: Perfect! There's already a `Utilities` folder. Let me create the `TestNowProvider` in the Tests project:
+
+Made changes.
+
+Now let's check if any tests are currently using the old `TestNowProvider` location: I can see that tests are already using `TestNowProvider`. Let me check the using statements in the test files to see how they're currently importing it: Perfect! I can see the tests are importing `using Frimerki.Services.Common;`. Now I need to update the test files to use the new namespace. Let me update them:
+```
+
+
+Made changes.
+
+
+```
+I need to remove the old import and just use the new one. Let me fix that: Let me check other test files that use TestNowProvider: I need to update the using statements. Let me update all the test files:
+```
+
+
+Made changes.
+
+
+```
+Now let me update the MessageServiceTests as well:
+```
+
+
+Made changes.
+
+
+```
+Now I need to remove the old `TestNowProvider` from the Services project to resolve the ambiguity: Now let's test to make sure everything still works: Great! The build succeeded. Now let's run the tests to make sure everything is working properly: Perfect! ✅ **All 371 tests are still passing**.
+
+Let me also clean up the using statements since they're no longer needed. I should remove the `Frimerki.Services.Common` import from the test files that only needed it for `TestNowProvider`: This file still needs `Frimerki.Services.Common` for `SystemNowProvider`, so I'll leave it. Let me check the other files: Great! Those files don't need the `Frimerki.Services.Common` import anymore. Let me clean them up:
+```
+
+
+Made changes.
+
+
+```
+
+```
+
+
+Made changes.
+
+
+```
+Let's run one final test to make sure everything is still working: Perfect! ✅ **All TestNowProvider-related tests are still passing** (3/3 tests passed).
+
+## Summary
+
+Successfully moved `TestNowProvider` from the **Services project** to the **Tests project** where it belongs! Here's what was accomplished:
+
+### Changes Made:
+1. **Created** TestNowProvider.cs in the Tests project
+2. **Removed** TestNowProvider.cs from the Services project
+3. **Updated using statements** in test files:
+   - Added `using Frimerki.Tests.Utilities;`
+   - Removed unnecessary `using Frimerki.Services.Common;` where it was only needed for `TestNowProvider`
+
+### Benefits:
+- ✅ **Proper separation of concerns** - Test utilities now live in the test project
+- ✅ **Cleaner architecture** - Production Services project no longer contains test-only code
+- ✅ **No functionality lost** - All 371 tests still pass, including the 3 TestNowProvider-specific tests
+- ✅ **Clean dependencies** - Test project properly references what it needs
+
+### Verification:
+- **Build**: ✅ Successful with no errors
+- **Tests**: ✅ All 371 tests passing (no regressions)
+- **TestNowProvider tests**: ✅ All 3 specific tests passing
+
+The `TestNowProvider` is now properly located in `Frimerki.Tests.Utilities` namespace and can still be used by all test classes that need to control time during testing! 🎯

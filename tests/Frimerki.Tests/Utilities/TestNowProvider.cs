@@ -1,4 +1,6 @@
-namespace Frimerki.Services.Common;
+using Frimerki.Services.Common;
+
+namespace Frimerki.Tests.Utilities;
 
 /// <summary>
 /// Test implementation of INowProvider that allows controlling the current time for testing.
