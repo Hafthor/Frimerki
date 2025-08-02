@@ -10,127 +10,136 @@ using Xunit;
 
 namespace Frimerki.Tests.Protocols.Pop3;
 
-public class Pop3SessionTests : IDisposable {
+file static class ExtensionMethods {
+    public static async Task WriteLineAndFlushAsync(this StreamWriter writer, string message) {
+        await writer.WriteLineAsync(message);
+        await writer.FlushAsync();
+    }
+}
+
+[Collection("Pop3Tests")]
+public class Pop3SessionTests {
     private readonly Mock<ISessionService> _mockSessionService;
     private readonly Mock<IMessageService> _mockMessageService;
     private readonly Mock<ILogger<Pop3Session>> _mockLogger;
-    private readonly TcpListener _listener;
-    private readonly TcpClient _client;
-    private readonly NetworkStream _stream;
 
     public Pop3SessionTests() {
         _mockSessionService = new Mock<ISessionService>();
         _mockMessageService = new Mock<IMessageService>();
         _mockLogger = new Mock<ILogger<Pop3Session>>();
-
-        // Set up TCP connection for testing
-        _listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
-        _listener.Start();
-        var endpoint = _listener.LocalEndpoint as System.Net.IPEndPoint;
-
-        _client = new TcpClient();
-        _client.Connect(System.Net.IPAddress.Loopback, endpoint!.Port);
-        _stream = _client.GetStream();
     }
 
-    public void Dispose() {
-        _stream?.Dispose();
-        _client?.Dispose();
-        _listener?.Stop();
-    }
+    private async Task<(StreamReader reader, StreamWriter writer, Task handleTask, IDisposable cleanup)> SetupSessionAsync() {
+        // Create fresh TCP connections for each test
+        var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var endpoint = listener.LocalEndpoint as System.Net.IPEndPoint;
 
-    private async Task<(StreamReader reader, StreamWriter writer, Task handleTask)> SetupSessionAsync() {
-        var serverClient = await _listener.AcceptTcpClientAsync();
+        var client = new TcpClient();
+        await client.ConnectAsync(System.Net.IPAddress.Loopback, endpoint!.Port);
+        var stream = client.GetStream();
+
+        var serverClient = await listener.AcceptTcpClientAsync();
         var session = new Pop3Session(_mockSessionService.Object, _mockMessageService.Object, _mockLogger.Object);
         var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
-        var reader = new StreamReader(_stream, Encoding.ASCII, leaveOpen: true);
-        var writer = new StreamWriter(_stream, Encoding.ASCII, leaveOpen: true) { AutoFlush = true };
+        var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
+        var writer = new StreamWriter(stream, Encoding.ASCII, leaveOpen: true) { AutoFlush = true };
 
         var handleTask = session.HandleAsync(serverClient, cts.Token);
 
-        return (reader, writer, handleTask);
+        // Return cleanup delegate
+        var cleanup = new DisposableAction(() => {
+            reader?.Dispose();
+            writer?.Dispose();
+            stream?.Dispose();
+            client?.Dispose();
+            serverClient?.Dispose();
+            listener?.Stop();
+        });
+
+        return (reader, writer, handleTask, cleanup);
+    }
+
+    private class DisposableAction : IDisposable {
+        private readonly Action _action;
+        public DisposableAction(Action action) => _action = action;
+        public void Dispose() => _action();
     }
 
     [Fact]
     public async Task HandleAsync_SendsGreeting() {
         // Arrange & Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
+            // Read greeting
+            var greeting = await reader.ReadLineAsync();
 
-        // Read greeting
-        var greeting = await reader.ReadLineAsync();
+            // Assert
+            Assert.Contains("+OK Frimerki POP3 Server Ready", greeting);
 
-        // Assert
-        Assert.Contains("+OK Frimerki POP3 Server Ready", greeting);
-
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 
     [Fact]
     public async Task HandleCapaCommand_ReturnsCapabilities() {
         // Arrange & Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+            // Send CAPA command
+            await writer.WriteLineAndFlushAsync("CAPA");
 
-        // Send CAPA command
-        await writer.WriteLineAsync("CAPA");
+            // Read multi-line CAPA response
+            var responses = new List<string>();
+            string? response;
+            do {
+                response = await reader.ReadLineAsync();
+                if (response != null) {
+                    responses.Add(response);
+                }
+            } while (response != null && response != ".");
 
-        // Read multi-line CAPA response
-        var responses = new List<string>();
-        string? response;
-        do {
-            response = await reader.ReadLineAsync();
-            if (response != null) {
-                responses.Add(response);
-            }
-        } while (response != null && response != ".");
+            var fullResponse = string.Join("\n", responses);
 
-        var fullResponse = string.Join("\n", responses);
+            // Assert
+            Assert.Contains("+OK Capability list follows", fullResponse);
+            Assert.Contains("USER", fullResponse);
+            Assert.Contains("TOP", fullResponse);
+            Assert.Contains("UIDL", fullResponse);
+            Assert.Contains(".", fullResponse); // End marker
 
-        // Assert
-        Assert.Contains("+OK Capability list follows", fullResponse);
-        Assert.Contains("USER", fullResponse);
-        Assert.Contains("TOP", fullResponse);
-        Assert.Contains("UIDL", fullResponse);
-        Assert.Contains(".", fullResponse); // End marker
-
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 
     [Fact]
     public async Task HandleUserCommand_SetsUsername() {
         // Arrange & Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+            // Send USER command
+            await writer.WriteLineAndFlushAsync("USER test@example.com");
 
-        // Send USER command
-        await writer.WriteLineAsync("USER test@example.com");
+            // Read response
+            var response = await reader.ReadLineAsync();
 
-        // Read response
-        var response = await reader.ReadLineAsync();
+            // Assert
+            Assert.Contains("+OK User accepted", response);
 
-        // Assert
-        Assert.Contains("+OK User accepted", response);
-
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 
     [Fact]
@@ -157,31 +166,30 @@ public class Pop3SessionTests : IDisposable {
                           .ReturnsAsync(paginatedResult);
 
         // Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Send USER command
-        await writer.WriteLineAsync("USER test@example.com");
-        await reader.ReadLineAsync(); // Read USER response
+            // Send USER command
+            await writer.WriteLineAndFlushAsync("USER test@example.com");
+            await reader.ReadLineAsync(); // Read USER response
 
-        // Send PASS command
-        await writer.WriteLineAsync("PASS password");
+            // Send PASS command
+            await writer.WriteLineAndFlushAsync("PASS password");
 
-        // Read response
-        var response = await reader.ReadLineAsync();
+            // Read response
+            var response = await reader.ReadLineAsync();
 
-        // Assert
-        Assert.Contains("+OK", response);
-        Assert.Contains("messages", response);
+            // Assert
+            Assert.Contains("+OK", response);
+            Assert.Contains("messages", response);
 
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 
     [Fact]
@@ -191,104 +199,125 @@ public class Pop3SessionTests : IDisposable {
                           .ReturnsAsync((LoginResponse?)null);
 
         // Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Send USER command
-        await writer.WriteLineAsync("USER invalid@example.com");
-        await reader.ReadLineAsync(); // Read USER response
+            // Send USER command
+            await writer.WriteLineAndFlushAsync("USER invalid@example.com");
+            await reader.ReadLineAsync(); // Read USER response
 
-        // Send PASS command
-        await writer.WriteLineAsync("PASS wrongpassword");
+            // Send PASS command
+            await writer.WriteLineAndFlushAsync("PASS wrongpassword");
 
-        // Read response
-        var response = await reader.ReadLineAsync();
+            // Read response
+            var response = await reader.ReadLineAsync();
 
-        // Assert
-        Assert.Contains("-ERR Authentication failed", response);
+            // Assert
+            Assert.Contains("-ERR Authentication failed", response);
 
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 
     [Fact]
     public async Task HandleNoopCommand_ReturnsOk() {
-        // Arrange & Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        // Arrange - Reset mocks to ensure clean state
+        _mockSessionService.Reset();
+        _mockMessageService.Reset();
+        _mockLogger.Reset();
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+        var testUser = new UserSessionInfo { Id = 1, Username = "test@example.com", Email = "test@example.com" };
+        var loginResponse = new LoginResponse {
+            User = testUser,
+            Token = "test-token",
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
+        };
+        _mockSessionService.Setup(x => x.LoginAsync(It.Is<LoginRequest>(r => r.Email == "test@example.com" && r.Password == "password")))
+                          .ReturnsAsync(loginResponse);
 
-        // Send NOOP command
-        await writer.WriteLineAsync("NOOP");
+        // Act
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
 
-        // Read response
-        var response = await reader.ReadLineAsync();
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Assert
-        Assert.Contains("+OK", response);
+            // Authenticate first
+            await writer.WriteLineAndFlushAsync("USER test@example.com");
+            await reader.ReadLineAsync(); // Read USER response
 
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            await writer.WriteLineAndFlushAsync("PASS password");
+            await reader.ReadLineAsync(); // Read PASS response
+
+            // Send NOOP command
+            await writer.WriteLineAndFlushAsync("NOOP");
+
+            // Read response
+            var response = await reader.ReadLineAsync();
+
+            // Assert
+            Assert.Contains("+OK", response);
+
+            // Cleanup with error handling
+            try {
+                await writer.WriteLineAndFlushAsync("QUIT");
+                await handleTask;
+            } catch (IOException) {
+                // Connection may have been closed, which is fine
+            }
+        }
     }
 
     [Fact]
     public async Task HandleUnknownCommand_ReturnsError() {
         // Arrange & Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Send unknown command
-        await writer.WriteLineAsync("UNKNOWN");
+            // Send unknown command
+            await writer.WriteLineAndFlushAsync("UNKNOWN");
 
-        // Read response
-        var response = await reader.ReadLineAsync();
+            // Read response
+            var response = await reader.ReadLineAsync();
 
-        // Assert
-        Assert.Contains("-ERR Unknown command", response);
+            // Assert
+            Assert.Contains("-ERR Unknown command", response);
 
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 
     [Fact]
     public async Task HandleInvalidCommand_ReturnsError() {
         // Arrange & Act
-        var (reader, writer, handleTask) = await SetupSessionAsync();
+        var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();
+        using (cleanup) {
 
-        // Read greeting and discard
-        await reader.ReadLineAsync();
+            // Read greeting and discard
+            await reader.ReadLineAsync();
 
-        // Send invalid command (just spaces)
-        await writer.WriteLineAsync("   ");
+            // Send invalid command (just spaces)
+            await writer.WriteLineAndFlushAsync("   ");
 
-        // Read response
-        var response = await reader.ReadLineAsync();
+            // Read response
+            var response = await reader.ReadLineAsync();
 
-        // Assert
-        Assert.Contains("-ERR Invalid command", response);
+            // Assert
+            Assert.Contains("-ERR Invalid command", response);
 
-        // Cleanup
-        await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
-        await handleTask;
-        reader.Dispose();
-        writer.Dispose();
+            // Cleanup
+            await writer.WriteLineAndFlushAsync("QUIT");
+            await handleTask;
+        }
     }
 }

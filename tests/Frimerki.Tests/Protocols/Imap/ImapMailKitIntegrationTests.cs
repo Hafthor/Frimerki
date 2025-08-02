@@ -21,6 +21,7 @@ namespace Frimerki.Tests.Protocols.Imap;
 /// <summary>
 /// Integration tests for IMAP server using MailKit client
 /// </summary>
+[Collection("MailKit")]
 public class ImapMailKitIntegrationTests : IAsyncDisposable {
     private readonly ITestOutputHelper _output;
     private readonly IServiceProvider _serviceProvider;

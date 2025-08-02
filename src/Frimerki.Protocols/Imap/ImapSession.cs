@@ -47,8 +47,12 @@ public class ImapSession {
 
     public async Task HandleSessionAsync() {
         try {
+            _logger.LogInformation("IMAP: Starting session for client");
+
             // Send greeting
             await SendResponseAsync("* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN UIDPLUS] Frimerki IMAP Server ready");
+
+            _logger.LogInformation("IMAP: Greeting sent successfully");
 
             while (_client.Connected && State != ImapConnectionState.Logout) {
                 var buffer = new byte[8192];

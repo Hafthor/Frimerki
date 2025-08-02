@@ -4,7 +4,7 @@ namespace Frimerki.Tests.Utilities;
 /// Provides unique port numbers for integration tests to avoid port conflicts
 /// </summary>
 public static class TestPortProvider {
-    private const int _startingPort = 9000; // Start from port 9000 for test servers
+    private const int _startingPort = 19000; // Start from port 19000 to avoid common conflicts (9000 is used by php-fpm)
     private const int _portRange = 65536 - _startingPort;
     private static int _offsetPort = 0;
 

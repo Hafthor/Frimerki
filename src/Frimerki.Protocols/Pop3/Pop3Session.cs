@@ -300,6 +300,11 @@ public partial class Pop3Session {
     }
 
     private async Task HandleNoopAsync(CancellationToken cancellationToken) {
+        if (!IsAuthenticated()) {
+            await SendResponseAsync("-ERR Not authenticated", cancellationToken);
+            return;
+        }
+
         await SendResponseAsync("+OK", cancellationToken);
     }
 

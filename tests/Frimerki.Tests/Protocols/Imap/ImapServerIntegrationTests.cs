@@ -9,6 +9,7 @@ using Frimerki.Services.User;
 using Frimerki.Tests.Utilities;
 using MailKit;
 using MailKit.Net.Imap;
+using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -68,6 +69,7 @@ public class XUnitLogger : ILogger {
 /// <summary>
 /// Integration tests for IMAP server using MailKit client
 /// </summary>
+[Collection("MailKit")]
 public class ImapServerIntegrationTests : IAsyncDisposable {
     private readonly ITestOutputHelper _output;
     private readonly IServiceProvider _serviceProvider;
@@ -176,7 +178,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
         await client.ConnectAsync("localhost", _testPort, false);
 
         // Test authentication with invalid credentials
-        await Assert.ThrowsAnyAsync<Exception>(async () => {
+        await Assert.ThrowsAnyAsync<AuthenticationException>(async () => {
             await client.AuthenticateAsync("testuser", "wrongpass");
         });
 
