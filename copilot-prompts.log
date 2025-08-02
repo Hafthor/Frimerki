@@ -20386,3 +20386,125 @@ Successfully moved `TestNowProvider` from the **Services project** to the **Test
 - **TestNowProvider tests**: ✅ All 3 specific tests passing
 
 The `TestNowProvider` is now properly located in `Frimerki.Tests.Utilities` namespace and can still be used by all test classes that need to control time during testing! 🎯
+
+Hafthor: Let's add a test for each of the protocols that make sure they can each handle multiple connections simulataneously. Ideally, each connection should do something unique in such a way that we can assert that the communications haven't intermingled.
+
+GitHub Copilot: Great idea! Let's create comprehensive concurrent connection tests for each protocol (IMAP, POP3, and SMTP) to ensure they can handle multiple simultaneous connections without data intermingling.
+
+Let me start by creating a new test file for concurrent protocol tests:
+
+Made changes.
+
+I need to check what services are available and fix any imports. Let me check what imports are needed: I need to check what the SMTP session requires and also fix some missing interfaces. Let me check the existing test structure: Let me check the SMTP protocol structure: Let me check the SMTP session tests to see the proper setup: I need to check what interfaces are available. Let me also check the XUnit logger provider: Let me check the XUnit logger provider implementation: Let me check what services the SMTP session actually needs: Now let me check the constructor: Let me check the EmailDeliveryService: Let me check its constructor: Now I need to fix the test file. Let me update it with the correct services and structure:
+```
+
+
+Made changes.
+
+
+```
+I need to fix several issues. Let me update the file properly by checking how the existing tests work and copying the right patterns:
+```
+
+
+Made changes.
+
+
+```
+Let me add the XUnit logger classes first and fix the missing services:
+```
+
+
+Made changes.
+
+
+```
+Let me fix the logger implementation and find the correct interfaces. First, let me search for IFolderService: Now let me check the ImapServer constructor: Let me check the constructor: Good! Now I can fix the ImapServer creation. Let me also check the SMTP session constructor and fix all the issues:
+```
+
+
+Made changes.
+
+
+```
+Let me fix the BeginScope method and the remaining issues:
+```
+
+
+Made changes.
+
+
+```
+Now let me fix the ImapServer constructor call:
+```
+
+
+Made changes.
+
+
+```
+Now let me fix the SMTP session setup. I need to check how SMTP sessions are properly created and how they handle connections: Now I understand! The SMTP session constructor takes a TcpClient and has a HandleAsync with just a cancellation token. Let me fix the SMTP setup:
+```
+
+
+Made changes.
+
+
+```
+Now let's try to compile and run the tests: Great! The build succeeded. Now let's run the concurrent protocol tests to see if they work:
+
+Continue to iterate?
+Copilot has been working on this problem for a while. It can continue to iterate, or you can send a new message to refine your prompt.
+
+Hafthor: @agent Continue: "Continue to iterate?"
+
+GitHub Copilot: Excellent! 🎉 All 3 concurrent protocol tests are passing! Let me run them individually to see the detailed output: Great! Now let me run the POP3 test to make sure it's working: Excellent! Now let me test the SMTP concurrent connections: Perfect! All concurrent protocol tests are working. Now let's run the full test suite to make sure we haven't broken anything and to see our overall progress: 🎉 **OUTSTANDING!** All 374 tests are now passing! We've successfully added 3 new concurrent protocol tests and increased the total test count from 371 to 374, all while maintaining 100% test success.
+
+## Summary
+
+I've successfully created comprehensive concurrent connection tests for all three protocols:
+
+### ✅ **Tests Created**
+
+1. **`ImapServer_CanHandleMultipleConcurrentConnections`**
+   - Creates 5 concurrent IMAP connections
+   - Each connection sends unique CAPABILITY commands with connection-specific tags (`A000`, `A001`, `A002`, etc.)
+   - Verifies that responses are properly isolated and contain the correct tag
+   - Uses the real IMAP server with mocked services
+
+2. **`Pop3Server_CanHandleMultipleConcurrentConnections`**
+   - Creates 5 concurrent POP3 sessions with fresh TCP connections
+   - Each connection authenticates with unique usernames (`test0@example.com`, `test1@example.com`, etc.)
+   - Tests the full authentication flow: USER → PASS → NOOP
+   - Verifies that each connection gets its own isolated session state
+
+3. **`SmtpServer_CanHandleMultipleConcurrentConnections`**
+   - Creates 5 concurrent SMTP sessions with fresh TCP connections
+   - Each connection sends unique EHLO commands with connection-specific hostnames (`client0.example.com`, `client1.example.com`, etc.)
+   - Tests greeting → EHLO → NOOP flow
+   - Verifies proper session isolation with unique responses
+
+### 🔧 **Key Features**
+
+1. **True Concurrency**: All connections run simultaneously using `Task.WhenAll()`
+2. **Connection Isolation**: Each test uses fresh TCP connections to prevent state leakage
+3. **Unique Identifiers**: Each connection sends unique commands/data to verify no intermingling
+4. **Proper Resource Cleanup**: Using `IDisposable` pattern with cleanup delegates
+5. **Timeout Protection**: Tests have reasonable timeouts to prevent hanging
+6. **Comprehensive Assertions**: Verify both connection count and response uniqueness
+
+### 📊 **Verification Strategy**
+
+- **Connection Uniqueness**: Each connection uses different identifiers (tag numbers, usernames, hostnames)
+- **Response Isolation**: Collect all responses in `ConcurrentBag<string>` and verify each connection got its unique response
+- **No Data Intermingling**: Assert that responses contain the correct connection-specific identifiers
+- **Concurrent Safety**: Use thread-safe collections and verify exact connection counts
+
+### 🎯 **Test Results**
+
+- ✅ **All 3 concurrent tests passing**
+- ✅ **Total test suite: 374/374 passing (100% success rate)**
+- ✅ **No regressions**: All existing tests still pass
+- ✅ **Performance**: Tests complete quickly (~10 seconds for full suite)
+
+These tests provide confidence that the Frimerki email server protocols can handle multiple simultaneous client connections without data corruption, session leakage, or response intermingling! 🚀
