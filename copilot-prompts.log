@@ -20508,3 +20508,40 @@ I've successfully created comprehensive concurrent connection tests for all thre
 - ✅ **Performance**: Tests complete quickly (~10 seconds for full suite)
 
 These tests provide confidence that the Frimerki email server protocols can handle multiple simultaneous client connections without data corruption, session leakage, or response intermingling! 🚀
+
+Hafthor: Can you create an INSTALLATION.md file with details on how to install and configure this application, especially noting how to support encrypted protocols?
+
+GitHub Copilot: I'll create a comprehensive INSTALLATION.md file for the Frímerki email server. Let me first check the current project structure to understand the configuration and setup requirements. Now let me create a comprehensive INSTALLATION.md file based on the project structure and configuration:
+
+Made changes.
+
+Summarized conversation historyI've created a comprehensive INSTALLATION.md file that covers all aspects of installing and configuring Frímerki with special emphasis on SSL/TLS encryption support. Here are the key sections included:
+
+## 🔐 **SSL/TLS Encryption Coverage**
+
+The guide provides three different approaches for securing email communications:
+
+1. **Self-Signed Certificates** - For development/testing with step-by-step OpenSSL commands
+2. **Let's Encrypt Certificates** - For production with automatic renewal setup
+3. **Reverse Proxy SSL Termination** - Recommended production approach using nginx
+
+## 📋 **Key Features Documented**
+
+- **Complete installation methods** (build from source & published releases)
+- **Detailed configuration** with all port settings (SMTP_SSL: 465, IMAP_SSL: 993, POP3_SSL: 995)
+- **Security hardening** including firewall setup and systemd security settings
+- **System service setup** for both Linux (systemd) and Windows
+- **Email client configuration** with proper STARTTLS and SSL/TLS settings
+- **Monitoring and maintenance** procedures
+- **Troubleshooting guide** for common issues
+
+## 🛡️ **Security Highlights**
+
+The installation guide emphasizes:
+- **Certificate management** with automatic Let's Encrypt renewal
+- **Firewall configuration** for all email ports
+- **Service hardening** with proper user accounts and permissions
+- **Production security settings** including rate limiting and JWT configuration
+- **Backup strategies** for the multi-database architecture
+
+The guide follows your coding style preferences with K&R brace style in code examples and maintains brevity while being comprehensive. It's production-ready and includes all the encrypted protocol configuration details you requested.
