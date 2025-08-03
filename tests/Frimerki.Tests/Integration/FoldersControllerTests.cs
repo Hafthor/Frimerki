@@ -3,10 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
-using Frimerki.Models.DTOs.Folder;
 using Frimerki.Models.Entities;
-using Frimerki.Server;
-using Frimerki.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,9 +53,7 @@ public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Progra
                 });
 
                 // Override the domain DB context factory for testing
-                services.AddSingleton<IDomainDbContextFactory>(provider => {
-                    return new TestDomainDbContextFactory(_domainDatabaseName);
-                });
+                services.AddSingleton<IDomainDbContextFactory>(_ => new TestDomainDbContextFactory(_domainDatabaseName));
             });
         });
 
@@ -117,7 +112,7 @@ public class FoldersControllerTests : IClassFixture<WebApplicationFactory<Progra
             Domain = domain
         };
 
-        var folders = new List<Frimerki.Models.Entities.Folder> {
+        var folders = new List<Folder> {
             new() {
                 Id = 1,
                 UserId = 1,

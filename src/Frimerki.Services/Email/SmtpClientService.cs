@@ -10,15 +10,7 @@ namespace Frimerki.Services.Email;
 /// <summary>
 /// Service for sending outbound emails via SMTP
 /// </summary>
-public class SmtpClientService {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<SmtpClientService> _logger;
-
-    public SmtpClientService(IConfiguration configuration, ILogger<SmtpClientService> logger) {
-        _configuration = configuration;
-        _logger = logger;
-    }
-
+public class SmtpClientService(IConfiguration configuration, ILogger<SmtpClientService> logger) {
     /// <summary>
     /// Send an email message via SMTP
     /// </summary>
@@ -59,11 +51,11 @@ public class SmtpClientService {
             }
 
             // Get SMTP configuration
-            var smtpHost = _configuration["Smtp:Host"] ?? "localhost";
-            var smtpPort = int.Parse(_configuration["Smtp:Port"] ?? "25");
-            var smtpUsername = _configuration["Smtp:Username"];
-            var smtpPassword = _configuration["Smtp:Password"];
-            var enableSsl = bool.Parse(_configuration["Smtp:EnableSsl"] ?? "false");
+            var smtpHost = configuration["Smtp:Host"] ?? "localhost";
+            var smtpPort = int.Parse(configuration["Smtp:Port"] ?? "25");
+            var smtpUsername = configuration["Smtp:Username"];
+            var smtpPassword = configuration["Smtp:Password"];
+            var enableSsl = bool.Parse(configuration["Smtp:EnableSsl"] ?? "false");
 
             using var smtpClient = new SmtpClient(smtpHost, smtpPort);
 
@@ -78,12 +70,12 @@ public class SmtpClientService {
 
             await smtpClient.SendMailAsync(message);
 
-            _logger.LogInformation("Email sent successfully from {From} to {To}",
+            logger.LogInformation("Email sent successfully from {From} to {To}",
                 fromAddress, request.ToAddress);
 
             return true;
         } catch (Exception ex) {
-            _logger.LogError(ex, "Failed to send email from {From} to {To}",
+            logger.LogError(ex, "Failed to send email from {From} to {To}",
                 fromAddress, request.ToAddress);
             return false;
         }
@@ -122,22 +114,22 @@ public class SmtpClientService {
     /// </summary>
     public bool ValidateConfiguration() {
         try {
-            var smtpHost = _configuration["Smtp:Host"];
-            var smtpPort = _configuration["Smtp:Port"];
+            var smtpHost = configuration["Smtp:Host"];
+            var smtpPort = configuration["Smtp:Port"];
 
             if (string.IsNullOrEmpty(smtpHost)) {
-                _logger.LogWarning("SMTP Host not configured");
+                logger.LogWarning("SMTP Host not configured");
                 return false;
             }
 
             if (!int.TryParse(smtpPort, out var port) || port is <= 0 or > 65535) {
-                _logger.LogWarning("Invalid SMTP port configuration: {Port}", smtpPort);
+                logger.LogWarning("Invalid SMTP port configuration: {Port}", smtpPort);
                 return false;
             }
 
             return true;
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error validating SMTP configuration");
+            logger.LogError(ex, "Error validating SMTP configuration");
             return false;
         }
     }

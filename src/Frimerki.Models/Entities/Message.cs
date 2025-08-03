@@ -14,20 +14,20 @@ public class Message {
     public string FromAddress { get; set; } = "";
 
     [MaxLength(255)]
-    public string? ToAddress { get; set; }
+    public string ToAddress { get; set; }
 
-    public string? CcAddress { get; set; }
+    public string CcAddress { get; set; }
 
-    public string? BccAddress { get; set; }
+    public string BccAddress { get; set; }
 
-    public string? Subject { get; set; }
+    public string Subject { get; set; }
 
     [Required]
     public string Headers { get; set; } = "";
 
-    public string? Body { get; set; }
+    public string Body { get; set; }
 
-    public string? BodyHtml { get; set; }
+    public string BodyHtml { get; set; }
 
     public int MessageSize { get; set; }
 
@@ -35,21 +35,21 @@ public class Message {
 
     public DateTime? SentDate { get; set; }
 
-    public string? InReplyTo { get; set; }
+    public string InReplyTo { get; set; }
 
-    public string? References { get; set; }
+    public string References { get; set; }
 
-    public string? BodyStructure { get; set; }
+    public string BodyStructure { get; set; }
 
-    public string? Envelope { get; set; }
+    public string Envelope { get; set; }
 
     public int Uid { get; set; }
 
     public int UidValidity { get; set; } = 1;
 
     // Navigation properties
-    public UidValiditySequence UidValiditySequence { get; set; } = null!;
-    public ICollection<UserMessage> UserMessages { get; set; } = new List<UserMessage>();
-    public ICollection<MessageFlag> MessageFlags { get; set; } = new List<MessageFlag>();
-    public ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
+    public UidValiditySequence UidValiditySequence { get; set; }
+    public ICollection<UserMessage> UserMessages { get; set; } = [];
+    public ICollection<MessageFlag> MessageFlags { get; set; } = [];
+    public ICollection<Attachment> Attachments { get; set; } = [];
 }

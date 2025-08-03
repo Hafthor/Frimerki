@@ -18,7 +18,7 @@ public class User {
     public string Salt { get; set; } = "";
 
     [MaxLength(255)]
-    public string? FullName { get; set; }
+    public string FullName { get; set; }
 
     [Required]
     [MaxLength(50)]
@@ -33,13 +33,13 @@ public class User {
     public DateTime? LastLogin { get; set; }
 
     // Account lockout properties
-    public int FailedLoginAttempts { get; set; } = 0;
+    public int FailedLoginAttempts { get; set; }
     public DateTime? LockoutEnd { get; set; }
     public DateTime? LastFailedLogin { get; set; }
 
     // Navigation properties
-    public DomainSettings Domain { get; set; } = null!;
-    public ICollection<Folder> Folders { get; set; } = new List<Folder>();
-    public ICollection<UserMessage> UserMessages { get; set; } = new List<UserMessage>();
-    public ICollection<MessageFlag> MessageFlags { get; set; } = new List<MessageFlag>();
+    public DomainSettings Domain { get; set; }
+    public ICollection<Folder> Folders { get; set; } = [];
+    public ICollection<UserMessage> UserMessages { get; set; } = [];
+    public ICollection<MessageFlag> MessageFlags { get; set; } = [];
 }

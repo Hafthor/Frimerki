@@ -422,39 +422,39 @@ public class MockUserServiceForController : IUserService {
     public bool PasswordUpdateSuccess { get; set; } = true;
     public bool DeleteSuccess { get; set; } = true;
 
-    private PaginatedInfo<UserResponse>? _usersResponse;
-    private UserResponse? _userResponse;
-    private UserStatsResponse? _userStatsResponse;
+    private PaginatedInfo<UserResponse> _usersResponse;
+    private UserResponse _userResponse;
+    private UserStatsResponse _userStatsResponse;
 
     public void SetUsersResponse(PaginatedInfo<UserResponse> response) => _usersResponse = response;
     public void SetUserResponse(UserResponse response) => _userResponse = response;
     public void SetUserStatsResponse(UserStatsResponse response) => _userStatsResponse = response;
 
-    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domain = null) {
+    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string domain = null) {
         if (ShouldThrowOnGetUsers) {
             throw new Exception("Service error");
         }
-        return Task.FromResult(_usersResponse ?? new PaginatedInfo<UserResponse> { Items = [], Skip = (skip - 1) * take, Take = take, TotalCount = 0 });
+        return _usersResponse ?? new PaginatedInfo<UserResponse> { Items = [], Skip = (skip - 1) * take, Take = take, TotalCount = 0 };
     }
 
-    public Task<UserResponse> CreateUserAsync(CreateUserRequest request) {
+    public async Task<UserResponse> CreateUserAsync(CreateUserRequest request) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException("Invalid user data");
         }
         if (ShouldThrowGenericException) {
             throw new Exception("Service error");
         }
-        return Task.FromResult(_userResponse ?? new UserResponse { Email = $"{request.Username}@{request.DomainName}", Username = request.Username });
+        return _userResponse ?? new UserResponse { Email = $"{request.Username}@{request.DomainName}", Username = request.Username };
     }
 
-    public async Task<UserResponse?> GetUserByEmailAsync(string email) {
+    public async Task<UserResponse> GetUserByEmailAsync(string email) {
         if (ShouldReturnNull) {
             return null;
         }
         return _userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] };
     }
 
-    public async Task<UserResponse?> UpdateUserAsync(string email, UserUpdateRequest request) {
+    public async Task<UserResponse> UpdateUserAsync(string email, UserUpdateRequest request) {
         if (ShouldReturnNull) {
             return null;
         }
@@ -468,59 +468,55 @@ public class MockUserServiceForController : IUserService {
         return PasswordUpdateSuccess;
     }
 
-    public Task<bool> DeleteUserAsync(string email) {
-        return Task.FromResult(DeleteSuccess);
-    }
+    public async Task<bool> DeleteUserAsync(string email) => DeleteSuccess;
 
-    public Task<UserStatsResponse> GetUserStatsAsync(string email) {
+    public async Task<UserStatsResponse> GetUserStatsAsync(string email) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException($"User '{email}' not found");
         }
-        return Task.FromResult(_userStatsResponse ?? new UserStatsResponse { MessageCount = 0, FolderCount = 0, StorageUsed = 0 });
+        return _userStatsResponse ?? new UserStatsResponse { MessageCount = 0, FolderCount = 0, StorageUsed = 0 };
     }
 
-    public Task<bool> UserExistsAsync(string email) {
-        return Task.FromResult(!ShouldReturnNull);
-    }
+    public async Task<bool> UserExistsAsync(string email) => !ShouldReturnNull;
 
-    public Task<UserResponse?> AuthenticateUserAsync(string email, string password) {
+    public async Task<UserResponse> AuthenticateUserAsync(string email, string password) {
         if (ShouldReturnNull) {
-            return Task.FromResult<UserResponse?>(null);
+            return null;
         }
-        return Task.FromResult<UserResponse?>(_userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] });
+        return _userResponse ?? new UserResponse { Email = email, Username = email.Split('@')[0] };
     }
 
-    public Task<Frimerki.Models.Entities.User?> AuthenticateUserEntityAsync(string email, string password) {
+    public async Task<Frimerki.Models.Entities.User> AuthenticateUserEntityAsync(string email, string password) {
         if (ShouldReturnNull) {
-            return Task.FromResult<Frimerki.Models.Entities.User?>(null);
+            return null;
         }
-        return Task.FromResult<Frimerki.Models.Entities.User?>(new Frimerki.Models.Entities.User {
+        return new Frimerki.Models.Entities.User {
             Id = 1,
             Username = email.Split('@')[0],
             DomainId = 1,
             CanLogin = true,
             Domain = new Frimerki.Models.Entities.DomainSettings { Name = email.Split('@')[1] }
-        });
+        };
     }
 
-    public Task<Frimerki.Models.Entities.User?> GetUserEntityByEmailAsync(string email) {
+    public async Task<Frimerki.Models.Entities.User> GetUserEntityByEmailAsync(string email) {
         if (ShouldReturnNull) {
-            return Task.FromResult<Frimerki.Models.Entities.User?>(null);
+            return null;
         }
-        return Task.FromResult<Frimerki.Models.Entities.User?>(new Frimerki.Models.Entities.User {
+        return new Frimerki.Models.Entities.User {
             Id = 1,
             Username = email.Split('@')[0],
             DomainId = 1,
             CanLogin = true,
             Domain = new Frimerki.Models.Entities.DomainSettings { Name = email.Split('@')[1] }
-        });
+        };
     }
 
-    public Task<bool> ValidateEmailFormatAsync(string email) {
-        return Task.FromResult(email.Contains('@') && email.Contains('.'));
+    public async Task<bool> ValidateEmailFormatAsync(string email) {
+        return email.Contains('@') && email.Contains('.');
     }
 
-    public Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) {
-        return Task.FromResult((false, (DateTime?)null));
+    public async Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) {
+        return (false, null);
     }
 }

@@ -1,6 +1,5 @@
 using System.Net.Sockets;
 using System.Text;
-using Frimerki.Models.DTOs.Folder;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Imap;
 using Frimerki.Services.Folder;
@@ -104,7 +103,7 @@ public class ImapCommandParserTests {
         Assert.Null(ImapCommandParser.ParseCommand("   "));
 
         // Test null
-        Assert.Null(ImapCommandParser.ParseCommand(null!));
+        Assert.Null(ImapCommandParser.ParseCommand(null));
     }
 
     [Fact]
@@ -228,23 +227,14 @@ public class ImapTypesTests {
     }
 }
 
-public class ImapStreamBasedTests : IDisposable {
+public sealed class ImapStreamBasedTests : IDisposable {
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
-    private readonly Mock<ILogger<ImapSession>> _mockLogger;
-    private readonly Mock<IUserService> _mockUserService;
-    private readonly Mock<IFolderService> _mockFolderService;
-    private readonly Mock<IMessageService> _mockMessageService;
-    private readonly CancellationTokenSource _cancellationTokenSource;
-
-    public ImapStreamBasedTests() {
-        _mockLogger = new Mock<ILogger<ImapSession>>();
-        _mockUserService = new Mock<IUserService>();
-        _mockFolderService = new Mock<IFolderService>();
-        _mockMessageService = new Mock<IMessageService>();
-
-        _cancellationTokenSource = new CancellationTokenSource();
-    }
+    private readonly Mock<ILogger<ImapSession>> _mockLogger = new();
+    private readonly Mock<IUserService> _mockUserService = new();
+    private readonly Mock<IFolderService> _mockFolderService = new();
+    private readonly Mock<IMessageService> _mockMessageService = new();
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
 
     public void Dispose() {
         _cancellationTokenSource.Cancel();
@@ -293,7 +283,7 @@ public class ImapStreamBasedTests : IDisposable {
 
     private async Task<string[]> ReadResponseAsync(NetworkStream stream) {
         var buffer = new byte[4096];
-        var responses = new List<string>();
+        List<string> responses = [];
 
         // Read with timeout to handle potential multiple responses
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -301,7 +291,7 @@ public class ImapStreamBasedTests : IDisposable {
         try {
             var bytesRead = await stream.ReadAsync(buffer, cts.Token);
             var response = Utf8NoBom.GetString(buffer, 0, bytesRead);
-            var lines = response.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = response.Split(["\r\n"], StringSplitOptions.RemoveEmptyEntries);
             responses.AddRange(lines);
         } catch (OperationCanceledException) {
             // Timeout - return what we have

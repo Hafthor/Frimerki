@@ -9,15 +9,8 @@ namespace Frimerki.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class MessagesController : ControllerBase {
-    private readonly IMessageService _messageService;
-    private readonly ILogger<MessagesController> _logger;
-
-    public MessagesController(IMessageService messageService, ILogger<MessagesController> logger) {
-        _messageService = messageService;
-        _logger = logger;
-    }
-
+public class MessagesController(IMessageService messageService, ILogger<MessagesController> logger)
+    : ControllerBase {
     /// <summary>
     /// Get messages with filtering and pagination
     /// </summary>
@@ -25,12 +18,12 @@ public class MessagesController : ControllerBase {
     public async Task<ActionResult<PaginatedInfo<MessageListItemResponse>>> GetMessages([FromQuery] MessageFilterRequest request) {
         try {
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Getting messages for user {UserId} with filters", userId);
+            logger.LogInformation("Getting messages for user {UserId} with filters", userId);
 
-            var result = await _messageService.GetMessagesAsync(userId, request);
+            var result = await messageService.GetMessagesAsync(userId, request);
             return Ok(result);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting messages");
+            logger.LogError(ex, "Error getting messages");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -42,16 +35,16 @@ public class MessagesController : ControllerBase {
     public async Task<ActionResult<MessageResponse>> GetMessage(int id) {
         try {
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Getting message {MessageId} for user {UserId}", id, userId);
+            logger.LogInformation("Getting message {MessageId} for user {UserId}", id, userId);
 
-            var message = await _messageService.GetMessageAsync(userId, id);
+            var message = await messageService.GetMessageAsync(userId, id);
             if (message == null) {
                 return NotFound(new { error = "Message not found" });
             }
 
             return Ok(message);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting message {MessageId}", id);
+            logger.LogError(ex, "Error getting message {MessageId}", id);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -67,18 +60,18 @@ public class MessagesController : ControllerBase {
             }
 
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Creating message for user {UserId}", userId);
+            logger.LogInformation("Creating message for user {UserId}", userId);
 
-            var message = await _messageService.CreateMessageAsync(userId, request);
+            var message = await messageService.CreateMessageAsync(userId, request);
             return CreatedAtAction(nameof(GetMessage), new { id = message.Id }, message);
         } catch (ArgumentException ex) {
-            _logger.LogWarning(ex, "Invalid request for creating message");
+            logger.LogWarning(ex, "Invalid request for creating message");
             return BadRequest(new { error = ex.Message });
         } catch (InvalidOperationException ex) {
-            _logger.LogError(ex, "Error creating message");
+            logger.LogError(ex, "Error creating message");
             return StatusCode(500, new { error = "Internal server error" });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Unexpected error creating message");
+            logger.LogError(ex, "Unexpected error creating message");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -94,19 +87,19 @@ public class MessagesController : ControllerBase {
             }
 
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Updating message {MessageId} for user {UserId}", id, userId);
+            logger.LogInformation("Updating message {MessageId} for user {UserId}", id, userId);
 
-            var message = await _messageService.UpdateMessageAsync(userId, id, request);
+            var message = await messageService.UpdateMessageAsync(userId, id, request);
             if (message == null) {
                 return NotFound(new { error = "Message not found" });
             }
 
             return Ok(message);
         } catch (ArgumentException ex) {
-            _logger.LogWarning(ex, "Invalid request for updating message {MessageId}", id);
+            logger.LogWarning(ex, "Invalid request for updating message {MessageId}", id);
             return BadRequest(new { error = ex.Message });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error updating message {MessageId}", id);
+            logger.LogError(ex, "Error updating message {MessageId}", id);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -122,19 +115,19 @@ public class MessagesController : ControllerBase {
             }
 
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Patching message {MessageId} for user {UserId}", id, userId);
+            logger.LogInformation("Patching message {MessageId} for user {UserId}", id, userId);
 
-            var message = await _messageService.UpdateMessageAsync(userId, id, request);
+            var message = await messageService.UpdateMessageAsync(userId, id, request);
             if (message == null) {
                 return NotFound(new { error = "Message not found" });
             }
 
             return Ok(message);
         } catch (ArgumentException ex) {
-            _logger.LogWarning(ex, "Invalid request for patching message {MessageId}", id);
+            logger.LogWarning(ex, "Invalid request for patching message {MessageId}", id);
             return BadRequest(new { error = ex.Message });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error patching message {MessageId}", id);
+            logger.LogError(ex, "Error patching message {MessageId}", id);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -146,16 +139,16 @@ public class MessagesController : ControllerBase {
     public async Task<ActionResult> DeleteMessage(int id) {
         try {
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Deleting message {MessageId} for user {UserId}", id, userId);
+            logger.LogInformation("Deleting message {MessageId} for user {UserId}", id, userId);
 
-            var result = await _messageService.DeleteMessageAsync(userId, id);
+            var result = await messageService.DeleteMessageAsync(userId, id);
             if (!result) {
                 return NotFound(new { error = "Message not found" });
             }
 
             return NoContent();
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error deleting message {MessageId}", id);
+            logger.LogError(ex, "Error deleting message {MessageId}", id);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

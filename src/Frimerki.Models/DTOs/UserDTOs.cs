@@ -55,10 +55,10 @@ public class UserRequest {
 
 public class UserUpdateRequest {
     [StringLength(255)]
-    public string? FullName { get; set; }
+    public string FullName { get; set; }
 
     [RegularExpression("^(User|DomainAdmin|HostAdmin)$", ErrorMessage = "Role must be User, DomainAdmin, or HostAdmin")]
-    public string? Role { get; set; }
+    public string Role { get; set; }
 
     public bool? CanReceive { get; set; }
 

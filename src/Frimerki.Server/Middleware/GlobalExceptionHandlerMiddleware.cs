@@ -6,22 +6,15 @@ namespace Frimerki.Server.Middleware;
 /// <summary>
 /// Global exception handling middleware to prevent stack trace exposure
 /// </summary>
-public class GlobalExceptionHandlerMiddleware {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<GlobalExceptionHandlerMiddleware> _logger;
-    private readonly IWebHostEnvironment _environment;
-
-    public GlobalExceptionHandlerMiddleware(RequestDelegate next, ILogger<GlobalExceptionHandlerMiddleware> logger, IWebHostEnvironment environment) {
-        _next = next;
-        _logger = logger;
-        _environment = environment;
-    }
-
+public class GlobalExceptionHandlerMiddleware(
+    RequestDelegate next,
+    ILogger<GlobalExceptionHandlerMiddleware> logger,
+    IWebHostEnvironment environment) {
     public async Task InvokeAsync(HttpContext context) {
         try {
-            await _next(context);
+            await next(context);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Unhandled exception occurred for request {Method} {Path}",
+            logger.LogError(ex, "Unhandled exception occurred for request {Method} {Path}",
                 context.Request.Method, context.Request.Path);
 
             await HandleExceptionAsync(context, ex);
@@ -34,7 +27,7 @@ public class GlobalExceptionHandlerMiddleware {
         object errorResponse;
 
         // Only include exception details in development environment
-        if (_environment.IsDevelopment()) {
+        if (environment.IsDevelopment()) {
             errorResponse = new {
                 error = "Internal server error",
                 message = exception.Message,

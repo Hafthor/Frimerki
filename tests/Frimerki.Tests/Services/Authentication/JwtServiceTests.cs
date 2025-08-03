@@ -14,7 +14,7 @@ public class JwtServiceTests {
         _mockLogger = new Mock<ILogger<JwtService>>();
 
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> {
+            .AddInMemoryCollection(new Dictionary<string, string> {
                 ["Jwt:Secret"] = "ThisIsAVeryLongSecretKeyForTesting123456789012345678901234567890",
                 ["Jwt:Issuer"] = "TestIssuer",
                 ["Jwt:Audience"] = "TestAudience"

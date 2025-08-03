@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace Frimerki.Server;
+namespace Frimerki.Server.Hubs;
 
 public class EmailHub : Hub {
     public async Task JoinFolder(string folderId) {
@@ -16,7 +16,7 @@ public class EmailHub : Hub {
         await base.OnConnectedAsync();
     }
 
-    public override async Task OnDisconnectedAsync(Exception? exception) {
+    public override async Task OnDisconnectedAsync(Exception exception) {
         await base.OnDisconnectedAsync(exception);
     }
 }

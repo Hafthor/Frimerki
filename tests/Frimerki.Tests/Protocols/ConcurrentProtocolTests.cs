@@ -3,11 +3,9 @@ using System.Net.Sockets;
 using System.Text;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
-using Frimerki.Models.Entities;
 using Frimerki.Protocols.Imap;
 using Frimerki.Protocols.Pop3;
 using Frimerki.Protocols.Smtp;
-using Frimerki.Services.Common;
 using Frimerki.Services.Email;
 using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
@@ -25,15 +23,9 @@ namespace Frimerki.Tests.Protocols;
 /// <summary>
 /// Simple XUnit logger provider for test output
 /// </summary>
-public class XUnitLoggerProvider : ILoggerProvider {
-    private readonly ITestOutputHelper _output;
-
-    public XUnitLoggerProvider(ITestOutputHelper output) {
-        _output = output;
-    }
-
+public class XUnitLoggerProvider(ITestOutputHelper output) : ILoggerProvider {
     public ILogger CreateLogger(string categoryName) {
-        return new XUnitLogger(_output, categoryName);
+        return new XUnitLogger(output, categoryName);
     }
 
     public void Dispose() { }
@@ -42,25 +34,17 @@ public class XUnitLoggerProvider : ILoggerProvider {
 /// <summary>
 /// Simple XUnit logger implementation
 /// </summary>
-public class XUnitLogger : ILogger {
-    private readonly ITestOutputHelper _output;
-    private readonly string _categoryName;
-
-    public XUnitLogger(ITestOutputHelper output, string categoryName) {
-        _output = output;
-        _categoryName = categoryName;
-    }
-
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => new NoOpDisposable();
+public class XUnitLogger(ITestOutputHelper output, string categoryName) : ILogger {
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => new NoOpDisposable();
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-        Exception? exception, Func<TState, Exception?, string> formatter) {
+        Exception exception, Func<TState, Exception, string> formatter) {
         var message = formatter(state, exception);
-        _output.WriteLine($"[{logLevel}] {_categoryName}: {message}");
+        output.WriteLine($"[{logLevel}] {categoryName}: {message}");
         if (exception != null) {
-            _output.WriteLine(exception.ToString());
+            output.WriteLine(exception.ToString());
         }
     }
 
@@ -70,13 +54,7 @@ public class XUnitLogger : ILogger {
 }
 
 [Collection("ConcurrentProtocolTests")]
-public class ConcurrentProtocolTests {
-    private readonly ITestOutputHelper _output;
-
-    public ConcurrentProtocolTests(ITestOutputHelper output) {
-        _output = output;
-    }
-
+public class ConcurrentProtocolTests(ITestOutputHelper output) {
     [Fact]
     public async Task ImapServer_CanHandleMultipleConcurrentConnections() {
         // Arrange
@@ -98,22 +76,23 @@ public class ConcurrentProtocolTests {
             tasks.Add(Task.Run(async () => {
                 try {
                     using var client = new TcpClient();
-                    await client.ConnectAsync("127.0.0.1", port);
-                    using var stream = client.GetStream();
+                    await client.ConnectAsync("127.0.0.1", port, cts.Token);
+                    await using var stream = client.GetStream();
                     using var reader = new StreamReader(stream, Encoding.ASCII);
-                    using var writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true };
+                    await using var writer = new StreamWriter(stream, Encoding.ASCII);
+                    writer.AutoFlush = true;
 
                     // Read greeting
-                    var greeting = await reader.ReadLineAsync();
-                    _output.WriteLine($"Connection {connectionId}: {greeting}");
+                    var greeting = await reader.ReadLineAsync(cts.Token);
+                    output.WriteLine($"Connection {connectionId}: {greeting}");
 
                     // Send unique capability request with connection ID
                     await writer.WriteLineAsync($"A{connectionId:D3} CAPABILITY");
 
                     // Read capability response
                     var response = new StringBuilder();
-                    string? line;
-                    while ((line = await reader.ReadLineAsync()) != null && !line.StartsWith($"A{connectionId:D3} OK")) {
+                    string line;
+                    while ((line = await reader.ReadLineAsync(cts.Token)) != null && !line.StartsWith($"A{connectionId:D3} OK")) {
                         response.AppendLine(line);
                     }
                     response.AppendLine(line); // Include the OK line
@@ -125,9 +104,9 @@ public class ConcurrentProtocolTests {
                     await writer.WriteLineAsync($"A{connectionId:D3} LOGOUT");
                     await reader.ReadLineAsync(); // Read logout response
                 } catch (Exception ex) {
-                    _output.WriteLine($"Connection {connectionId} failed: {ex.Message}");
+                    output.WriteLine($"Connection {connectionId} failed: {ex.Message}");
                 }
-            }));
+            }, cts.Token));
         }
 
         await Task.WhenAll(tasks);
@@ -163,7 +142,7 @@ public class ConcurrentProtocolTests {
                     using (cleanup) {
                         // Read greeting
                         var greeting = await reader.ReadLineAsync();
-                        _output.WriteLine($"POP3 Connection {connectionId}: {greeting}");
+                        output.WriteLine($"POP3 Connection {connectionId}: {greeting}");
 
                         // Send unique USER command with connection-specific username
                         await writer.WriteLineAndFlushAsync($"USER test{connectionId}@example.com");
@@ -188,7 +167,7 @@ public class ConcurrentProtocolTests {
                         }
                     }
                 } catch (Exception ex) {
-                    _output.WriteLine($"POP3 Connection {connectionId} failed: {ex.Message}");
+                    output.WriteLine($"POP3 Connection {connectionId} failed: {ex.Message}");
                 }
             }));
         }
@@ -203,7 +182,7 @@ public class ConcurrentProtocolTests {
             var expectedPrefix = $"Connection-{i}:";
             var connectionResponse = results.FirstOrDefault(r => r.StartsWith(expectedPrefix));
             Assert.NotNull(connectionResponse);
-            _output.WriteLine($"POP3 Result {i}: {connectionResponse}");
+            output.WriteLine($"POP3 Result {i}: {connectionResponse}");
         }
     }
 
@@ -222,14 +201,14 @@ public class ConcurrentProtocolTests {
                     using (cleanup) {
                         // Read greeting
                         var greeting = await reader.ReadLineAsync();
-                        _output.WriteLine($"SMTP Connection {connectionId}: {greeting}");
+                        output.WriteLine($"SMTP Connection {connectionId}: {greeting}");
 
                         // Send unique EHLO command with connection-specific hostname
                         await writer.WriteLineAndFlushAsync($"EHLO client{connectionId}.example.com");
 
                         // Read EHLO response (multi-line)
                         var ehloResponse = new StringBuilder();
-                        string? line;
+                        string line;
                         while ((line = await reader.ReadLineAsync()) != null && !line.StartsWith("250 ")) {
                             ehloResponse.AppendLine(line);
                         }
@@ -250,7 +229,7 @@ public class ConcurrentProtocolTests {
                         }
                     }
                 } catch (Exception ex) {
-                    _output.WriteLine($"SMTP Connection {connectionId} failed: {ex.Message}");
+                    output.WriteLine($"SMTP Connection {connectionId} failed: {ex.Message}");
                 }
             }));
         }
@@ -265,7 +244,7 @@ public class ConcurrentProtocolTests {
             var expectedPrefix = $"Connection-{i}:";
             var connectionResponse = results.FirstOrDefault(r => r.StartsWith(expectedPrefix));
             Assert.NotNull(connectionResponse);
-            _output.WriteLine($"SMTP Result {i}: {connectionResponse}");
+            output.WriteLine($"SMTP Result {i}: {connectionResponse}");
         }
     }
 
@@ -274,7 +253,7 @@ public class ConcurrentProtocolTests {
 
         // Add logging
         services.AddLogging(builder => {
-            builder.AddProvider(new XUnitLoggerProvider(_output));
+            builder.AddProvider(new XUnitLoggerProvider(output));
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
@@ -327,12 +306,12 @@ public class ConcurrentProtocolTests {
 
         // Return cleanup delegate
         var cleanup = new DisposableAction(() => {
-            reader?.Dispose();
-            writer?.Dispose();
-            stream?.Dispose();
-            client?.Dispose();
-            serverClient?.Dispose();
-            listener?.Stop();
+            reader.Dispose();
+            writer.Dispose();
+            stream.Dispose();
+            client.Dispose();
+            serverClient.Dispose();
+            listener.Stop();
         });
 
         return (reader, writer, handleTask, cleanup);
@@ -372,13 +351,13 @@ public class ConcurrentProtocolTests {
 
         // Return cleanup delegate
         var cleanup = new DisposableAction(() => {
-            reader?.Dispose();
-            writer?.Dispose();
-            stream?.Dispose();
-            client?.Dispose();
-            serverClient?.Dispose();
-            listener?.Stop();
-            context?.Dispose();
+            reader.Dispose();
+            writer.Dispose();
+            stream.Dispose();
+            client.Dispose();
+            serverClient.Dispose();
+            listener.Stop();
+            context.Dispose();
         });
 
         return (reader, writer, handleTask, cleanup);

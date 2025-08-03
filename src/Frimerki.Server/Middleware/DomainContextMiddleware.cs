@@ -7,20 +7,12 @@ namespace Frimerki.Server.Middleware;
 /// <summary>
 /// Middleware to extract and validate domain context from incoming requests
 /// </summary>
-public class DomainContextMiddleware {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<DomainContextMiddleware> _logger;
-
+public class DomainContextMiddleware(
+    RequestDelegate next,
+    ILogger<DomainContextMiddleware> logger) {
     // Regex to extract email addresses from various contexts
     private static readonly Regex EmailRegex = new(Constants.ValidEmailRegex,
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    public DomainContextMiddleware(
-        RequestDelegate next,
-        ILogger<DomainContextMiddleware> logger) {
-        _next = next;
-        _logger = logger;
-    }
 
     public async Task InvokeAsync(HttpContext context) {
         var domain = await ExtractDomainFromRequestAsync(context);
@@ -33,18 +25,18 @@ public class DomainContextMiddleware {
             var domainExists = await domainRegistry.DomainExistsAsync(domain);
             if (domainExists) {
                 context.Items["Domain"] = domain;
-                _logger.LogDebug("Domain context set to {Domain} for request {Path}",
+                logger.LogDebug("Domain context set to {Domain} for request {Path}",
                     domain, context.Request.Path);
             } else {
-                _logger.LogWarning("Request for unknown domain {Domain} from {RemoteIp}",
+                logger.LogWarning("Request for unknown domain {Domain} from {RemoteIp}",
                     domain, context.Connection.RemoteIpAddress);
             }
         }
 
-        await _next(context);
+        await next(context);
     }
 
-    private async Task<string?> ExtractDomainFromRequestAsync(HttpContext context) {
+    private async Task<string> ExtractDomainFromRequestAsync(HttpContext context) {
         // Try to extract domain from different sources
 
         // 1. From query parameters (for API requests)
@@ -79,7 +71,7 @@ public class DomainContextMiddleware {
         return null;
     }
 
-    private async Task<string?> ExtractDomainFromJsonBodyAsync(HttpContext context) {
+    private async Task<string> ExtractDomainFromJsonBodyAsync(HttpContext context) {
         try {
             // Enable buffering so we can read the body multiple times
             context.Request.EnableBuffering();
@@ -96,12 +88,12 @@ public class DomainContextMiddleware {
                 if (match.Groups.Count >= 3) {
                     var domain = match.Groups[2].Value.ToLower();
                     // We'll validate this domain later in the main InvokeAsync method
-                    // For now, just return the first domain found
+                    // For now, return the first domain found
                     return domain;
                 }
             }
         } catch (Exception ex) {
-            _logger.LogWarning(ex, "Error extracting domain from request body");
+            logger.LogWarning(ex, "Error extracting domain from request body");
         }
 
         return null;
@@ -116,7 +108,7 @@ public class DomainContextMiddleware {
 /// Extension methods for domain context
 /// </summary>
 public static class DomainContextExtensions {
-    public static string? GetDomain(this HttpContext context) {
+    public static string GetDomain(this HttpContext context) {
         return context.Items.TryGetValue("Domain", out var domain) ? domain as string : null;
     }
 

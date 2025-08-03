@@ -57,7 +57,7 @@ public class DomainDbContextFactory : IDomainDbContextFactory {
 
         _logger.LogInformation("Creating new domain database for {DomainName} at {DatabasePath}", domainName, dbPath);
 
-        using var context = CreateDbContext(domainName);
+        await using var context = await CreateDbContextAsync(domainName);
         await context.Database.EnsureCreatedAsync();
 
         // Create the domain record in the domain-specific database

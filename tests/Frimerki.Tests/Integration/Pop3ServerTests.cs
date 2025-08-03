@@ -109,7 +109,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         var serverTask = pop3Server.StartAsync(cancellationTokenSource.Token);
 
         // Give the server a moment to start
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationTokenSource.Token);
 
         try {
             // Create a test user and authenticate via web API
@@ -119,13 +119,13 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
             using var pop3Client = new Pop3Client();
 
             // Connect to our POP3 server
-            await pop3Client.ConnectAsync("127.0.0.1", testPort, false);
+            await pop3Client.ConnectAsync("127.0.0.1", testPort, false, cancellationTokenSource.Token);
 
             // Assert connection is established
             Assert.True(pop3Client.IsConnected);
 
             // Authenticate with the test user
-            await pop3Client.AuthenticateAsync(email, password);
+            await pop3Client.AuthenticateAsync(email, password, cancellationTokenSource.Token);
 
             // Assert authentication succeeded
             Assert.True(pop3Client.IsAuthenticated);
@@ -139,12 +139,12 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
             Assert.True(totalSize >= 0);
 
             // Disconnect
-            await pop3Client.DisconnectAsync(true);
+            await pop3Client.DisconnectAsync(true, cancellationTokenSource.Token);
             Assert.False(pop3Client.IsConnected);
 
         } finally {
             // Stop the server
-            cancellationTokenSource.Cancel();
+            await cancellationTokenSource.CancelAsync();
             await serverTask;
             pop3Server.Dispose();
         }
@@ -166,22 +166,22 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         using var cancellationTokenSource = new CancellationTokenSource();
         var serverTask = pop3Server.StartAsync(cancellationTokenSource.Token);
 
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationTokenSource.Token);
 
         try {
             using var pop3Client = new Pop3Client();
 
-            await pop3Client.ConnectAsync("127.0.0.1", testPort, false);
+            await pop3Client.ConnectAsync("127.0.0.1", testPort, false, cancellationTokenSource.Token);
             Assert.True(pop3Client.IsConnected);
 
             // Try to authenticate with invalid credentials
             var exception = await Assert.ThrowsAsync<MailKit.Security.AuthenticationException>(
-                () => pop3Client.AuthenticateAsync("invalid@example.com", "wrongpassword"));
+                () => pop3Client.AuthenticateAsync("invalid@example.com", "wrongpassword", cancellationTokenSource.Token));
 
             Assert.False(pop3Client.IsAuthenticated);
 
         } finally {
-            cancellationTokenSource.Cancel();
+            await cancellationTokenSource.CancelAsync();
             await serverTask;
             pop3Server.Dispose();
         }
@@ -203,7 +203,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         using var cancellationTokenSource = new CancellationTokenSource();
         var serverTask = pop3Server.StartAsync(cancellationTokenSource.Token);
 
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationTokenSource.Token);
 
         try {
             // Create test user and send them a message
@@ -212,35 +212,35 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
 
             using var pop3Client = new Pop3Client();
 
-            await pop3Client.ConnectAsync("127.0.0.1", testPort, false);
-            await pop3Client.AuthenticateAsync(email, password);
+            await pop3Client.ConnectAsync("127.0.0.1", testPort, false, cancellationTokenSource.Token);
+            await pop3Client.AuthenticateAsync(email, password, cancellationTokenSource.Token);
 
             // Check if we have messages
             var messageCount = pop3Client.Count;
             if (messageCount > 0) {
                 // Get first message
-                var message = await pop3Client.GetMessageAsync(0);
+                var message = await pop3Client.GetMessageAsync(0, cancellationTokenSource.Token);
                 Assert.NotNull(message);
                 Assert.NotNull(message.Headers);
 
                 // Get message size
-                var size = pop3Client.GetMessageSize(0);
+                var size = await pop3Client.GetMessageSizeAsync(0, cancellationTokenSource.Token);
                 Assert.True(size > 0);
 
                 // Check the full message
                 Assert.NotNull(message.Subject);
 
                 // Mark message for deletion
-                pop3Client.DeleteMessage(0);
+                await pop3Client.DeleteMessageAsync(0, cancellationTokenSource.Token);
 
                 // Verify message is marked for deletion
                 // Note: The actual deletion happens on QUIT
             }
 
-            await pop3Client.DisconnectAsync(true);
+            await pop3Client.DisconnectAsync(true, cancellationTokenSource.Token);
 
         } finally {
-            cancellationTokenSource.Cancel();
+            await cancellationTokenSource.CancelAsync();
             await serverTask;
             pop3Server.Dispose();
         }
@@ -262,7 +262,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         using var cancellationTokenSource = new CancellationTokenSource();
         var serverTask = pop3Server.StartAsync(cancellationTokenSource.Token);
 
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationTokenSource.Token);
 
         try {
             var (email, password) = await CreateTestUserAsync();
@@ -270,26 +270,26 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
 
             using var pop3Client = new Pop3Client();
 
-            await pop3Client.ConnectAsync("127.0.0.1", testPort, false);
-            await pop3Client.AuthenticateAsync(email, password);
+            await pop3Client.ConnectAsync("127.0.0.1", testPort, false, cancellationTokenSource.Token);
+            await pop3Client.AuthenticateAsync(email, password, cancellationTokenSource.Token);
 
             var messageCount = pop3Client.Count;
             if (messageCount > 0) {
                 // Get unique ID for first message
-                var uid = await pop3Client.GetMessageUidAsync(0);
+                var uid = await pop3Client.GetMessageUidAsync(0, cancellationTokenSource.Token);
                 Assert.NotNull(uid);
                 Assert.NotEmpty(uid);
 
                 // Get all unique IDs
-                var uids = await pop3Client.GetMessageUidsAsync();
+                var uids = await pop3Client.GetMessageUidsAsync(cancellationTokenSource.Token);
                 Assert.NotNull(uids);
                 Assert.Equal(messageCount, uids.Count);
             }
 
-            await pop3Client.DisconnectAsync(true);
+            await pop3Client.DisconnectAsync(true, cancellationTokenSource.Token);
 
         } finally {
-            cancellationTokenSource.Cancel();
+            await cancellationTokenSource.CancelAsync();
             await serverTask;
             pop3Server.Dispose();
         }
@@ -311,7 +311,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         using var cancellationTokenSource = new CancellationTokenSource();
         var serverTask = pop3Server.StartAsync(cancellationTokenSource.Token);
 
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationTokenSource.Token);
 
         try {
             var (email, password) = await CreateTestUserAsync();
@@ -319,13 +319,13 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
 
             using var pop3Client = new Pop3Client();
 
-            await pop3Client.ConnectAsync("127.0.0.1", testPort, false);
-            await pop3Client.AuthenticateAsync(email, password);
+            await pop3Client.ConnectAsync("127.0.0.1", testPort, false, cancellationTokenSource.Token);
+            await pop3Client.AuthenticateAsync(email, password, cancellationTokenSource.Token);
 
             var messageCount = pop3Client.Count;
             if (messageCount > 0) {
                 // Get message (MailKit will use TOP command internally for headers)
-                var message = await pop3Client.GetMessageAsync(0);
+                var message = await pop3Client.GetMessageAsync(0, cancellationTokenSource.Token);
                 Assert.NotNull(message);
                 Assert.NotNull(message.Headers);
 
@@ -333,10 +333,10 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
                 // MailKit uses TOP internally when getting headers
             }
 
-            await pop3Client.DisconnectAsync(true);
+            await pop3Client.DisconnectAsync(true, cancellationTokenSource.Token);
 
         } finally {
-            cancellationTokenSource.Cancel();
+            await cancellationTokenSource.CancelAsync();
             await serverTask;
             pop3Server.Dispose();
         }
@@ -358,38 +358,38 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         using var cancellationTokenSource = new CancellationTokenSource();
         var serverTask = pop3Server.StartAsync(cancellationTokenSource.Token);
 
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationTokenSource.Token);
 
         try {
             var (email, password) = await CreateTestUserAsync();
 
             using var pop3Client = new Pop3Client();
 
-            await pop3Client.ConnectAsync("127.0.0.1", testPort, false);
-            await pop3Client.AuthenticateAsync(email, password);
+            await pop3Client.ConnectAsync("127.0.0.1", testPort, false, cancellationTokenSource.Token);
+            await pop3Client.AuthenticateAsync(email, password, cancellationTokenSource.Token);
 
             // Send NOOP command
-            await pop3Client.NoOpAsync();
+            await pop3Client.NoOpAsync(cancellationTokenSource.Token);
 
             // Verify connection is still active
             Assert.True(pop3Client.IsConnected);
             Assert.True(pop3Client.IsAuthenticated);
 
-            await pop3Client.DisconnectAsync(true);
+            await pop3Client.DisconnectAsync(true, cancellationTokenSource.Token);
 
         } finally {
-            cancellationTokenSource.Cancel();
+            await cancellationTokenSource.CancelAsync();
             await serverTask;
             pop3Server.Dispose();
         }
     }
 
-    private Task<(string email, string password)> CreateTestUserAsync() {
+    private async Task<(string email, string password)> CreateTestUserAsync() {
         // Use the seeded test user
         var email = "testuser@test.com";
         var password = "TestPassword123!";
 
-        return Task.FromResult((email, password));
+        return (email, password);
     }
 
     private async Task SendTestMessageAsync(string toEmail) {

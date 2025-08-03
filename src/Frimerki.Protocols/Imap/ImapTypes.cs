@@ -40,9 +40,9 @@ public enum ImapResponseType {
 /// IMAP response with status and message
 /// </summary>
 public record ImapResponse(string Tag = "",
-                        ImapResponseType Type = ImapResponseType.Ok,
+                            ImapResponseType Type = ImapResponseType.Ok,
                             string Message = "",
-                            string? ResponseCode = null) {
+                            string ResponseCode = null) {
     public override string ToString() =>
         string.IsNullOrEmpty(ResponseCode)
             ? $"{Tag} {Type.ToString().ToUpper()} {Message}"

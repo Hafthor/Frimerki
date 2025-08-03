@@ -24,7 +24,7 @@ public class DomainRequest {
     [StringLength(255)]
     public string DatabaseName { get; set; }
 
-    public bool CreateDatabase { get; set; } = false;
+    public bool CreateDatabase { get; set; }
 
     public bool IsActive { get; set; } = true;
 
@@ -35,12 +35,12 @@ public class DomainRequest {
 public class DomainUpdateRequest {
     [StringLength(255)]
     [RegularExpression(Constants.ValidDomainRegex, ErrorMessage = "Invalid domain name format")]
-    public string? Name { get; set; }
+    public string Name { get; set; }
 
     public bool? IsActive { get; set; }
 
     [EmailAddress]
-    public string? CatchAllUser { get; set; }
+    public string CatchAllUser { get; set; }
 }
 
 public class DkimKeyInfo {

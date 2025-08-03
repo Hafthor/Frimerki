@@ -1,37 +1,28 @@
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.RegularExpressions;
-
 using Frimerki.Data;
 using Frimerki.Models.Configuration;
 using Frimerki.Models.DTOs;
-using Frimerki.Models.Entities;
 using Frimerki.Services.Common;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Frimerki.Services.User;
 
-public partial class UserService : IUserService {
-    private readonly EmailDbContext _context;
-    private readonly INowProvider _nowProvider;
-    private readonly ILogger<UserService> _logger;
-    private readonly AccountLockoutOptions _lockoutOptions;
+public partial class UserService(
+    EmailDbContext context,
+    INowProvider nowProvider,
+    ILogger<UserService> logger,
+    IOptions<AccountLockoutOptions> lockoutOptions)
+    : IUserService {
+    private readonly AccountLockoutOptions _lockoutOptions = lockoutOptions.Value;
 
-    public UserService(EmailDbContext context, INowProvider nowProvider, ILogger<UserService> logger, IOptions<AccountLockoutOptions> lockoutOptions) {
-        _context = context;
-        _nowProvider = nowProvider;
-        _logger = logger;
-        _lockoutOptions = lockoutOptions.Value;
-    }
-
-    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 0, int take = 50, string? domainFilter = null) {
-        _logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
+    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 0, int take = 50, string domainFilter = null) {
+        logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
             skip, take, domainFilter ?? "All");
 
-        var query = _context.Users
+        var query = context.Users
             .Include(u => u.Domain)
             .AsQueryable();
 
@@ -63,10 +54,10 @@ public partial class UserService : IUserService {
         };
     }
 
-    public async Task<UserResponse?> GetUserByEmailAsync(string email) {
-        _logger.LogInformation("Getting user by email: {Email}", email);
+    public async Task<UserResponse> GetUserByEmailAsync(string email) {
+        logger.LogInformation("Getting user by email: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
@@ -79,10 +70,10 @@ public partial class UserService : IUserService {
     }
 
     public async Task<UserResponse> CreateUserAsync(CreateUserRequest request) {
-        _logger.LogInformation("Creating user: {Username}@{Domain}", request.Username, request.DomainName);
+        logger.LogInformation("Creating user: {Username}@{Domain}", request.Username, request.DomainName);
 
         // Validate domain exists
-        var domain = await _context.Domains
+        var domain = await context.Domains
             .FirstOrDefaultAsync(d => d.Name == request.DomainName);
 
         if (domain == null) {
@@ -90,7 +81,7 @@ public partial class UserService : IUserService {
         }
 
         // Check if user already exists
-        var existingUser = await _context.Users
+        var existingUser = await context.Users
             .AnyAsync(u => u.Username == request.Username && u.DomainId == domain.Id);
 
         if (existingUser) {
@@ -110,17 +101,17 @@ public partial class UserService : IUserService {
             Role = request.Role,
             CanReceive = request.CanReceive,
             CanLogin = request.CanLogin,
-            CreatedAt = _nowProvider.UtcNow
+            CreatedAt = nowProvider.UtcNow
         };
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
 
         // Create default folders for the user
         await CreateDefaultFoldersAsync(user.Id);
 
         // Reload user with domain information
-        var createdUser = await _context.Users
+        var createdUser = await context.Users
             .Include(u => u.Domain)
             .FirstAsync(u => u.Id == user.Id);
 
@@ -132,15 +123,15 @@ public partial class UserService : IUserService {
             LastActivity = DateTime.MinValue
         };
 
-        _logger.LogInformation("User created successfully: {Email}", $"{request.Username}@{request.DomainName}");
+        logger.LogInformation("User created successfully: {Email}", $"{request.Username}@{request.DomainName}");
 
         return MapToUserResponse(createdUser, stats);
     }
 
-    public async Task<UserResponse?> UpdateUserAsync(string email, UserUpdateRequest request) {
-        _logger.LogInformation("Updating user: {Email}", email);
+    public async Task<UserResponse> UpdateUserAsync(string email, UserUpdateRequest request) {
+        logger.LogInformation("Updating user: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
@@ -165,16 +156,16 @@ public partial class UserService : IUserService {
             user.CanLogin = request.CanLogin.Value;
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
         var stats = await GetUserStatsInternalAsync(user.Id);
         return MapToUserResponse(user, stats);
     }
 
     public async Task<bool> UpdateUserPasswordAsync(string email, UserPasswordUpdateRequest request) {
-        _logger.LogInformation("Updating password for user: {Email}", email);
+        logger.LogInformation("Updating password for user: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
@@ -197,14 +188,14 @@ public partial class UserService : IUserService {
         // Reset failed login attempts when password is changed
         await ResetFailedLoginAttemptsAsync(user);
 
-        _logger.LogInformation("Password updated successfully for user: {Email}", email);
+        logger.LogInformation("Password updated successfully for user: {Email}", email);
         return true;
     }
 
     public async Task<bool> DeleteUserAsync(string email) {
-        _logger.LogInformation("Deleting user: {Email}", email);
+        logger.LogInformation("Deleting user: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
@@ -214,17 +205,17 @@ public partial class UserService : IUserService {
 
         // TODO: Handle cascade deletes for user messages, folders, etc.
         // For now, we'll just delete the user record
-        _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
+        context.Users.Remove(user);
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("User deleted successfully: {Email}", email);
+        logger.LogInformation("User deleted successfully: {Email}", email);
         return true;
     }
 
     public async Task<UserStatsResponse> GetUserStatsAsync(string email) {
-        _logger.LogInformation("Getting stats for user: {Email}", email);
+        logger.LogInformation("Getting stats for user: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
@@ -236,84 +227,84 @@ public partial class UserService : IUserService {
     }
 
     public async Task<bool> UserExistsAsync(string email) {
-        return await _context.Users
+        return await context.Users
             .Include(u => u.Domain)
             .AnyAsync(u => u.Username + "@" + u.Domain.Name == email);
     }
 
-    public async Task<UserResponse?> AuthenticateUserAsync(string email, string password) {
-        _logger.LogInformation("Authenticating user: {Email}", email);
+    public async Task<UserResponse> AuthenticateUserAsync(string email, string password) {
+        logger.LogInformation("Authenticating user: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
         if (user == null || !user.CanLogin) {
-            _logger.LogWarning("Authentication failed for {Email}: User not found or cannot login", email);
+            logger.LogWarning("Authentication failed for {Email}: User not found or cannot login", email);
             return null;
         }
 
         // Check if account is locked
         if (IsAccountLocked(user)) {
-            _logger.LogWarning("Authentication failed for {Email}: Account is locked until {LockoutEnd}",
+            logger.LogWarning("Authentication failed for {Email}: Account is locked until {LockoutEnd}",
                 email, user.LockoutEnd);
             return null;
         }
 
         if (!VerifyPassword(password, user.PasswordHash, user.Salt)) {
-            _logger.LogWarning("Authentication failed for {Email}: Invalid password", email);
+            logger.LogWarning("Authentication failed for {Email}: Invalid password", email);
             await RecordFailedLoginAttemptAsync(user);
             return null;
         }
 
         // Successful login - reset failed attempts and update last login
         await ResetFailedLoginAttemptsAsync(user);
-        user.LastLogin = _nowProvider.UtcNow;
-        await _context.SaveChangesAsync();
+        user.LastLogin = nowProvider.UtcNow;
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("Authentication successful for {Email}", email);
+        logger.LogInformation("Authentication successful for {Email}", email);
         var stats = await GetUserStatsInternalAsync(user.Id);
         return MapToUserResponse(user, stats);
     }
 
-    public async Task<Frimerki.Models.Entities.User?> AuthenticateUserEntityAsync(string email, string password) {
-        _logger.LogInformation("Authenticating user entity: {Email}", email);
+    public async Task<Frimerki.Models.Entities.User> AuthenticateUserEntityAsync(string email, string password) {
+        logger.LogInformation("Authenticating user entity: {Email}", email);
 
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
         if (user == null || !user.CanLogin) {
-            _logger.LogWarning("Authentication failed for {Email}: User not found or cannot login", email);
+            logger.LogWarning("Authentication failed for {Email}: User not found or cannot login", email);
             return null;
         }
 
         // Check if account is locked
         if (IsAccountLocked(user)) {
-            _logger.LogWarning("Authentication failed for {Email}: Account is locked until {LockoutEnd}",
+            logger.LogWarning("Authentication failed for {Email}: Account is locked until {LockoutEnd}",
                 email, user.LockoutEnd);
             return null;
         }
 
         if (!VerifyPassword(password, user.PasswordHash, user.Salt)) {
-            _logger.LogWarning("Authentication failed for {Email}: Invalid password", email);
+            logger.LogWarning("Authentication failed for {Email}: Invalid password", email);
             await RecordFailedLoginAttemptAsync(user);
             return null;
         }
 
         // Successful login - reset failed attempts and update last login
         await ResetFailedLoginAttemptsAsync(user);
-        user.LastLogin = _nowProvider.UtcNow;
-        await _context.SaveChangesAsync();
+        user.LastLogin = nowProvider.UtcNow;
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("Authentication successful for {Email}", email);
+        logger.LogInformation("Authentication successful for {Email}", email);
         return user;
     }
 
-    public async Task<Frimerki.Models.Entities.User?> GetUserEntityByEmailAsync(string email) {
-        _logger.LogInformation("Getting user entity by email: {Email}", email);
+    public async Task<Frimerki.Models.Entities.User> GetUserEntityByEmailAsync(string email) {
+        logger.LogInformation("Getting user entity by email: {Email}", email);
 
-        return await _context.Users
+        return await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
     }
@@ -321,12 +312,10 @@ public partial class UserService : IUserService {
     [GeneratedRegex(@"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")]
     private static partial Regex EmailValidationRegex();
 
-    public Task<bool> ValidateEmailFormatAsync(string email) {
-        return Task.FromResult(EmailValidationRegex().IsMatch(email));
-    }
+    public async Task<bool> ValidateEmailFormatAsync(string email) => EmailValidationRegex().IsMatch(email);
 
     public async Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) {
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .FirstOrDefaultAsync(u => u.Username + "@" + u.Domain.Name == email);
 
@@ -339,21 +328,21 @@ public partial class UserService : IUserService {
     }
 
     private async Task<UserStatsResponse> GetUserStatsInternalAsync(int userId) {
-        var messageCount = await _context.UserMessages
+        var messageCount = await context.UserMessages
             .Where(um => um.UserId == userId)
             .CountAsync();
 
-        var folderCount = await _context.Folders
+        var folderCount = await context.Folders
             .Where(f => f.UserId == userId)
             .CountAsync();
 
         // Calculate storage used (sum of message sizes for this user)
-        var storageUsed = await _context.UserMessages
+        var storageUsed = await context.UserMessages
             .Where(um => um.UserId == userId)
-            .Join(_context.Messages, um => um.MessageId, m => m.Id, (um, m) => m.MessageSize)
+            .Join(context.Messages, um => um.MessageId, m => m.Id, (um, m) => m.MessageSize)
             .SumAsync();
 
-        var lastActivity = await _context.UserMessages
+        var lastActivity = await context.UserMessages
             .Where(um => um.UserId == userId)
             .OrderByDescending(um => um.ReceivedAt)
             .Select(um => um.ReceivedAt)
@@ -378,8 +367,8 @@ public partial class UserService : IUserService {
             new Models.Entities.Folder { UserId = userId, Name = "OUTBOX", SystemFolderType = "OUTBOX" }
         };
 
-        _context.Folders.AddRange(defaultFolders);
-        await _context.SaveChangesAsync();
+        context.Folders.AddRange(defaultFolders);
+        await context.SaveChangesAsync();
     }
 
     private UserResponse MapToUserResponse(Frimerki.Models.Entities.User user, UserStatsResponse stats) {
@@ -416,7 +405,7 @@ public partial class UserService : IUserService {
     }
 
     private string FormatBytes(long bytes) {
-        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
         int counter = 0;
         decimal number = bytes;
         while (Math.Round(number / 1024) >= 1) {
@@ -431,7 +420,7 @@ public partial class UserService : IUserService {
             return false;
         }
 
-        var now = _nowProvider.UtcNow;
+        var now = nowProvider.UtcNow;
         if (user.LockoutEnd > now) {
             return true;
         }
@@ -447,7 +436,7 @@ public partial class UserService : IUserService {
             return;
         }
 
-        var now = _nowProvider.UtcNow;
+        var now = nowProvider.UtcNow;
 
         // Reset failed attempts if the reset window has passed
         if (user.LastFailedLogin.HasValue &&
@@ -461,14 +450,14 @@ public partial class UserService : IUserService {
         // Lock account if threshold reached
         if (user.FailedLoginAttempts >= _lockoutOptions.MaxFailedAttempts) {
             user.LockoutEnd = now.AddMinutes(_lockoutOptions.LockoutDurationMinutes);
-            _logger.LogWarning("Account locked for user {Email} after {Attempts} failed attempts. Lockout ends at {LockoutEnd}",
+            logger.LogWarning("Account locked for user {Email} after {Attempts} failed attempts. Lockout ends at {LockoutEnd}",
                 $"{user.Username}@{user.Domain.Name}", user.FailedLoginAttempts, user.LockoutEnd);
         } else {
-            _logger.LogWarning("Failed login attempt for user {Email}. Attempt {Current}/{Max}",
+            logger.LogWarning("Failed login attempt for user {Email}. Attempt {Current}/{Max}",
                 $"{user.Username}@{user.Domain.Name}", user.FailedLoginAttempts, _lockoutOptions.MaxFailedAttempts);
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 
     private async Task ResetFailedLoginAttemptsAsync(Frimerki.Models.Entities.User user) {
@@ -476,7 +465,7 @@ public partial class UserService : IUserService {
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
             user.LastFailedLogin = null;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
     }
 }

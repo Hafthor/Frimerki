@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Server;
@@ -8,10 +9,8 @@ namespace Frimerki.Server.Controllers;
 [ApiController]
 [Route("api/server")]
 // TODO: Add [Authorize(Roles = "HostAdmin")] when authentication is implemented
-public class ServerController : ControllerBase {
-    private readonly IServerService _serverService;
-    private readonly ILogger<ServerController> _logger;
-
+public class ServerController(IServerService serverService, ILogger<ServerController> logger)
+    : ControllerBase {
     // Assembly information - cached at startup since it cannot change during runtime
     private static readonly string ApplicationVersion;
 
@@ -22,21 +21,16 @@ public class ServerController : ControllerBase {
                            ?? "Unknown";
     }
 
-    public ServerController(IServerService serverService, ILogger<ServerController> logger) {
-        _serverService = serverService;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Get server status and statistics (HostAdmin only)
     /// </summary>
     [HttpGet("status")]
     public async Task<ActionResult<ServerStatusResponse>> GetServerStatus() {
         try {
-            var status = await _serverService.GetServerStatusAsync();
+            var status = await serverService.GetServerStatusAsync();
             return Ok(status);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving server status");
+            logger.LogError(ex, "Error retrieving server status");
             return StatusCode(500, new { error = "Failed to retrieve server status" });
         }
     }
@@ -47,7 +41,7 @@ public class ServerController : ControllerBase {
     [HttpGet("health")]
     public async Task<ActionResult<ServerHealthResponse>> GetServerHealth() {
         try {
-            var health = await _serverService.GetServerHealthAsync();
+            var health = await serverService.GetServerHealthAsync();
 
             // Return appropriate HTTP status based on health
             return health.Status switch {
@@ -57,18 +51,18 @@ public class ServerController : ControllerBase {
                 _ => Ok(health)
             };
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error performing health check");
+            logger.LogError(ex, "Error performing health check");
             return StatusCode(500, new ServerHealthResponse {
                 Status = "Critical",
                 Message = "Health check failed due to internal error",
-                Checks = new List<HealthCheck> {
+                Checks = [
                     new() {
                         Name = "System",
                         Status = "Critical",
                         Message = "Health check failed",
                         ResponseTimeMs = 0
                     }
-                }
+                ]
             });
         }
     }
@@ -79,10 +73,10 @@ public class ServerController : ControllerBase {
     [HttpGet("metrics")]
     public async Task<ActionResult<ServerMetricsResponse>> GetServerMetrics() {
         try {
-            var metrics = await _serverService.GetServerMetricsAsync();
+            var metrics = await serverService.GetServerMetricsAsync();
             return Ok(metrics);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving server metrics");
+            logger.LogError(ex, "Error retrieving server metrics");
             return StatusCode(500, new { error = "Failed to retrieve server metrics" });
         }
     }
@@ -104,10 +98,10 @@ public class ServerController : ControllerBase {
                 take = 100;
             }
 
-            var logs = await _serverService.GetServerLogsAsync(skip, take, level);
+            var logs = await serverService.GetServerLogsAsync(skip, take, level);
             return Ok(logs);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving server logs");
+            logger.LogError(ex, "Error retrieving server logs");
             return StatusCode(500, new { error = "Failed to retrieve server logs" });
         }
     }
@@ -118,10 +112,10 @@ public class ServerController : ControllerBase {
     [HttpGet("settings")]
     public async Task<ActionResult<ServerSettingsResponse>> GetServerSettings() {
         try {
-            var settings = await _serverService.GetServerSettingsAsync();
+            var settings = await serverService.GetServerSettingsAsync();
             return Ok(settings);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving server settings");
+            logger.LogError(ex, "Error retrieving server settings");
             return StatusCode(500, new { error = "Failed to retrieve server settings" });
         }
     }
@@ -136,12 +130,12 @@ public class ServerController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            await _serverService.UpdateServerSettingsAsync(request);
+            await serverService.UpdateServerSettingsAsync(request);
 
-            _logger.LogInformation("Server settings updated by admin");
+            logger.LogInformation("Server settings updated by admin");
             return Ok(new { message = "Server settings updated successfully" });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error updating server settings");
+            logger.LogError(ex, "Error updating server settings");
             return StatusCode(500, new { error = "Failed to update server settings" });
         }
     }
@@ -156,12 +150,12 @@ public class ServerController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            var backup = await _serverService.CreateBackupAsync(request);
+            var backup = await serverService.CreateBackupAsync(request);
 
-            _logger.LogInformation("Backup created: {BackupId}", backup.BackupId);
+            logger.LogInformation("Backup created: {BackupId}", backup.BackupId);
             return Ok(backup);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error creating backup");
+            logger.LogError(ex, "Error creating backup");
             return StatusCode(500, new { error = "Failed to create backup" });
         }
     }
@@ -176,12 +170,12 @@ public class ServerController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            var restore = await _serverService.RestoreFromBackupAsync(request);
+            var restore = await serverService.RestoreFromBackupAsync(request);
 
-            _logger.LogInformation("Restore completed from backup: {BackupId}", request.BackupId);
+            logger.LogInformation("Restore completed from backup: {BackupId}", request.BackupId);
             return Ok(restore);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error restoring from backup");
+            logger.LogError(ex, "Error restoring from backup");
             return StatusCode(500, new { error = "Failed to restore from backup" });
         }
     }
@@ -193,12 +187,12 @@ public class ServerController : ControllerBase {
     public async Task<IActionResult> DownloadBackup(string backupId) {
         try {
             // In a real implementation, validate backupId and stream the file
-            _logger.LogInformation("Backup download requested: {BackupId}", backupId);
+            logger.LogInformation("Backup download requested: {BackupId}", backupId);
 
             // For now, return not found since we don't have actual backup files
             return NotFound(new { error = "Backup file not found" });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error downloading backup {BackupId}", backupId);
+            logger.LogError(ex, "Error downloading backup {BackupId}", backupId);
             return StatusCode(500, new { error = "Failed to download backup" });
         }
     }
@@ -214,7 +208,7 @@ public class ServerController : ControllerBase {
 
             return Ok(backups);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error listing backups");
+            logger.LogError(ex, "Error listing backups");
             return StatusCode(500, new { error = "Failed to list backups" });
         }
     }
@@ -226,11 +220,11 @@ public class ServerController : ControllerBase {
     public async Task<IActionResult> DeleteBackup(string backupId) {
         try {
             // In a real implementation, delete the backup file
-            _logger.LogInformation("Backup deletion requested: {BackupId}", backupId);
+            logger.LogInformation("Backup deletion requested: {BackupId}", backupId);
 
             return Ok(new { message = "Backup deleted successfully" });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error deleting backup {BackupId}", backupId);
+            logger.LogError(ex, "Error deleting backup {BackupId}", backupId);
             return StatusCode(500, new { error = "Failed to delete backup" });
         }
     }
@@ -241,7 +235,7 @@ public class ServerController : ControllerBase {
     [HttpPost("restart")]
     public async Task<IActionResult> RestartServer([FromQuery] string service = "") {
         try {
-            _logger.LogWarning("Server restart requested by admin. Service: {Service}", service ?? "all");
+            logger.LogWarning("Server restart requested by admin. Service: {Service}", service ?? "all");
 
             // In a real implementation, restart the specified service or all services
             return Ok(new {
@@ -251,7 +245,7 @@ public class ServerController : ControllerBase {
                 warning = "This operation will temporarily interrupt service"
             });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error restarting server/service");
+            logger.LogError(ex, "Error restarting server/service");
             return StatusCode(500, new { error = "Failed to restart server" });
         }
     }
@@ -266,16 +260,16 @@ public class ServerController : ControllerBase {
                 ServerName = Environment.MachineName,
                 OperatingSystem = Environment.OSVersion.ToString(),
                 Framework = Environment.Version.ToString(),
-                ProcessorCount = Environment.ProcessorCount,
+                Environment.ProcessorCount,
                 WorkingDirectory = Environment.CurrentDirectory,
-                ApplicationVersion = ApplicationVersion,
-                StartTime = System.Diagnostics.Process.GetCurrentProcess().StartTime,
-                Uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime
+                ApplicationVersion,
+                Process.GetCurrentProcess().StartTime,
+                Uptime = DateTime.UtcNow - Process.GetCurrentProcess().StartTime
             };
 
             return Ok(info);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving system information");
+            logger.LogError(ex, "Error retrieving system information");
             return StatusCode(500, new { error = "Failed to retrieve system information" });
         }
     }

@@ -23,10 +23,10 @@ public class ServerStatistics {
 }
 
 public class ServerServices {
-    public ServiceStatus SMTP { get; set; } = new();
-    public ServiceStatus IMAP { get; set; } = new();
-    public ServiceStatus POP3 { get; set; } = new();
-    public ServiceStatus WebAPI { get; set; } = new();
+    public ServiceStatus Smtp { get; set; } = new();
+    public ServiceStatus Imap { get; set; } = new();
+    public ServiceStatus Pop3 { get; set; } = new();
+    public ServiceStatus WebApi { get; set; } = new();
 }
 
 public class ServiceStatus {

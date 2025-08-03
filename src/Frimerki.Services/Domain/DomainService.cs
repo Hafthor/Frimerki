@@ -18,25 +18,14 @@ public interface IDomainService {
     Task<DkimKeyResponse> GenerateDkimKeyAsync(string domainName, GenerateDkimKeyRequest request);
 }
 
-public class DomainService : IDomainService {
-    private readonly EmailDbContext _dbContext;
-    private readonly IDomainRegistryService _domainRegistryService;
-    private readonly IDomainDbContextFactory _domainDbFactory;
-    private readonly ILogger<DomainService> _logger;
-
-    public DomainService(
-        EmailDbContext dbContext,
-        IDomainRegistryService domainRegistryService,
-        IDomainDbContextFactory domainDbFactory,
-        ILogger<DomainService> logger) {
-        _dbContext = dbContext;
-        _domainRegistryService = domainRegistryService;
-        _domainDbFactory = domainDbFactory;
-        _logger = logger;
-    }
-
+public class DomainService(
+    EmailDbContext dbContext,
+    IDomainRegistryService domainRegistryService,
+    IDomainDbContextFactory domainDbFactory,
+    ILogger<DomainService> logger)
+    : IDomainService {
     public async Task<DomainListResponse> GetDomainsAsync(string userRole = "", int userDomainId = 0) {
-        var query = _dbContext.Domains.AsQueryable();
+        var query = dbContext.Domains.AsQueryable();
 
         // Apply role-based filtering
         if (userRole == "DomainAdmin" && userDomainId > 0) {
@@ -86,7 +75,7 @@ public class DomainService : IDomainService {
     }
 
     public async Task<DomainResponse> GetDomainByNameAsync(string domainName) {
-        var domain = await _dbContext.Domains
+        var domain = await dbContext.Domains
             .Include(d => d.CatchAllUser)
             .Include(d => d.DkimKeys)
             .Include(d => d.Users)
@@ -121,7 +110,7 @@ public class DomainService : IDomainService {
 
     public async Task<CreateDomainResponse> CreateDomainAsync(DomainRequest request) {
         // Check if domain already exists in domain registry
-        var existingRegistry = await _domainRegistryService.GetDomainRegistryAsync(request.Name);
+        var existingRegistry = await domainRegistryService.GetDomainRegistryAsync(request.Name);
         if (existingRegistry != null) {
             throw new InvalidOperationException($"Domain '{request.Name}' is already registered in the domain registry");
         }
@@ -138,16 +127,16 @@ public class DomainService : IDomainService {
 
         try {
             // Step 1: Register domain in the domain registry (this creates the domain-specific database)
-            var domainRegistry = await _domainRegistryService.RegisterDomainAsync(
+            var domainRegistry = await domainRegistryService.RegisterDomainAsync(
                 normalizedDomainName,
                 request.DatabaseName,
                 request.CreateDatabase);
-            _logger.LogInformation("Domain '{DomainName}' registered in domain registry with database '{DatabaseName}'",
+            logger.LogInformation("Domain '{DomainName}' registered in domain registry with database '{DatabaseName}'",
                 normalizedDomainName, domainRegistry.DatabaseName);
 
             // Step 2: Create domain settings in the domain-specific database
-            using var domainContext = await _domainDbFactory.CreateDbContextAsync(normalizedDomainName);
-            var domainSettings = new Models.Entities.DomainSettings {
+            await using var domainContext = await domainDbFactory.CreateDbContextAsync(normalizedDomainName);
+            var domainSettings = new DomainSettings {
                 Name = normalizedDomainName,
                 CreatedAt = DateTime.UtcNow
             };
@@ -155,11 +144,11 @@ public class DomainService : IDomainService {
             domainContext.DomainSettings.Add(domainSettings);
             await domainContext.SaveChangesAsync();
 
-            _logger.LogInformation("Domain '{DomainName}' created in domain-specific database with ID {DomainId}",
+            logger.LogInformation("Domain '{DomainName}' created in domain-specific database with ID {DomainId}",
                 domainSettings.Name, domainSettings.Id);
 
-            // Determine if database is dedicated (only used by this domain)
-            var allDomains = await _domainRegistryService.GetAllDomainsAsync();
+            // Determine if the database is dedicated (only used by this domain)
+            var allDomains = await domainRegistryService.GetAllDomainsAsync();
             var isDedicated = allDomains.Count(d => d.DatabaseName == domainRegistry.DatabaseName) == 1;
 
             return new CreateDomainResponse {
@@ -176,13 +165,13 @@ public class DomainService : IDomainService {
                 }
             };
         } catch (Exception ex) {
-            _logger.LogError(ex, "Failed to create domain '{DomainName}'", normalizedDomainName);
+            logger.LogError(ex, "Failed to create domain '{DomainName}'", normalizedDomainName);
             throw;
         }
     }
 
     public async Task<DomainResponse> UpdateDomainAsync(string domainName, DomainUpdateRequest request) {
-        var domain = await _dbContext.Domains
+        var domain = await dbContext.Domains
             .Include(d => d.CatchAllUser)
             .Include(d => d.Users)
             .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
@@ -196,7 +185,7 @@ public class DomainService : IDomainService {
         // Update Name if provided
         if (!string.IsNullOrEmpty(request.Name) && domain.Name != request.Name) {
             // Check if new name already exists
-            var existingDomain = await _dbContext.Domains
+            var existingDomain = await dbContext.Domains
                 .FirstOrDefaultAsync(d => d.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase) && d.Id != domain.Id);
 
             if (existingDomain != null) {
@@ -205,14 +194,14 @@ public class DomainService : IDomainService {
 
             domain.Name = request.Name;
             hasChanges = true;
-            _logger.LogInformation("Domain '{DomainName}' name changed to '{NewName}'", domainName, request.Name);
+            logger.LogInformation("Domain '{DomainName}' name changed to '{NewName}'", domainName, request.Name);
         }
 
         // Update IsActive if provided - this updates the global registry, not domain settings
         if (request.IsActive.HasValue) {
-            await _domainRegistryService.SetDomainActiveAsync(domainName, request.IsActive.Value);
+            await domainRegistryService.SetDomainActiveAsync(domainName, request.IsActive.Value);
             hasChanges = true;
-            _logger.LogInformation("Domain '{DomainName}' IsActive changed to {IsActive}", domainName, request.IsActive.Value);
+            logger.LogInformation("Domain '{DomainName}' IsActive changed to {IsActive}", domainName, request.IsActive.Value);
         }
 
         // Update catch-all user if provided
@@ -226,7 +215,7 @@ public class DomainService : IDomainService {
                     throw new ArgumentException("Catch-all user must belong to this domain");
                 }
 
-                var catchAllUser = await _dbContext.Users
+                var catchAllUser = await dbContext.Users
                     .FirstOrDefaultAsync(u => u.Username.Equals(emailParts[0], StringComparison.OrdinalIgnoreCase) && u.DomainId == domain.Id);
 
                 if (catchAllUser == null) {
@@ -239,15 +228,15 @@ public class DomainService : IDomainService {
         }
 
         if (hasChanges) {
-            await _dbContext.SaveChangesAsync();
-            _logger.LogInformation("Domain '{DomainName}' updated", domainName);
+            await dbContext.SaveChangesAsync();
+            logger.LogInformation("Domain '{DomainName}' updated", domainName);
         }
 
         return await GetDomainByNameAsync(domain.Name);
     }
 
     public async Task DeleteDomainAsync(string domainName) {
-        var domain = await _dbContext.Domains
+        var domain = await dbContext.Domains
             .Include(d => d.Users)
             .Include(d => d.DkimKeys)
             .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
@@ -261,14 +250,14 @@ public class DomainService : IDomainService {
             throw new InvalidOperationException($"Cannot delete domain '{domainName}' because it has {domain.Users.Count} user(s)");
         }
 
-        _dbContext.Domains.Remove(domain);
-        await _dbContext.SaveChangesAsync();
+        dbContext.Domains.Remove(domain);
+        await dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Domain '{DomainName}' deleted", domainName);
+        logger.LogInformation("Domain '{DomainName}' deleted", domainName);
     }
 
     public async Task<DkimKeyResponse> GetDkimKeyAsync(string domainName) {
-        var domain = await _dbContext.Domains
+        var domain = await dbContext.Domains
             .Include(d => d.DkimKeys)
             .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
@@ -293,7 +282,7 @@ public class DomainService : IDomainService {
     }
 
     public async Task<DkimKeyResponse> GenerateDkimKeyAsync(string domainName, GenerateDkimKeyRequest request) {
-        var domain = await _dbContext.Domains
+        var domain = await dbContext.Domains
             .Include(d => d.DkimKeys)
             .FirstOrDefaultAsync(d => d.Name.Equals(domainName, StringComparison.OrdinalIgnoreCase));
 
@@ -327,10 +316,10 @@ public class DomainService : IDomainService {
             CreatedAt = DateTime.UtcNow
         };
 
-        _dbContext.DkimKeys.Add(dkimKey);
-        await _dbContext.SaveChangesAsync();
+        dbContext.DkimKeys.Add(dkimKey);
+        await dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("DKIM key generated for domain '{DomainName}' with selector '{Selector}'", domainName, request.Selector);
+        logger.LogInformation("DKIM key generated for domain '{DomainName}' with selector '{Selector}'", domainName, request.Selector);
 
         var dnsRecord = $"v=DKIM1; k=rsa; p={publicKey}";
 
@@ -347,10 +336,10 @@ public class DomainService : IDomainService {
         // Calculate storage used by all users in the domain
         // This is a simplified calculation - in a real implementation,
         // you'd sum up message sizes and attachment sizes
-        var messageCount = await _dbContext.Users
+        var messageCount = await dbContext.Users
             .Where(u => u.DomainId == domainId)
-            .Join(_dbContext.UserMessages, u => u.Id, um => um.UserId, (u, um) => um)
-            .Join(_dbContext.Messages, um => um.MessageId, m => m.Id, (um, m) => m.MessageSize)
+            .Join(dbContext.UserMessages, u => u.Id, um => um.UserId, (u, um) => um)
+            .Join(dbContext.Messages, um => um.MessageId, m => m.Id, (um, m) => m.MessageSize)
             .SumAsync();
 
         return messageCount;
@@ -383,7 +372,7 @@ public class DomainService : IDomainService {
     }
 
     private async Task<bool> GetDomainIsActiveAsync(string domainName) {
-        var domainRegistry = await _domainRegistryService.GetDomainRegistryAsync(domainName);
+        var domainRegistry = await domainRegistryService.GetDomainRegistryAsync(domainName);
         return domainRegistry?.IsActive ?? false;
     }
 }

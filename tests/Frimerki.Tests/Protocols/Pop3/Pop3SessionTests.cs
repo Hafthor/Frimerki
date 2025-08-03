@@ -18,15 +18,9 @@ file static class ExtensionMethods {
 
 [Collection("Pop3Tests")]
 public class Pop3SessionTests {
-    private readonly Mock<ISessionService> _mockSessionService;
-    private readonly Mock<IMessageService> _mockMessageService;
-    private readonly Mock<ILogger<Pop3Session>> _mockLogger;
-
-    public Pop3SessionTests() {
-        _mockSessionService = new Mock<ISessionService>();
-        _mockMessageService = new Mock<IMessageService>();
-        _mockLogger = new Mock<ILogger<Pop3Session>>();
-    }
+    private readonly Mock<ISessionService> _mockSessionService = new();
+    private readonly Mock<IMessageService> _mockMessageService = new();
+    private readonly Mock<ILogger<Pop3Session>> _mockLogger = new();
 
     private async Task<(StreamReader reader, StreamWriter writer, Task handleTask, IDisposable cleanup)> SetupSessionAsync() {
         // Create fresh TCP connections for each test
@@ -48,21 +42,19 @@ public class Pop3SessionTests {
 
         // Return cleanup delegate
         var cleanup = new DisposableAction(() => {
-            reader?.Dispose();
-            writer?.Dispose();
-            stream?.Dispose();
-            client?.Dispose();
-            serverClient?.Dispose();
-            listener?.Stop();
+            reader.Dispose();
+            writer.Dispose();
+            stream.Dispose();
+            client.Dispose();
+            serverClient.Dispose();
+            listener.Stop();
         });
 
         return (reader, writer, handleTask, cleanup);
     }
 
-    private class DisposableAction : IDisposable {
-        private readonly Action _action;
-        public DisposableAction(Action action) => _action = action;
-        public void Dispose() => _action();
+    private class DisposableAction(Action action) : IDisposable {
+        public void Dispose() => action();
     }
 
     [Fact]
@@ -95,7 +87,7 @@ public class Pop3SessionTests {
 
             // Read multi-line CAPA response
             var responses = new List<string>();
-            string? response;
+            string response;
             do {
                 response = await reader.ReadLineAsync();
                 if (response != null) {
@@ -195,7 +187,7 @@ public class Pop3SessionTests {
     public async Task HandlePassCommand_WithInvalidCredentials_ReturnsFailure() {
         // Arrange
         _mockSessionService.Setup(x => x.LoginAsync(It.IsAny<LoginRequest>()))
-                          .ReturnsAsync((LoginResponse?)null);
+                          .ReturnsAsync((LoginResponse)null);
 
         // Act
         var (reader, writer, handleTask, cleanup) = await SetupSessionAsync();

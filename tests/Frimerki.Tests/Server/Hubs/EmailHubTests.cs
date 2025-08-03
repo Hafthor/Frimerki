@@ -1,4 +1,5 @@
 using Frimerki.Server;
+using Frimerki.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Moq;
 

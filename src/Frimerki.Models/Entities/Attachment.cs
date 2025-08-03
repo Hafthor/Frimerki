@@ -29,5 +29,5 @@ public class Attachment {
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public Message Message { get; set; } = null!;
+    public Message Message { get; set; }
 }

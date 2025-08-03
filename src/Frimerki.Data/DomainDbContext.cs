@@ -6,12 +6,9 @@ namespace Frimerki.Data;
 /// <summary>
 /// Domain-specific database context for a single domain's data
 /// </summary>
-public class DomainDbContext : DbContext {
-    public string DomainName { get; }
-
-    public DomainDbContext(DbContextOptions<DomainDbContext> options, string domainName) : base(options) {
-        DomainName = domainName;
-    }
+public class DomainDbContext(DbContextOptions<DomainDbContext> options, string domainName)
+    : DbContext(options) {
+    public string DomainName { get; } = domainName;
 
     public DbSet<User> Users { get; set; }
     public DbSet<DomainSettings> DomainSettings { get; set; }

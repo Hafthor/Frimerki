@@ -6,7 +6,7 @@ namespace Frimerki.Protocols.Imap;
 /// Parses IMAP commands according to RFC 3501 syntax
 /// </summary>
 public static class ImapCommandParser {
-    public static ImapCommand? ParseCommand(string commandLine) {
+    public static ImapCommand ParseCommand(string commandLine) {
         if (string.IsNullOrWhiteSpace(commandLine)) {
             return null;
         }

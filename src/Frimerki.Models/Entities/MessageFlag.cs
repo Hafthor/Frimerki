@@ -18,6 +18,6 @@ public class MessageFlag {
     public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public Message Message { get; set; } = null!;
-    public User User { get; set; } = null!;
+    public Message Message { get; set; }
+    public User User { get; set; }
 }

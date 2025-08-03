@@ -32,9 +32,7 @@ public class DomainServiceTests : IDisposable {
             _logger);
     }
 
-    public void Dispose() {
-        _context.Dispose();
-    }
+    public void Dispose() => _context.Dispose();
 
     [Fact]
     public async Task GetDomainsAsync_WithNoRoleFilter_ReturnsAllDomains() {
@@ -820,9 +818,9 @@ public class DomainServiceTests : IDisposable {
 public class MockDomainRegistryService : IDomainRegistryService {
     public List<string> ExistingDomains { get; } = [];
     public List<DomainRegistry> RegisteredDomains { get; } = [];
-    public bool ShouldThrowOnRegister { get; set; } = false;
+    public bool ShouldThrowOnRegister { get; set; }
 
-    public Task<DomainRegistry> RegisterDomainAsync(string domainName, string? databaseName = null, bool createDatabase = false) {
+    public async Task<DomainRegistry> RegisterDomainAsync(string domainName, string databaseName = null, bool createDatabase = false) {
         if (ShouldThrowOnRegister) {
             throw new InvalidOperationException("Simulated registry error");
         }
@@ -840,25 +838,24 @@ public class MockDomainRegistryService : IDomainRegistryService {
         };
 
         RegisteredDomains.Add(registry);
-        return Task.FromResult(registry);
+        return registry;
     }
 
-    public Task<DomainRegistry?> GetDomainRegistryAsync(string domainName) {
-        return Task.FromResult(ExistingDomains.Contains(domainName)
+    public async Task<DomainRegistry> GetDomainRegistryAsync(string domainName) {
+        return ExistingDomains.Contains(domainName)
             ? new DomainRegistry { Name = domainName, IsActive = true }
-            : null);
+            : null;
     }
 
     public async Task<List<DomainRegistry>> GetAllDomainsAsync() => RegisteredDomains;
 
     public async Task<bool> DomainExistsAsync(string domainName) => true; // For testing, assume domain validation passes
 
-    public Task SetDomainActiveAsync(string domainName, bool isActive) {
+    public async Task SetDomainActiveAsync(string domainName, bool isActive) {
         var domain = RegisteredDomains.FirstOrDefault(d => d.Name == domainName);
         if (domain != null) {
             domain.IsActive = isActive;
         }
-        return Task.CompletedTask;
     }
 
     public async Task<bool> DatabaseExistsAsync(string databaseName) => false;

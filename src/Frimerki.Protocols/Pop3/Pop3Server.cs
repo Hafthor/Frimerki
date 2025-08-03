@@ -13,7 +13,7 @@ public class Pop3Server : BackgroundService {
     private readonly ILogger<Pop3Server> _logger;
     private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
-    private TcpListener? _listener;
+    private TcpListener _listener;
     private readonly int _port;
 
     public Pop3Server(
@@ -31,7 +31,7 @@ public class Pop3Server : BackgroundService {
     /// </summary>
     public Pop3Server(ILogger<Pop3Server> logger, IServiceProvider serviceProvider, int port) {
         _logger = logger;
-        _configuration = null!;
+        _configuration = null;
         _serviceProvider = serviceProvider;
         _port = port;
     }

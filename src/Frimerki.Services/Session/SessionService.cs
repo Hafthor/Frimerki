@@ -1,61 +1,45 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
-
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Services.Authentication;
 using Frimerki.Services.Common;
 using Frimerki.Services.User;
-
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Services.Session;
 
 public interface ISessionService {
-    Task<LoginResponse?> LoginAsync(LoginRequest request);
+    Task<LoginResponse> LoginAsync(LoginRequest request);
     Task<bool> LogoutAsync(string userId);
     Task<SessionResponse> GetCurrentSessionAsync(ClaimsPrincipal user);
-    Task<LoginResponse?> RefreshTokenAsync(string refreshToken);
+    Task<LoginResponse> RefreshTokenAsync(string refreshToken);
     Task<bool> RevokeRefreshTokenAsync(string refreshToken);
 }
 
-public class SessionService : ISessionService {
-    private readonly EmailDbContext _context;
-    private readonly IUserService _userService;
-    private readonly IJwtService _jwtService;
-    private readonly INowProvider _nowProvider;
-    private readonly ILogger<SessionService> _logger;
-
+public class SessionService(
+    EmailDbContext context,
+    IUserService userService,
+    IJwtService jwtService,
+    INowProvider nowProvider,
+    ILogger<SessionService> logger)
+    : ISessionService {
     // In-memory storage for refresh tokens (in production, use Redis or database)
-    private static readonly ConcurrentDictionary<string, RefreshTokenInfo> _refreshTokens = new();
+    private static readonly ConcurrentDictionary<string, RefreshTokenInfo> RefreshTokens = new();
 
-    public SessionService(
-        EmailDbContext context,
-        IUserService userService,
-        IJwtService jwtService,
-        INowProvider nowProvider,
-        ILogger<SessionService> logger) {
-        _context = context;
-        _userService = userService;
-        _jwtService = jwtService;
-        _nowProvider = nowProvider;
-        _logger = logger;
-    }
-
-    public async Task<LoginResponse?> LoginAsync(LoginRequest request) {
-        _logger.LogInformation("Login attempt for user: {Email}", request.Email);
+    public async Task<LoginResponse> LoginAsync(LoginRequest request) {
+        logger.LogInformation("Login attempt for user: {Email}", request.Email);
 
         try {
             // Authenticate user
-            var user = await _userService.AuthenticateUserEntityAsync(request.Email, request.Password);
+            var user = await userService.AuthenticateUserEntityAsync(request.Email, request.Password);
             if (user == null) {
-                _logger.LogWarning("Login failed for user: {Email} - Invalid credentials", request.Email);
+                logger.LogWarning("Login failed for user: {Email} - Invalid credentials", request.Email);
                 return null;
             }
 
             if (!user.CanLogin) {
-                _logger.LogWarning("Login failed for user: {Email} - Account disabled", request.Email);
+                logger.LogWarning("Login failed for user: {Email} - Account disabled", request.Email);
                 return null;
             }
 
@@ -74,20 +58,20 @@ public class SessionService : ISessionService {
             };
 
             // Generate tokens
-            var accessToken = _jwtService.GenerateAccessToken(sessionInfo);
-            var refreshToken = _jwtService.GenerateRefreshToken();
-            var expiresAt = _jwtService.GetTokenExpiration(request.RememberMe);
+            var accessToken = jwtService.GenerateAccessToken(sessionInfo);
+            var refreshToken = jwtService.GenerateRefreshToken();
+            var expiresAt = jwtService.GetTokenExpiration(request.RememberMe);
 
             // Store refresh token
-            var now = _nowProvider.UtcNow;
-            _refreshTokens[refreshToken] = new RefreshTokenInfo {
-                UserId = user.Id,
-                Email = $"{user.Username}@{user.Domain.Name}",
-                CreatedAt = now,
-                ExpiresAt = now.AddDays(30) // Refresh tokens expire in 30 days
-            };
+            var now = nowProvider.UtcNow;
+            RefreshTokens[refreshToken] = new RefreshTokenInfo(
+                UserId: user.Id,
+                Email: $"{user.Username}@{user.Domain.Name}",
+                CreatedAt: now,
+                ExpiresAt: now.AddDays(30) // Refresh tokens expire in 30 days
+            );
 
-            _logger.LogInformation("Login successful for user: {Email}", request.Email);
+            logger.LogInformation("Login successful for user: {Email}", request.Email);
 
             return new LoginResponse {
                 Token = accessToken,
@@ -96,29 +80,29 @@ public class SessionService : ISessionService {
                 RefreshToken = refreshToken
             };
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during login for user: {Email}", request.Email);
+            logger.LogError(ex, "Error during login for user: {Email}", request.Email);
             return null;
         }
     }
 
     public async Task<bool> LogoutAsync(string userId) {
-        _logger.LogInformation("Logout request for user ID: {UserId}", userId);
+        logger.LogInformation("Logout request for user ID: {UserId}", userId);
 
         try {
             // Remove all refresh tokens for this user
-            var tokensToRemove = _refreshTokens
+            var tokensToRemove = RefreshTokens
                 .Where(kvp => kvp.Value.UserId.ToString() == userId)
                 .Select(kvp => kvp.Key)
                 .ToList();
 
             foreach (var token in tokensToRemove) {
-                _refreshTokens.TryRemove(token, out _);
+                RefreshTokens.TryRemove(token, out _);
             }
 
-            _logger.LogInformation("Logout successful for user ID: {UserId}", userId);
+            logger.LogInformation("Logout successful for user ID: {UserId}", userId);
             return true;
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during logout for user ID: {UserId}", userId);
+            logger.LogError(ex, "Error during logout for user ID: {UserId}", userId);
             return false;
         }
     }
@@ -135,7 +119,7 @@ public class SessionService : ISessionService {
             }
 
             // Get updated user information
-            var userInfo = await _userService.GetUserEntityByEmailAsync(email);
+            var userInfo = await userService.GetUserEntityByEmailAsync(email);
             if (userInfo == null) {
                 return new SessionResponse { IsAuthenticated = false };
             }
@@ -154,8 +138,8 @@ public class SessionService : ISessionService {
             };
 
             // Generate a fresh token (auto-refresh functionality)
-            var newToken = _jwtService.GenerateAccessToken(sessionInfo);
-            var expiresAt = _jwtService.GetTokenExpiration();
+            var newToken = jwtService.GenerateAccessToken(sessionInfo);
+            var expiresAt = jwtService.GetTokenExpiration();
 
             return new SessionResponse {
                 IsAuthenticated = true,
@@ -164,31 +148,31 @@ public class SessionService : ISessionService {
                 Token = newToken
             };
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting current session");
+            logger.LogError(ex, "Error getting current session");
             return new SessionResponse { IsAuthenticated = false };
         }
     }
 
-    public async Task<LoginResponse?> RefreshTokenAsync(string refreshToken) {
-        _logger.LogInformation("Refresh token request");
+    public async Task<LoginResponse> RefreshTokenAsync(string refreshToken) {
+        logger.LogInformation("Refresh token request");
 
         try {
-            if (!_refreshTokens.TryGetValue(refreshToken, out var tokenInfo)) {
-                _logger.LogWarning("Invalid refresh token provided");
+            if (!RefreshTokens.TryGetValue(refreshToken, out var tokenInfo)) {
+                logger.LogWarning("Invalid refresh token provided");
                 return null;
             }
 
-            if (tokenInfo.ExpiresAt < _nowProvider.UtcNow) {
-                _logger.LogWarning("Refresh token expired");
-                _refreshTokens.TryRemove(refreshToken, out _);
+            if (tokenInfo.ExpiresAt < nowProvider.UtcNow) {
+                logger.LogWarning("Refresh token expired");
+                RefreshTokens.TryRemove(refreshToken, out _);
                 return null;
             }
 
             // Get current user information
-            var user = await _userService.GetUserEntityByEmailAsync(tokenInfo.Email);
+            var user = await userService.GetUserEntityByEmailAsync(tokenInfo.Email);
             if (user == null || !user.CanLogin) {
-                _logger.LogWarning("User not found or disabled during token refresh: {Email}", tokenInfo.Email);
-                _refreshTokens.TryRemove(refreshToken, out _);
+                logger.LogWarning("User not found or disabled during token refresh: {Email}", tokenInfo.Email);
+                RefreshTokens.TryRemove(refreshToken, out _);
                 return null;
             }
 
@@ -207,21 +191,21 @@ public class SessionService : ISessionService {
             };
 
             // Generate new tokens
-            var accessToken = _jwtService.GenerateAccessToken(sessionInfo);
-            var newRefreshToken = _jwtService.GenerateRefreshToken();
-            var expiresAt = _jwtService.GetTokenExpiration();
+            var accessToken = jwtService.GenerateAccessToken(sessionInfo);
+            var newRefreshToken = jwtService.GenerateRefreshToken();
+            var expiresAt = jwtService.GetTokenExpiration();
 
             // Replace old refresh token with new one
-            _refreshTokens.TryRemove(refreshToken, out _);
-            var now = _nowProvider.UtcNow;
-            _refreshTokens[newRefreshToken] = new RefreshTokenInfo {
-                UserId = user.Id,
-                Email = $"{user.Username}@{user.Domain.Name}",
-                CreatedAt = now,
-                ExpiresAt = now.AddDays(30)
-            };
+            RefreshTokens.TryRemove(refreshToken, out _);
+            var now = nowProvider.UtcNow;
+            RefreshTokens[newRefreshToken] = new RefreshTokenInfo(
+                UserId: user.Id,
+                Email: $"{user.Username}@{user.Domain.Name}",
+                CreatedAt: now,
+                ExpiresAt: now.AddDays(30)
+            );
 
-            _logger.LogInformation("Token refresh successful for user: {Email}", $"{user.Username}@{user.Domain.Name}");
+            logger.LogInformation("Token refresh successful for user: {Email}", $"{user.Username}@{user.Domain.Name}");
 
             return new LoginResponse {
                 Token = accessToken,
@@ -230,28 +214,23 @@ public class SessionService : ISessionService {
                 RefreshToken = newRefreshToken
             };
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during token refresh");
+            logger.LogError(ex, "Error during token refresh");
             return null;
         }
     }
 
     public async Task<bool> RevokeRefreshTokenAsync(string refreshToken) {
-        _logger.LogInformation("Refresh token revocation request");
+        logger.LogInformation("Refresh token revocation request");
 
         try {
-            var removed = _refreshTokens.TryRemove(refreshToken, out _);
-            _logger.LogInformation("Refresh token revocation result: {Removed}", removed);
+            var removed = RefreshTokens.TryRemove(refreshToken, out _);
+            logger.LogInformation("Refresh token revocation result: {Removed}", removed);
             return removed;
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during refresh token revocation");
+            logger.LogError(ex, "Error during refresh token revocation");
             return false;
         }
     }
 
-    private class RefreshTokenInfo {
-        public int UserId { get; set; }
-        public string Email { get; set; } = "";
-        public DateTime CreatedAt { get; set; }
-        public DateTime ExpiresAt { get; set; }
-    }
+    private record RefreshTokenInfo(int UserId, string Email, DateTime CreatedAt, DateTime ExpiresAt);
 }

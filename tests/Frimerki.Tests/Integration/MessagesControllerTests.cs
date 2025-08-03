@@ -1,12 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
-using Frimerki.Server;
-using Frimerki.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,9 +53,7 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
                 });
 
                 // Override the domain DB context factory for testing
-                services.AddSingleton<IDomainDbContextFactory>(provider => {
-                    return new TestDomainDbContextFactory(_domainDatabaseName);
-                });
+                services.AddSingleton<IDomainDbContextFactory>(_ => new TestDomainDbContextFactory(_domainDatabaseName));
             });
         });
 
@@ -97,9 +93,9 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
         };
 
         // Create password hash that matches the service implementation
-        var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         string passwordHash;
-        using (var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes("password123", Convert.FromBase64String(salt), 10000, System.Security.Cryptography.HashAlgorithmName.SHA256)) {
+        using (var pbkdf2 = new Rfc2898DeriveBytes("password123", Convert.FromBase64String(salt), 10000, HashAlgorithmName.SHA256)) {
             var hash = pbkdf2.GetBytes(32);
             passwordHash = Convert.ToBase64String(hash);
         }
@@ -118,7 +114,7 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
             Domain = domain
         };
 
-        var folders = new List<Frimerki.Models.Entities.Folder> {
+        var folders = new List<Folder> {
             new() {
                 Id = 1,
                 UserId = 1,
@@ -151,7 +147,7 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
             }
         };
 
-        var message = new Frimerki.Models.Entities.Message {
+        var message = new Message {
             Id = 1,
             HeaderMessageId = "<test@example.com>",
             FromAddress = "sender@example.com",

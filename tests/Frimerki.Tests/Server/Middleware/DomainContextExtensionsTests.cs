@@ -4,11 +4,7 @@ using Microsoft.AspNetCore.Http;
 namespace Frimerki.Tests.Server.Middleware;
 
 public class DomainContextExtensionsTests {
-    private readonly DefaultHttpContext _httpContext;
-
-    public DomainContextExtensionsTests() {
-        _httpContext = new DefaultHttpContext();
-    }
+    private readonly DefaultHttpContext _httpContext = new();
 
     [Fact]
     public void GetDomain_WhenNoDomainSet_ReturnsNull() {

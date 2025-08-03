@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Frimerki.Models.DTOs.Folder;
+namespace Frimerki.Models.DTOs;
 
 public class FolderRequest {
     [Required, StringLength(255)]
@@ -15,12 +15,12 @@ public class FolderRequest {
 
 public class FolderUpdateRequest {
     [StringLength(255)]
-    public string? Name { get; set; }
+    public string Name { get; set; }
 
     [StringLength(1)]
-    public string? Delimiter { get; set; }
+    public string Delimiter { get; set; }
 
-    public string? Attributes { get; set; }
+    public string Attributes { get; set; }
     public bool? Subscribed { get; set; }
 }
 

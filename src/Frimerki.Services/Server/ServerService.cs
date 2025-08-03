@@ -20,23 +20,15 @@ public interface IServerService {
     Task<RestoreResponse> RestoreFromBackupAsync(RestoreRequest request);
 }
 
-public class ServerService : IServerService {
-    private readonly EmailDbContext _dbContext;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<ServerService> _logger;
-    private static readonly DateTime _startTime = DateTime.UtcNow;
+public class ServerService(
+    EmailDbContext dbContext,
+    IConfiguration configuration,
+    ILogger<ServerService> logger)
+    : IServerService {
+    private static readonly DateTime StartTime = DateTime.UtcNow;
 
     private static readonly string ApplicationVersion = Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0-alpha";
-
-    public ServerService(
-        EmailDbContext dbContext,
-        IConfiguration configuration,
-        ILogger<ServerService> logger) {
-        _dbContext = dbContext;
-        _configuration = configuration;
-        _logger = logger;
-    }
 
     public async Task<ServerStatusResponse> GetServerStatusAsync() {
         try {
@@ -46,12 +38,12 @@ public class ServerService : IServerService {
             return new ServerStatusResponse {
                 Status = "Running",
                 Version = ApplicationVersion,
-                Uptime = _startTime,
+                Uptime = StartTime,
                 Statistics = statistics,
                 Services = services
             };
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting server status");
+            logger.LogError(ex, "Error getting server status");
             throw;
         }
     }
@@ -117,14 +109,14 @@ public class ServerService : IServerService {
     public async Task<ServerSettingsResponse> GetServerSettingsAsync() {
         // Return current configuration settings (sanitized)
         var settings = new Dictionary<string, object> {
-            ["MaxMessageSize"] = _configuration["Server:MaxMessageSize"] ?? "25MB",
-            ["StorageQuotaPerUser"] = _configuration["Server:StorageQuotaPerUser"] ?? "1GB",
-            ["EnableSMTP"] = bool.Parse(_configuration["Server:EnableSMTP"] ?? "true"),
-            ["EnableIMAP"] = bool.Parse(_configuration["Server:EnableIMAP"] ?? "true"),
-            ["EnablePOP3"] = bool.Parse(_configuration["Server:EnablePOP3"] ?? "true"),
-            ["RequireSSL"] = bool.Parse(_configuration["Security:RequireSSL"] ?? "true"),
-            ["EnableRateLimit"] = bool.Parse(_configuration["Security:EnableRateLimit"] ?? "true"),
-            ["MaxFailedLogins"] = int.Parse(_configuration["Security:MaxFailedLogins"] ?? "5")
+            ["MaxMessageSize"] = configuration["Server:MaxMessageSize"] ?? "25MB",
+            ["StorageQuotaPerUser"] = configuration["Server:StorageQuotaPerUser"] ?? "1GB",
+            ["EnableSMTP"] = bool.Parse(configuration["Server:EnableSMTP"] ?? "true"),
+            ["EnableIMAP"] = bool.Parse(configuration["Server:EnableIMAP"] ?? "true"),
+            ["EnablePOP3"] = bool.Parse(configuration["Server:EnablePOP3"] ?? "true"),
+            ["RequireSSL"] = bool.Parse(configuration["Security:RequireSSL"] ?? "true"),
+            ["EnableRateLimit"] = bool.Parse(configuration["Security:EnableRateLimit"] ?? "true"),
+            ["MaxFailedLogins"] = int.Parse(configuration["Security:MaxFailedLogins"] ?? "5")
         };
 
         await Task.Yield();
@@ -137,11 +129,11 @@ public class ServerService : IServerService {
     public async Task UpdateServerSettingsAsync(ServerSettingsRequest request) {
         // In a real implementation, you would update the configuration
         // This might involve updating appsettings.json or a database table
-        _logger.LogInformation("Server settings update requested");
+        logger.LogInformation("Server settings update requested");
 
-        // For now, just log the request
+        // For now, only log the request
         foreach (var setting in request.Settings) {
-            _logger.LogInformation("Setting {Key} = {Value}", setting.Key, setting.Value);
+            logger.LogInformation("Setting {Key} = {Value}", setting.Key, setting.Value);
         }
 
         await Task.Yield();
@@ -151,7 +143,7 @@ public class ServerService : IServerService {
         var backupId = Guid.NewGuid().ToString();
         var fileName = $"frimerki-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip";
 
-        _logger.LogInformation("Creating backup {BackupId}", backupId);
+        logger.LogInformation("Creating backup {BackupId}", backupId);
 
         // In a real implementation, you would:
         // 1. Create a database backup
@@ -171,7 +163,7 @@ public class ServerService : IServerService {
     }
 
     public async Task<RestoreResponse> RestoreFromBackupAsync(RestoreRequest request) {
-        _logger.LogInformation("Restoring from backup {BackupId}", request.BackupId);
+        logger.LogInformation("Restoring from backup {BackupId}", request.BackupId);
 
         // In a real implementation, you would:
         // 1. Validate the backup file
@@ -190,12 +182,12 @@ public class ServerService : IServerService {
     }
 
     private async Task<ServerStatistics> GetStatisticsAsync() {
-        var totalUsers = await _dbContext.Users.CountAsync();
-        var totalDomains = await _dbContext.Domains.CountAsync();
-        var totalMessages = await _dbContext.Messages.CountAsync();
+        var totalUsers = await dbContext.Users.CountAsync();
+        var totalDomains = await dbContext.Domains.CountAsync();
+        var totalMessages = await dbContext.Messages.CountAsync();
 
         var today = DateTime.UtcNow.Date;
-        var messagesToday = await _dbContext.Messages
+        var messagesToday = await dbContext.Messages
             .Where(m => m.ReceivedAt >= today)
             .CountAsync();
 
@@ -214,33 +206,33 @@ public class ServerService : IServerService {
 
     private ServerServices GetServicesStatus() {
         return new ServerServices {
-            SMTP = new ServiceStatus {
-                IsRunning = bool.Parse(_configuration["Server:EnableSMTP"] ?? "true"),
-                Port = int.Parse(_configuration["SMTP:Port"] ?? "25"),
-                SslEnabled = bool.Parse(_configuration["SMTP:EnableSSL"] ?? "false"),
+            Smtp = new ServiceStatus {
+                IsRunning = bool.Parse(configuration["Server:EnableSMTP"] ?? "true"),
+                Port = int.Parse(configuration["SMTP:Port"] ?? "25"),
+                SslEnabled = bool.Parse(configuration["SMTP:EnableSSL"] ?? "false"),
                 ActiveConnections = 0,
-                LastStarted = _startTime
+                LastStarted = StartTime
             },
-            IMAP = new ServiceStatus {
-                IsRunning = bool.Parse(_configuration["Server:EnableIMAP"] ?? "true"),
-                Port = int.Parse(_configuration["IMAP:Port"] ?? "143"),
-                SslEnabled = bool.Parse(_configuration["IMAP:EnableSSL"] ?? "false"),
+            Imap = new ServiceStatus {
+                IsRunning = bool.Parse(configuration["Server:EnableIMAP"] ?? "true"),
+                Port = int.Parse(configuration["IMAP:Port"] ?? "143"),
+                SslEnabled = bool.Parse(configuration["IMAP:EnableSSL"] ?? "false"),
                 ActiveConnections = 0,
-                LastStarted = _startTime
+                LastStarted = StartTime
             },
-            POP3 = new ServiceStatus {
-                IsRunning = bool.Parse(_configuration["Server:EnablePOP3"] ?? "true"),
-                Port = int.Parse(_configuration["POP3:Port"] ?? "110"),
-                SslEnabled = bool.Parse(_configuration["POP3:EnableSSL"] ?? "false"),
+            Pop3 = new ServiceStatus {
+                IsRunning = bool.Parse(configuration["Server:EnablePOP3"] ?? "true"),
+                Port = int.Parse(configuration["POP3:Port"] ?? "110"),
+                SslEnabled = bool.Parse(configuration["POP3:EnableSSL"] ?? "false"),
                 ActiveConnections = 0,
-                LastStarted = _startTime
+                LastStarted = StartTime
             },
-            WebAPI = new ServiceStatus {
+            WebApi = new ServiceStatus {
                 IsRunning = true,
-                Port = int.Parse(_configuration["Kestrel:Endpoints:Http:Url"]?.Split(':').LastOrDefault() ?? _configuration["ASPNETCORE_URLS"]?.Split(':').LastOrDefault() ?? "5000"),
-                SslEnabled = _configuration["Kestrel:Endpoints:Https"] != null || (_configuration["ASPNETCORE_URLS"]?.Contains("https") ?? false),
+                Port = int.Parse(configuration["Kestrel:Endpoints:Http:Url"]?.Split(':').LastOrDefault() ?? configuration["ASPNETCORE_URLS"]?.Split(':').LastOrDefault() ?? "5000"),
+                SslEnabled = configuration["Kestrel:Endpoints:Https"] != null || (configuration["ASPNETCORE_URLS"]?.Contains("https") ?? false),
                 ActiveConnections = 0,
-                LastStarted = _startTime
+                LastStarted = StartTime
             }
         };
     }
@@ -248,7 +240,7 @@ public class ServerService : IServerService {
     private async Task<HealthCheck> CheckDatabaseHealthAsync() {
         var stopwatch = Stopwatch.StartNew();
         try {
-            await _dbContext.Database.CanConnectAsync();
+            await dbContext.Database.CanConnectAsync();
             stopwatch.Stop();
 
             return new HealthCheck {
@@ -318,11 +310,11 @@ public class ServerService : IServerService {
 
     private List<HealthCheck> CheckServicesHealth() {
         // In a real implementation, check if services are actually running
-        return new List<HealthCheck> {
+        return [
             new() { Name = "SMTP Service", Status = "Healthy", Message = "Service running", ResponseTimeMs = 0 },
             new() { Name = "IMAP Service", Status = "Healthy", Message = "Service running", ResponseTimeMs = 0 },
             new() { Name = "POP3 Service", Status = "Healthy", Message = "Service running", ResponseTimeMs = 0 }
-        };
+        ];
     }
 
     private SystemMetrics GetSystemMetrics() {
@@ -344,7 +336,7 @@ public class ServerService : IServerService {
 
     private async Task<EmailMetrics> GetEmailMetricsAsync() {
         var today = DateTime.UtcNow.Date;
-        var receivedToday = await _dbContext.Messages
+        var receivedToday = await dbContext.Messages
             .Where(m => m.ReceivedAt >= today)
             .CountAsync();
 
@@ -363,7 +355,7 @@ public class ServerService : IServerService {
 
         try {
             // Get the actual database file path from Entity Framework
-            var connectionString = _dbContext.Database.GetConnectionString();
+            var connectionString = dbContext.Database.GetConnectionString();
             if (!string.IsNullOrEmpty(connectionString)) {
                 // Parse SQLite connection string properly
                 var builder = new SqliteConnectionStringBuilder(connectionString);
@@ -374,7 +366,7 @@ public class ServerService : IServerService {
                 }
             }
         } catch (Exception ex) {
-            _logger.LogWarning(ex, "Could not determine database size");
+            logger.LogWarning(ex, "Could not determine database size");
         }
 
         return new DatabaseMetrics {

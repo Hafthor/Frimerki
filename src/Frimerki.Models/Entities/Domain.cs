@@ -14,8 +14,8 @@ public class DomainSettings {
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public User? CatchAllUser { get; set; }
-    public ICollection<User> Users { get; set; } = new List<User>();
-    public ICollection<DkimKey> DkimKeys { get; set; } = new List<DkimKey>();
-    public ICollection<UidValiditySequence> UidValiditySequences { get; set; } = new List<UidValiditySequence>();
+    public User CatchAllUser { get; set; }
+    public ICollection<User> Users { get; set; } = [];
+    public ICollection<DkimKey> DkimKeys { get; set; } = [];
+    public ICollection<UidValiditySequence> UidValiditySequences { get; set; } = [];
 }

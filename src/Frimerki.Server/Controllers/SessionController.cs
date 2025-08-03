@@ -9,17 +9,11 @@ namespace Frimerki.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SessionController : ControllerBase {
-    private readonly ISessionService _sessionService;
-    private readonly IUserService _userService;
-    private readonly ILogger<SessionController> _logger;
-
-    public SessionController(ISessionService sessionService, IUserService userService, ILogger<SessionController> logger) {
-        _sessionService = sessionService;
-        _userService = userService;
-        _logger = logger;
-    }
-
+public class SessionController(
+    ISessionService sessionService,
+    IUserService userService,
+    ILogger<SessionController> logger)
+    : ControllerBase {
     /// <summary>
     /// Create session (login)
     /// </summary>
@@ -30,12 +24,12 @@ public class SessionController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            _logger.LogInformation("Login request for email: {Email}", request.Email);
+            logger.LogInformation("Login request for email: {Email}", request.Email);
 
             // Check if account is locked before attempting authentication
-            var (isLocked, lockoutEnd) = await _userService.GetAccountLockoutStatusAsync(request.Email);
+            var (isLocked, lockoutEnd) = await userService.GetAccountLockoutStatusAsync(request.Email);
             if (isLocked && lockoutEnd.HasValue) {
-                _logger.LogWarning("Login blocked for locked account: {Email}, lockout ends: {LockoutEnd}",
+                logger.LogWarning("Login blocked for locked account: {Email}, lockout ends: {LockoutEnd}",
                     request.Email, lockoutEnd);
                 return Unauthorized(new {
                     error = "Account is temporarily locked due to multiple failed login attempts",
@@ -44,7 +38,7 @@ public class SessionController : ControllerBase {
                 });
             }
 
-            var result = await _sessionService.LoginAsync(request);
+            var result = await sessionService.LoginAsync(request);
             if (result == null) {
                 return Unauthorized(new { error = "Invalid email or password" });
             }
@@ -59,7 +53,7 @@ public class SessionController : ControllerBase {
 
             return Ok(result);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during login for email: {Email}", request.Email);
+            logger.LogError(ex, "Error during login for email: {Email}", request.Email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -76,9 +70,9 @@ public class SessionController : ControllerBase {
                 return BadRequest(new { error = "Invalid user session" });
             }
 
-            _logger.LogInformation("Logout request for user ID: {UserId}", userId);
+            logger.LogInformation("Logout request for user ID: {UserId}", userId);
 
-            var success = await _sessionService.LogoutAsync(userId);
+            var success = await sessionService.LogoutAsync(userId);
 
             // Clear refresh token cookie
             Response.Cookies.Delete("refreshToken");
@@ -88,7 +82,7 @@ public class SessionController : ControllerBase {
                 Success = success
             });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during logout");
+            logger.LogError(ex, "Error during logout");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -100,9 +94,9 @@ public class SessionController : ControllerBase {
     [Authorize]
     public async Task<ActionResult<SessionResponse>> GetSession() {
         try {
-            _logger.LogInformation("Get session request for user: {Email}", User.FindFirst(ClaimTypes.Email)?.Value);
+            logger.LogInformation("Get session request for user: {Email}", User.FindFirst(ClaimTypes.Email)?.Value);
 
-            var session = await _sessionService.GetCurrentSessionAsync(User);
+            var session = await sessionService.GetCurrentSessionAsync(User);
 
             if (!session.IsAuthenticated) {
                 return Unauthorized(new { error = "Session invalid or expired" });
@@ -110,7 +104,7 @@ public class SessionController : ControllerBase {
 
             return Ok(session);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting current session");
+            logger.LogError(ex, "Error getting current session");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -119,7 +113,7 @@ public class SessionController : ControllerBase {
     /// Refresh access token using refresh token
     /// </summary>
     [HttpPost("refresh")]
-    public async Task<ActionResult<LoginResponse>> RefreshToken([FromBody] RefreshTokenRequest? request) {
+    public async Task<ActionResult<LoginResponse>> RefreshToken([FromBody] RefreshTokenRequest request) {
         try {
             var refreshToken = request?.RefreshToken;
 
@@ -132,9 +126,9 @@ public class SessionController : ControllerBase {
                 return BadRequest(new { error = "Refresh token is required" });
             }
 
-            _logger.LogInformation("Token refresh request");
+            logger.LogInformation("Token refresh request");
 
-            var result = await _sessionService.RefreshTokenAsync(refreshToken);
+            var result = await sessionService.RefreshTokenAsync(refreshToken);
             if (result == null) {
                 // Clear invalid refresh token cookie
                 Response.Cookies.Delete("refreshToken");
@@ -151,7 +145,7 @@ public class SessionController : ControllerBase {
 
             return Ok(result);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during token refresh");
+            logger.LogError(ex, "Error during token refresh");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -160,7 +154,7 @@ public class SessionController : ControllerBase {
     /// Revoke refresh token
     /// </summary>
     [HttpPost("revoke")]
-    public async Task<ActionResult> RevokeToken([FromBody] RefreshTokenRequest? request) {
+    public async Task<ActionResult> RevokeToken([FromBody] RefreshTokenRequest request) {
         try {
             var refreshToken = request?.RefreshToken;
 
@@ -173,19 +167,19 @@ public class SessionController : ControllerBase {
                 return BadRequest(new { error = "Refresh token is required" });
             }
 
-            _logger.LogInformation("Token revocation request");
+            logger.LogInformation("Token revocation request");
 
-            var success = await _sessionService.RevokeRefreshTokenAsync(refreshToken);
+            var success = await sessionService.RevokeRefreshTokenAsync(refreshToken);
 
             // Clear refresh token cookie
             Response.Cookies.Delete("refreshToken");
 
             return Ok(new {
                 message = success ? "Token revoked successfully" : "Token revocation completed",
-                success = success
+                success
             });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error during token revocation");
+            logger.LogError(ex, "Error during token revocation");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -201,13 +195,13 @@ public class SessionController : ControllerBase {
             var role = User.FindFirst(ClaimTypes.Role)?.Value;
 
             return Ok(new {
-                isAuthenticated = isAuthenticated,
-                email = email,
-                role = role,
+                isAuthenticated,
+                email,
+                role,
                 timestamp = DateTime.UtcNow
             });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting auth status");
+            logger.LogError(ex, "Error getting auth status");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

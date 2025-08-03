@@ -2,9 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
-using Frimerki.Models.DTOs.Folder;
 using Frimerki.Models.Entities;
-using Frimerki.Services;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -53,9 +51,7 @@ public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
                 });
 
                 // Override the domain DB context factory for testing
-                services.AddSingleton<IDomainDbContextFactory>(provider => {
-                    return new TestDomainDbContextFactory(_domainDatabaseName);
-                });
+                services.AddSingleton<IDomainDbContextFactory>(_ => new TestDomainDbContextFactory(_domainDatabaseName));
             });
         });
 

@@ -14,17 +14,17 @@ namespace Frimerki.Protocols.Smtp;
 public partial class SmtpSession : IDisposable {
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
-    private TcpClient? _client;
-    private NetworkStream? _stream;
-    private StreamReader? _reader;
-    private StreamWriter? _writer;
+    private TcpClient _client;
+    private NetworkStream _stream;
+    private StreamReader _reader;
+    private StreamWriter _writer;
     private readonly IUserService _userService;
     private readonly EmailDeliveryService _emailDeliveryService;
     private readonly ILogger _logger;
 
     private SmtpSessionState _state = SmtpSessionState.Initial;
-    private User? _authenticatedUser;
-    private string? _mailFrom;
+    private User _authenticatedUser;
+    private string _mailFrom;
     private readonly List<string> _rcptTo = [];
     private readonly StringBuilder _messageData = new();
 
@@ -50,7 +50,7 @@ public partial class SmtpSession : IDisposable {
             await SendResponseAsync("220 frimerki.local ESMTP Frimerki Mail Server");
             _state = SmtpSessionState.Connected;
 
-            string? line;
+            string line;
             while (!cancellationToken.IsCancellationRequested &&
                    (line = await _reader.ReadLineAsync(cancellationToken)) != null) {
 
@@ -134,7 +134,7 @@ public partial class SmtpSession : IDisposable {
         });
     }
 
-    private async Task HandleAuthPlainAsync(string? credentials, CancellationToken cancellationToken) {
+    private async Task HandleAuthPlainAsync(string credentials, CancellationToken cancellationToken) {
         if (credentials == null) {
             await SendResponseAsync("334 ");
             credentials = await _reader.ReadLineAsync(cancellationToken);
@@ -261,7 +261,7 @@ public partial class SmtpSession : IDisposable {
         await SendResponseAsync("354 Start mail input; end with <CRLF>.<CRLF>");
         _state = SmtpSessionState.Data;
 
-        string? line;
+        string line;
         while ((line = await _reader.ReadLineAsync(cancellationToken)) != null) {
             if (line == ".") {
                 // End of message

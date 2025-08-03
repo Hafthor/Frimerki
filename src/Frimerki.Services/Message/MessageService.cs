@@ -10,18 +10,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Services.Message;
 
-public class MessageService : IMessageService {
-    private readonly EmailDbContext _context;
-    private readonly INowProvider _nowProvider;
-    private readonly ILogger<MessageService> _logger;
-
+public class MessageService(EmailDbContext context, INowProvider nowProvider, ILogger<MessageService> logger)
+    : IMessageService {
     // Standard IMAP flag names
-    private const string SeenFlag = "\\Seen";
-    private const string AnsweredFlag = "\\Answered";
-    private const string FlaggedFlag = "\\Flagged";
-    private const string DeletedFlag = "\\Deleted";
-    private const string DraftFlag = "\\Draft";
-    private const string RecentFlag = "\\Recent";
+    private const string SeenFlag = @"\Seen";
+    private const string AnsweredFlag = @"\Answered";
+    private const string FlaggedFlag = @"\Flagged";
+    private const string DeletedFlag = @"\Deleted";
+    private const string DraftFlag = @"\Draft";
+    private const string RecentFlag = @"\Recent";
 
     // Standard IMAP flags with their corresponding properties in MessageFlagsRequest
     public static readonly FrozenDictionary<string, Func<MessageFlagsRequest, bool?>> StandardFlags =
@@ -34,20 +31,14 @@ public class MessageService : IMessageService {
             //[RecentFlag] = req => req.Recent, // Not included on purpose?
         }.ToFrozenDictionary();
 
-    public MessageService(EmailDbContext context, INowProvider nowProvider, ILogger<MessageService> logger) {
-        _context = context;
-        _nowProvider = nowProvider;
-        _logger = logger;
-    }
-
     public async Task<PaginatedInfo<MessageListItemResponse>> GetMessagesAsync(int userId, MessageFilterRequest request) {
-        _logger.LogInformation("Getting messages for user {UserId} with filters", userId);
+        logger.LogInformation("Getting messages for user {UserId} with filters", userId);
 
         // Validate take parameter
         var take = Math.Min(request.Take, 100);
 
         // Build base query
-        var query = _context.UserMessages
+        var query = context.UserMessages
             .Where(um => um.UserId == userId)
             .Include(um => um.Message)
             .Include(um => um.Folder)
@@ -125,7 +116,7 @@ public class MessageService : IMessageService {
             .ToListAsync();
 
         // Generate next URL if there are more items
-        string? nextUrl = null;
+        string nextUrl = null;
         if (request.Skip + take < totalCount) {
             nextUrl = BuildNextUrl(request, request.Skip + take);
         }
@@ -139,14 +130,14 @@ public class MessageService : IMessageService {
             AppliedFilters = BuildAppliedFilters(request)
         };
 
-        _logger.LogInformation("Retrieved {Count} messages for user {UserId}", messages.Count, userId);
+        logger.LogInformation("Retrieved {Count} messages for user {UserId}", messages.Count, userId);
         return response;
     }
 
-    public async Task<MessageResponse?> GetMessageAsync(int userId, int messageId) {
-        _logger.LogInformation("Getting message {MessageId} for user {UserId}", messageId, userId);
+    public async Task<MessageResponse> GetMessageAsync(int userId, int messageId) {
+        logger.LogInformation("Getting message {MessageId} for user {UserId}", messageId, userId);
 
-        var userMessage = await _context.UserMessages
+        var userMessage = await context.UserMessages
             .Where(um => um.UserId == userId && um.Message.Id == messageId)
             .Include(um => um.Message)
                 .ThenInclude(m => m.Attachments)
@@ -155,7 +146,7 @@ public class MessageService : IMessageService {
             .FirstOrDefaultAsync();
 
         if (userMessage == null) {
-            _logger.LogWarning("Message {MessageId} not found for user {UserId}", messageId, userId);
+            logger.LogWarning("Message {MessageId} not found for user {UserId}", messageId, userId);
             return null;
         }
 
@@ -195,15 +186,15 @@ public class MessageService : IMessageService {
             Folder = userMessage.Folder.Name
         };
 
-        _logger.LogInformation("Retrieved message {MessageId} for user {UserId}", messageId, userId);
+        logger.LogInformation("Retrieved message {MessageId} for user {UserId}", messageId, userId);
         return response;
     }
 
     public async Task<MessageResponse> CreateMessageAsync(int userId, MessageRequest request) {
-        _logger.LogInformation("Creating message for user {UserId}", userId);
+        logger.LogInformation("Creating message for user {UserId}", userId);
 
         // Get user's SENT folder
-        var sentFolder = await _context.Folders
+        var sentFolder = await context.Folders
             .Where(f => f.UserId == userId && f.SystemFolderType == "SENT")
             .FirstOrDefaultAsync();
 
@@ -213,7 +204,7 @@ public class MessageService : IMessageService {
 
         // Generate unique UIDs
         var uid = await GetNextUidAsync();
-        var messageId = $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>";
+        var messageId = $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>";
 
         // Create the message
         var message = new Frimerki.Models.Entities.Message {
@@ -227,8 +218,8 @@ public class MessageService : IMessageService {
             BodyHtml = request.BodyHtml,
             Headers = BuildHeaders(messageId, request),
             MessageSize = CalculateMessageSize(request),
-            SentDate = _nowProvider.UtcNow,
-            ReceivedAt = _nowProvider.UtcNow,
+            SentDate = nowProvider.UtcNow,
+            ReceivedAt = nowProvider.UtcNow,
             InReplyTo = request.InReplyTo,
             References = request.References,
             Uid = uid,
@@ -237,8 +228,8 @@ public class MessageService : IMessageService {
             BodyStructure = BuildBodyStructureJson(request)
         };
 
-        _context.Messages.Add(message);
-        await _context.SaveChangesAsync();
+        context.Messages.Add(message);
+        await context.SaveChangesAsync();
 
         // Create UserMessage relationship
         var userMessage = new UserMessage {
@@ -246,10 +237,10 @@ public class MessageService : IMessageService {
             MessageId = message.Id,
             FolderId = sentFolder.Id,
             Uid = uid,
-            ReceivedAt = _nowProvider.UtcNow
+            ReceivedAt = nowProvider.UtcNow
         };
 
-        _context.UserMessages.Add(userMessage);
+        context.UserMessages.Add(userMessage);
 
         // Set default flags (mark as seen since user is sending it)
         var seenFlag = new MessageFlag {
@@ -259,31 +250,31 @@ public class MessageService : IMessageService {
             IsSet = true
         };
 
-        _context.MessageFlags.Add(seenFlag);
+        context.MessageFlags.Add(seenFlag);
 
         // Update folder statistics
         sentFolder.Exists += 1;
         sentFolder.UidNext = uid + 1;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("Created message {MessageId} for user {UserId}", message.Id, userId);
+        logger.LogInformation("Created message {MessageId} for user {UserId}", message.Id, userId);
 
         // Return the created message
         return await GetMessageAsync(userId, message.Id) ?? throw new InvalidOperationException("Failed to retrieve created message");
     }
 
-    public async Task<MessageResponse?> UpdateMessageAsync(int userId, int messageId, MessageUpdateRequest request) {
-        _logger.LogInformation("Updating message {MessageId} for user {UserId}", messageId, userId);
+    public async Task<MessageResponse> UpdateMessageAsync(int userId, int messageId, MessageUpdateRequest request) {
+        logger.LogInformation("Updating message {MessageId} for user {UserId}", messageId, userId);
 
-        var userMessage = await _context.UserMessages
+        var userMessage = await context.UserMessages
             .Where(um => um.UserId == userId && um.Message.Id == messageId)
             .Include(um => um.Message)
             .Include(um => um.Folder)
             .FirstOrDefaultAsync();
 
         if (userMessage == null) {
-            _logger.LogWarning("Message {MessageId} not found for user {UserId}", messageId, userId);
+            logger.LogWarning("Message {MessageId} not found for user {UserId}", messageId, userId);
             return null;
         }
 
@@ -298,7 +289,7 @@ public class MessageService : IMessageService {
 
         // Move to different folder if provided
         if (request.FolderId.HasValue && request.FolderId.Value != userMessage.FolderId) {
-            var targetFolder = await _context.Folders
+            var targetFolder = await context.Folders
                 .Where(f => f.UserId == userId && f.Id == request.FolderId.Value)
                 .FirstOrDefaultAsync();
 
@@ -340,33 +331,33 @@ public class MessageService : IMessageService {
         }
 
         if (hasChanges) {
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("Updated message {MessageId} for user {UserId}", messageId, userId);
+            await context.SaveChangesAsync();
+            logger.LogInformation("Updated message {MessageId} for user {UserId}", messageId, userId);
         }
 
         return await GetMessageAsync(userId, messageId);
     }
 
     public async Task<bool> DeleteMessageAsync(int userId, int messageId) {
-        _logger.LogInformation("Deleting message {MessageId} for user {UserId}", messageId, userId);
+        logger.LogInformation("Deleting message {MessageId} for user {UserId}", messageId, userId);
 
-        var userMessage = await _context.UserMessages
+        var userMessage = await context.UserMessages
             .Where(um => um.UserId == userId && um.Message.Id == messageId)
             .Include(um => um.Folder)
             .FirstOrDefaultAsync();
 
         if (userMessage == null) {
-            _logger.LogWarning("Message {MessageId} not found for user {UserId}", messageId, userId);
+            logger.LogWarning("Message {MessageId} not found for user {UserId}", messageId, userId);
             return false;
         }
 
         // Get user's TRASH folder
-        var trashFolder = await _context.Folders
+        var trashFolder = await context.Folders
             .Where(f => f.UserId == userId && f.SystemFolderType == "TRASH")
             .FirstOrDefaultAsync();
 
         if (trashFolder == null) {
-            _logger.LogError("User {UserId} has no TRASH folder", userId);
+            logger.LogError("User {UserId} has no TRASH folder", userId);
             return false;
         }
 
@@ -379,12 +370,12 @@ public class MessageService : IMessageService {
         trashFolder.UidNext += 1;
 
         // Mark as deleted
-        var deletedFlag = await _context.MessageFlags
+        var deletedFlag = await context.MessageFlags
             .Where(mf => mf.MessageId == messageId && mf.UserId == userId && mf.FlagName == DeletedFlag)
             .FirstOrDefaultAsync();
 
         if (deletedFlag == null) {
-            _context.MessageFlags.Add(new MessageFlag {
+            context.MessageFlags.Add(new MessageFlag {
                 MessageId = messageId,
                 UserId = userId,
                 FlagName = DeletedFlag,
@@ -392,18 +383,18 @@ public class MessageService : IMessageService {
             });
         } else {
             deletedFlag.IsSet = true;
-            deletedFlag.ModifiedAt = _nowProvider.UtcNow;
+            deletedFlag.ModifiedAt = nowProvider.UtcNow;
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("Moved message {MessageId} to trash for user {UserId}", messageId, userId);
+        logger.LogInformation("Moved message {MessageId} to trash for user {UserId}", messageId, userId);
         return true;
     }
 
     // Helper methods
     private IQueryable<UserMessage> ApplyFlagFiltering(IQueryable<UserMessage> query, int userId, string flags) {
-        (string? name, bool set) flag = flags.ToLower() switch {
+        (string name, bool set) flag = flags.ToLower() switch {
             "read" or "seen" => (SeenFlag, true),
             "unread" or "unseen" => (SeenFlag, false),
             "flagged" => (FlaggedFlag, true),
@@ -490,7 +481,7 @@ public class MessageService : IMessageService {
         return $"/api/messages?{string.Join("&", query.Select(q => q.Key + "=" + Uri.EscapeDataString(q.Value)))}";
     }
 
-    private string? FormatDateTime(DateTime? dt) {
+    private string FormatDateTime(DateTime? dt) {
         return dt.HasValue ? FormatDateTime(dt.Value) : null;
     }
 
@@ -523,7 +514,7 @@ public class MessageService : IMessageService {
         return filters;
     }
 
-    private static void AddStringFilter(Dictionary<string, object> filters, string key, string? value) {
+    private static void AddStringFilter(Dictionary<string, object> filters, string key, string value) {
         if (!string.IsNullOrEmpty(value)) {
             filters[key] = value;
         }
@@ -535,7 +526,7 @@ public class MessageService : IMessageService {
         }
     }
 
-    private static void AddFilter(Dictionary<string, object> filters, string key, string? value) {
+    private static void AddFilter(Dictionary<string, object> filters, string key, string value) {
         if (value != null) {
             filters[key] = value;
         }
@@ -567,7 +558,7 @@ public class MessageService : IMessageService {
         // Handle custom flags
         if (flagsRequest.CustomFlags != null) {
             // Remove existing custom flags not in the new list
-            var existingCustomFlags = await _context.MessageFlags
+            var existingCustomFlags = await context.MessageFlags
                 .Where(mf => mf.MessageId == messageId && mf.UserId == userId &&
                            !mf.FlagName.StartsWith("\\"))
                 .ToListAsync();
@@ -575,7 +566,7 @@ public class MessageService : IMessageService {
             foreach (var flag in existingCustomFlags) {
                 if (!flagsRequest.CustomFlags.Contains(flag.FlagName)) {
                     flag.IsSet = false;
-                    flag.ModifiedAt = _nowProvider.UtcNow;
+                    flag.ModifiedAt = nowProvider.UtcNow;
                 }
             }
 
@@ -587,12 +578,12 @@ public class MessageService : IMessageService {
     }
 
     private async Task SetMessageFlagAsync(int userId, int messageId, string flagName, bool isSet) {
-        var flag = await _context.MessageFlags
+        var flag = await context.MessageFlags
             .Where(mf => mf.MessageId == messageId && mf.UserId == userId && mf.FlagName == flagName)
             .FirstOrDefaultAsync();
 
         if (flag == null) {
-            _context.MessageFlags.Add(new MessageFlag {
+            context.MessageFlags.Add(new MessageFlag {
                 MessageId = messageId,
                 UserId = userId,
                 FlagName = flagName,
@@ -600,18 +591,18 @@ public class MessageService : IMessageService {
             });
         } else {
             flag.IsSet = isSet;
-            flag.ModifiedAt = _nowProvider.UtcNow;
+            flag.ModifiedAt = nowProvider.UtcNow;
         }
     }
 
     private bool IsDraftMessage(int userId, int messageId) {
-        return _context.MessageFlags
+        return context.MessageFlags
             .Any(mf => mf.MessageId == messageId && mf.UserId == userId &&
                       mf.FlagName == DraftFlag && mf.IsSet);
     }
 
     private async Task<string> GetUserEmailAsync(int userId) {
-        var user = await _context.Users
+        var user = await context.Users
             .Include(u => u.Domain)
             .Where(u => u.Id == userId)
             .FirstOrDefaultAsync();
@@ -620,7 +611,7 @@ public class MessageService : IMessageService {
     }
 
     private async Task<int> GetNextUidAsync() {
-        var lastMessage = await _context.Messages
+        var lastMessage = await context.Messages
             .OrderByDescending(m => m.Uid)
             .FirstOrDefaultAsync();
 
@@ -628,17 +619,17 @@ public class MessageService : IMessageService {
     }
 
     private string FormatMessageSize(int bytes) {
-        string[] sizes = { "B", "KB", "MB", "GB" };
+        string[] sizes = ["B", "KB", "MB", "GB"];
         double len = bytes;
         int order = 0;
         while (len >= 1024 && order < sizes.Length - 1) {
             order++;
-            len = len / 1024;
+            len /= 1024;
         }
         return $"{len:0.##} {sizes[order]}";
     }
 
-    private MessageEnvelopeResponse ParseEnvelope(string? envelopeJson) {
+    private MessageEnvelopeResponse ParseEnvelope(string envelopeJson) {
         if (string.IsNullOrEmpty(envelopeJson)) {
             return new MessageEnvelopeResponse();
         }
@@ -650,7 +641,7 @@ public class MessageService : IMessageService {
         }
     }
 
-    private MessageBodyStructureResponse ParseBodyStructure(string? bodyStructureJson) {
+    private MessageBodyStructureResponse ParseBodyStructure(string bodyStructureJson) {
         if (string.IsNullOrEmpty(bodyStructureJson)) {
             return new MessageBodyStructureResponse { Type = "text", Subtype = "plain" };
         }
@@ -666,7 +657,7 @@ public class MessageService : IMessageService {
     private string BuildHeaders(string messageId, MessageRequest request) {
         var headers = new List<string> {
             $"Message-ID: {messageId}",
-            $"Date: {_nowProvider.UtcNow:r}",
+            $"Date: {nowProvider.UtcNow:r}",
             $"From: {request.ToAddress}",
             $"To: {request.ToAddress}",
             $"Subject: {request.Subject}"
@@ -708,12 +699,12 @@ public class MessageService : IMessageService {
 
     private string BuildEnvelopeJson(MessageRequest request, string fromEmail) {
         var envelope = new MessageEnvelopeResponse {
-            Date = _nowProvider.UtcNow.ToString("r"),
+            Date = nowProvider.UtcNow.ToString("r"),
             Subject = request.Subject,
-            From = new List<MessageAddressResponse> { new() { Email = fromEmail } },
-            ReplyTo = new List<MessageAddressResponse> { new() { Email = fromEmail } },
-            To = new List<MessageAddressResponse> { new() { Email = request.ToAddress } },
-            MessageId = $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>"
+            From = [new() { Email = fromEmail }],
+            ReplyTo = [new() { Email = fromEmail }],
+            To = [new() { Email = request.ToAddress }],
+            MessageId = $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>"
         };
 
         if (!string.IsNullOrEmpty(request.CcAddress)) {

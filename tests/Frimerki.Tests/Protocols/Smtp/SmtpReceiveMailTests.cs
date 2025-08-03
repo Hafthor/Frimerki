@@ -4,8 +4,6 @@ using Frimerki.Data;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Smtp;
 using Frimerki.Services;
-using Frimerki.Services.Email;
-using Frimerki.Services.User;
 using Frimerki.Tests.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +15,7 @@ namespace Frimerki.Tests.Protocols.Smtp;
 /// <summary>
 /// Integration tests for SMTP email receiving functionality
 /// </summary>
-public class SmtpReceiveMailTests : IAsyncDisposable {
+public sealed class SmtpReceiveMailTests : IAsyncDisposable {
     private readonly ITestOutputHelper _output;
     private readonly IServiceProvider _serviceProvider;
     private readonly EmailDbContext _context;
@@ -125,9 +123,10 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
         using var client = new TcpClient();
         await client.ConnectAsync("localhost", _testPort);
 
-        using var stream = client.GetStream();
+        await using var stream = client.GetStream();
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+        await using var writer = new StreamWriter(stream, Encoding.UTF8);
+        writer.AutoFlush = true;
 
         // Read greeting
         var greeting = await reader.ReadLineAsync();
@@ -141,7 +140,7 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
         Assert.StartsWith("250", ehloResponse);
 
         // Skip additional EHLO responses
-        string? line;
+        string line;
         while ((line = await reader.ReadLineAsync()) != null && line.StartsWith("250-")) {
             // Read remaining EHLO responses
         }
@@ -217,9 +216,10 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
         using var client = new TcpClient();
         await client.ConnectAsync("localhost", _testPort);
 
-        using var stream = client.GetStream();
+        await using var stream = client.GetStream();
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+        await using var writer = new StreamWriter(stream, Encoding.UTF8);
+        writer.AutoFlush = true;
 
         // Read greeting
         await reader.ReadLineAsync();
@@ -229,7 +229,7 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
         await reader.ReadLineAsync();
 
         // Skip additional EHLO responses
-        string? line;
+        string line;
         while ((line = await reader.ReadLineAsync()) != null && line.StartsWith("250-")) {
             // Read remaining EHLO responses
         }
@@ -273,7 +273,7 @@ public class SmtpReceiveMailTests : IAsyncDisposable {
     }
 
     public async ValueTask DisposeAsync() {
-        _cancellationTokenSource.Cancel();
+        await _cancellationTokenSource.CancelAsync();
 
         try {
             await _serverTask.WaitAsync(TimeSpan.FromSeconds(5));

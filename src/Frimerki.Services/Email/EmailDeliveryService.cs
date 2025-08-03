@@ -14,35 +14,23 @@ namespace Frimerki.Services.Email;
 /// <summary>
 /// Service for delivering incoming emails to user mailboxes
 /// </summary>
-public class EmailDeliveryService {
-    private readonly EmailDbContext _context;
-    private readonly IUserService _userService;
-    private readonly INowProvider _nowProvider;
-    private readonly ILogger<EmailDeliveryService> _logger;
-
-    public EmailDeliveryService(
-        EmailDbContext context,
-        IUserService userService,
-        INowProvider nowProvider,
-        ILogger<EmailDeliveryService> logger) {
-        _context = context;
-        _userService = userService;
-        _nowProvider = nowProvider;
-        _logger = logger;
-    }
-
+public class EmailDeliveryService(
+    EmailDbContext context,
+    IUserService userService,
+    INowProvider nowProvider,
+    ILogger<EmailDeliveryService> logger) {
     /// <summary>
     /// Deliver an incoming email to the appropriate recipient(s)
     /// </summary>
     public async Task<bool> DeliverEmailAsync(string fromAddress, List<string> toAddresses, string messageData) {
         try {
-            _logger.LogInformation("Delivering email from {FromAddress} to {ToCount} recipients",
+            logger.LogInformation("Delivering email from {FromAddress} to {ToCount} recipients",
                 fromAddress, toAddresses.Count);
 
             // Parse the message data using MimeKit
             var mimeMessage = await ParseMimeMessageAsync(messageData);
             if (mimeMessage == null) {
-                _logger.LogError("Failed to parse incoming message");
+                logger.LogError("Failed to parse incoming message");
                 return false;
             }
 
@@ -57,15 +45,15 @@ public class EmailDeliveryService {
             var success = deliveryResults.Any(r => r);
 
             if (success) {
-                _logger.LogInformation("Email delivered successfully to {SuccessCount}/{TotalCount} recipients",
+                logger.LogInformation("Email delivered successfully to {SuccessCount}/{TotalCount} recipients",
                     deliveryResults.Count(r => r), deliveryResults.Count);
             } else {
-                _logger.LogWarning("Email delivery failed for all recipients");
+                logger.LogWarning("Email delivery failed for all recipients");
             }
 
             return success;
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error delivering email from {FromAddress}", fromAddress);
+            logger.LogError(ex, "Error delivering email from {FromAddress}", fromAddress);
             return false;
         }
     }
@@ -75,7 +63,7 @@ public class EmailDeliveryService {
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(messageData));
             return await MimeMessage.LoadAsync(stream);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error parsing MIME message");
+            logger.LogError(ex, "Error parsing MIME message");
             return null;
         }
     }
@@ -83,30 +71,30 @@ public class EmailDeliveryService {
     private async Task<bool> DeliverToRecipientAsync(string fromAddress, string toAddress, MimeMessage mimeMessage, string rawMessageData) {
         try {
             // Find the recipient user
-            var user = await _userService.GetUserEntityByEmailAsync(toAddress);
+            var user = await userService.GetUserEntityByEmailAsync(toAddress);
             if (user == null) {
-                _logger.LogWarning("Recipient {ToAddress} not found, message not delivered", toAddress);
+                logger.LogWarning("Recipient {ToAddress} not found, message not delivered", toAddress);
                 return false;
             }
 
             if (!user.CanReceive) {
-                _logger.LogWarning("Recipient {ToAddress} cannot receive mail, message not delivered", toAddress);
+                logger.LogWarning("Recipient {ToAddress} cannot receive mail, message not delivered", toAddress);
                 return false;
             }
 
             // Get user's INBOX folder
-            var inboxFolder = await _context.Folders
+            var inboxFolder = await context.Folders
                 .Where(f => f.UserId == user.Id && f.SystemFolderType == "INBOX")
                 .FirstOrDefaultAsync();
 
             if (inboxFolder == null) {
-                _logger.LogError("INBOX folder not found for user {UserId}", user.Id);
+                logger.LogError("INBOX folder not found for user {UserId}", user.Id);
                 return false;
             }
 
             // Generate unique UID for this folder
             var uid = await GetNextUidAsync(inboxFolder);
-            var messageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>";
+            var messageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>";
 
             // Create the message entity
             var message = new Frimerki.Models.Entities.Message {
@@ -121,7 +109,7 @@ public class EmailDeliveryService {
                 Headers = ExtractHeaders(rawMessageData),
                 MessageSize = rawMessageData.Length,
                 SentDate = mimeMessage.Date.DateTime,
-                ReceivedAt = _nowProvider.UtcNow,
+                ReceivedAt = nowProvider.UtcNow,
                 InReplyTo = mimeMessage.InReplyTo,
                 References = string.Join(" ", mimeMessage.References),
                 Uid = uid,
@@ -130,8 +118,8 @@ public class EmailDeliveryService {
                 BodyStructure = BuildBodyStructureJson(mimeMessage)
             };
 
-            _context.Messages.Add(message);
-            await _context.SaveChangesAsync();
+            context.Messages.Add(message);
+            await context.SaveChangesAsync();
 
             // Create UserMessage relationship for the recipient
             var userMessage = new UserMessage {
@@ -139,10 +127,10 @@ public class EmailDeliveryService {
                 MessageId = message.Id,
                 FolderId = inboxFolder.Id,
                 Uid = uid,
-                ReceivedAt = _nowProvider.UtcNow
+                ReceivedAt = nowProvider.UtcNow
             };
 
-            _context.UserMessages.Add(userMessage);
+            context.UserMessages.Add(userMessage);
 
             // Set default flags for incoming mail (mark as unread/recent)
             var recentFlag = new MessageFlag {
@@ -152,7 +140,7 @@ public class EmailDeliveryService {
                 IsSet = true
             };
 
-            _context.MessageFlags.Add(recentFlag);
+            context.MessageFlags.Add(recentFlag);
 
             // Update folder statistics
             inboxFolder.Exists++;
@@ -160,14 +148,14 @@ public class EmailDeliveryService {
             inboxFolder.Unseen++; // Since we didn't set \Seen flag
             inboxFolder.UidNext = uid + 1;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
-            _logger.LogInformation("Delivered message {MessageId} to user {UserId} in INBOX",
+            logger.LogInformation("Delivered message {MessageId} to user {UserId} in INBOX",
                 message.Id, user.Id);
 
             return true;
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error delivering message to {ToAddress}", toAddress);
+            logger.LogError(ex, "Error delivering message to {ToAddress}", toAddress);
             return false;
         }
     }
@@ -178,7 +166,7 @@ public class EmailDeliveryService {
         folder.UidNext++;
 
         // Save the updated folder to persist the incremented UidNext
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
         return currentUid;
     }
@@ -207,7 +195,7 @@ public class EmailDeliveryService {
             From = [.. mimeMessage.From.Select(addr => new MessageAddressResponse(addr))],
             ReplyTo = [.. mimeMessage.ReplyTo.Select(addr => new MessageAddressResponse(addr))],
             To = [.. mimeMessage.To.Select(addr => new MessageAddressResponse(addr))],
-            MessageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{_nowProvider.UtcNow:yyyyMMddHHmmss}>"
+            MessageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>"
         };
 
         if (mimeMessage.Cc?.Count > 0) {

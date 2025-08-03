@@ -6,10 +6,7 @@ namespace Frimerki.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class HealthController : ControllerBase {
-    private readonly ILogger<HealthController> _logger;
-    private readonly INowProvider _nowProvider;
-
+public class HealthController(ILogger<HealthController> logger, INowProvider nowProvider) : ControllerBase {
     // Assembly information - cached at startup since it cannot change during runtime
     private static readonly string Version;
     private static readonly string ProductName;
@@ -22,22 +19,17 @@ public class HealthController : ControllerBase {
         Description = assembly?.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description ?? "Lightweight Email Server";
     }
 
-    public HealthController(ILogger<HealthController> logger, INowProvider nowProvider) {
-        _logger = logger;
-        _nowProvider = nowProvider;
-    }
-
     [HttpGet]
     public IActionResult GetHealth() {
         var response = new {
             Status = "Healthy",
             Server = "Frimerki Email Server",
-            Version = Version,
-            Timestamp = _nowProvider.UtcNow,
+            Version,
+            Timestamp = nowProvider.UtcNow,
             Framework = ".NET 8"
         };
 
-        _logger.LogInformation("Health check requested");
+        logger.LogInformation("Health check requested");
         return Ok(response);
     }
 
@@ -45,8 +37,8 @@ public class HealthController : ControllerBase {
     public IActionResult GetServerInfo() {
         var response = new {
             Name = ProductName,
-            Description = Description,
-            Version = Version,
+            Description,
+            Version,
             Framework = ".NET 8",
             Database = "SQLite",
             Protocols = new {

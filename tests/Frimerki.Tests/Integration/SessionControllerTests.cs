@@ -4,8 +4,6 @@ using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
-using Frimerki.Server;
-using Frimerki.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,31 +12,19 @@ using Microsoft.Extensions.Hosting;
 namespace Frimerki.Tests.Integration;
 
 // Test implementation of IDomainDbContextFactory for integration tests
-public class TestDomainDbContextFactory : IDomainDbContextFactory {
-    private readonly string _databaseName;
-
-    public TestDomainDbContextFactory(string databaseName) {
-        _databaseName = databaseName;
-    }
-
+public class TestDomainDbContextFactory(string databaseName) : IDomainDbContextFactory {
     public DomainDbContext CreateDbContext(string domainName) {
         var options = new DbContextOptionsBuilder<DomainDbContext>()
-            .UseInMemoryDatabase(_databaseName)
+            .UseInMemoryDatabase(databaseName)
             .Options;
         return new DomainDbContext(options, domainName);
     }
 
-    public Task<DomainDbContext> CreateDbContextAsync(string domainName) {
-        return Task.FromResult(CreateDbContext(domainName));
-    }
+    public async Task<DomainDbContext> CreateDbContextAsync(string domainName) => CreateDbContext(domainName);
 
-    public string GetDatabasePath(string domainName) {
-        return _databaseName;
-    }
+    public string GetDatabasePath(string domainName) => databaseName;
 
-    public Task EnsureDatabaseExistsAsync(string domainName) {
-        return Task.CompletedTask;
-    }
+    public async Task EnsureDatabaseExistsAsync(string domainName) { }
 }
 
 public class SessionControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
@@ -82,9 +68,7 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
                 });
 
                 // Override the domain DB context factory for testing
-                services.AddSingleton<IDomainDbContextFactory>(provider => {
-                    return new TestDomainDbContextFactory(_domainDatabaseName);
-                });
+                services.AddSingleton<IDomainDbContextFactory>(_ => new TestDomainDbContextFactory(_domainDatabaseName));
             });
         });
 

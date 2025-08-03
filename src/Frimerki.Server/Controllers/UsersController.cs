@@ -9,15 +9,7 @@ namespace Frimerki.Server.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-public class UsersController : ControllerBase {
-    private readonly IUserService _userService;
-    private readonly ILogger<UsersController> _logger;
-
-    public UsersController(IUserService userService, ILogger<UsersController> logger) {
-        _userService = userService;
-        _logger = logger;
-    }
-
+public class UsersController(IUserService userService, ILogger<UsersController> logger) : ControllerBase {
     /// <summary>
     /// List all users (HostAdmin) or domain users (DomainAdmin)
     /// </summary>
@@ -34,13 +26,13 @@ public class UsersController : ControllerBase {
                 take = 50;
             }
 
-            _logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
+            logger.LogInformation("Getting users list - Skip: {Skip}, Take: {Take}, Domain: {Domain}",
                 skip, take, domain ?? "All");
 
-            var result = await _userService.GetUsersAsync(skip, take, domain);
+            var result = await userService.GetUsersAsync(skip, take, domain);
             return Ok(result);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting users list");
+            logger.LogError(ex, "Error getting users list");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -55,15 +47,15 @@ public class UsersController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            _logger.LogInformation("Creating user: {Username}@{Domain}", request.Username, request.DomainName);
+            logger.LogInformation("Creating user: {Username}@{Domain}", request.Username, request.DomainName);
 
-            var user = await _userService.CreateUserAsync(request);
+            var user = await userService.CreateUserAsync(request);
             return CreatedAtAction(nameof(GetUser), new { email = $"{request.Username}@{request.DomainName}" }, user);
         } catch (ArgumentException ex) {
-            _logger.LogWarning("User creation failed: {Message}", ex.Message);
+            logger.LogWarning("User creation failed: {Message}", ex.Message);
             return BadRequest(new { error = ex.Message });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error creating user: {Username}@{Domain}", request.Username, request.DomainName);
+            logger.LogError(ex, "Error creating user: {Username}@{Domain}", request.Username, request.DomainName);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -74,9 +66,9 @@ public class UsersController : ControllerBase {
     [HttpGet("{email}")]
     public async Task<ActionResult> GetUser(string email) {
         try {
-            _logger.LogInformation("Getting user details: {Email}", email);
+            logger.LogInformation("Getting user details: {Email}", email);
 
-            var user = await _userService.GetUserByEmailAsync(email);
+            var user = await userService.GetUserByEmailAsync(email);
             if (user == null) {
                 return NotFound();
             }
@@ -100,7 +92,7 @@ public class UsersController : ControllerBase {
             };
             return Ok(minimalResponse);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting user: {Email}", email);
+            logger.LogError(ex, "Error getting user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -115,16 +107,16 @@ public class UsersController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            _logger.LogInformation("Updating user: {Email}", email);
+            logger.LogInformation("Updating user: {Email}", email);
 
-            var user = await _userService.UpdateUserAsync(email, request);
+            var user = await userService.UpdateUserAsync(email, request);
             if (user == null) {
                 return NotFound(new { error = $"User '{email}' not found" });
             }
 
             return Ok(user);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error updating user: {Email}", email);
+            logger.LogError(ex, "Error updating user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -139,16 +131,16 @@ public class UsersController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            _logger.LogInformation("Patching user: {Email}", email);
+            logger.LogInformation("Patching user: {Email}", email);
 
-            var user = await _userService.UpdateUserAsync(email, request);
+            var user = await userService.UpdateUserAsync(email, request);
             if (user == null) {
                 return NotFound(new { error = $"User '{email}' not found" });
             }
 
             return Ok(user);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error patching user: {Email}", email);
+            logger.LogError(ex, "Error patching user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -163,19 +155,19 @@ public class UsersController : ControllerBase {
                 return BadRequest(ModelState);
             }
 
-            _logger.LogInformation("Updating password for user: {Email}", email);
+            logger.LogInformation("Updating password for user: {Email}", email);
 
-            var success = await _userService.UpdateUserPasswordAsync(email, request);
+            var success = await userService.UpdateUserPasswordAsync(email, request);
             if (!success) {
                 return NotFound(new { error = $"User '{email}' not found" });
             }
 
             return Ok(new { message = "Password updated successfully" });
         } catch (UnauthorizedAccessException ex) {
-            _logger.LogWarning("Password update failed for user {Email}: {Message}", email, ex.Message);
+            logger.LogWarning("Password update failed for user {Email}: {Message}", email, ex.Message);
             return BadRequest(new { error = ex.Message });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error updating password for user: {Email}", email);
+            logger.LogError(ex, "Error updating password for user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -186,16 +178,16 @@ public class UsersController : ControllerBase {
     [HttpDelete("{email}")]
     public async Task<ActionResult> DeleteUser(string email) {
         try {
-            _logger.LogInformation("Deleting user: {Email}", email);
+            logger.LogInformation("Deleting user: {Email}", email);
 
-            var success = await _userService.DeleteUserAsync(email);
+            var success = await userService.DeleteUserAsync(email);
             if (!success) {
                 return NotFound(new { error = $"User '{email}' not found" });
             }
 
             return Ok(new { message = $"User '{email}' deleted successfully" });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error deleting user: {Email}", email);
+            logger.LogError(ex, "Error deleting user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
@@ -206,15 +198,15 @@ public class UsersController : ControllerBase {
     [HttpGet("{email}/stats")]
     public async Task<ActionResult<UserStatsResponse>> GetUserStats(string email) {
         try {
-            _logger.LogInformation("Getting stats for user: {Email}", email);
+            logger.LogInformation("Getting stats for user: {Email}", email);
 
-            var stats = await _userService.GetUserStatsAsync(email);
+            var stats = await userService.GetUserStatsAsync(email);
             return Ok(stats);
         } catch (ArgumentException ex) {
-            _logger.LogWarning("Get user stats failed: {Message}", ex.Message);
+            logger.LogWarning("Get user stats failed: {Message}", ex.Message);
             return NotFound(new { error = ex.Message });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error getting stats for user: {Email}", email);
+            logger.LogError(ex, "Error getting stats for user: {Email}", email);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

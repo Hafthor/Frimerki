@@ -17,28 +17,17 @@ public interface IDomainRegistryService {
     Task SetDomainActiveAsync(string domainName, bool isActive);
 }
 
-public class DomainRegistryService : IDomainRegistryService {
-    private readonly GlobalDbContext _globalContext;
-    private readonly IDomainDbContextFactory _domainDbFactory;
-    private readonly INowProvider _nowProvider;
-    private readonly ILogger<DomainRegistryService> _logger;
-
-    public DomainRegistryService(
-        GlobalDbContext globalContext,
-        IDomainDbContextFactory domainDbFactory,
-        INowProvider nowProvider,
-        ILogger<DomainRegistryService> logger) {
-        _globalContext = globalContext;
-        _domainDbFactory = domainDbFactory;
-        _nowProvider = nowProvider;
-        _logger = logger;
-    }
-
+public class DomainRegistryService(
+    GlobalDbContext globalContext,
+    IDomainDbContextFactory domainDbFactory,
+    INowProvider nowProvider,
+    ILogger<DomainRegistryService> logger)
+    : IDomainRegistryService {
     public async Task<DomainRegistry> RegisterDomainAsync(string domainName, string databaseName = "", bool createDatabase = false) {
         var normalizedDomain = domainName.ToLower();
 
         // Check if domain already exists
-        var existing = await _globalContext.DomainRegistry
+        var existing = await globalContext.DomainRegistry
             .FirstOrDefaultAsync(d => d.Name == normalizedDomain);
 
         if (existing != null) {
@@ -51,17 +40,14 @@ public class DomainRegistryService : IDomainRegistryService {
         // Check database existence
         var databaseExists = await DatabaseExistsAsync(targetDatabaseName);
 
-        if (createDatabase && databaseExists) {
-            throw new InvalidOperationException($"Database {targetDatabaseName} already exists");
-        }
-
-        if (!createDatabase && !databaseExists) {
+        if (createDatabase) {
+            if (databaseExists) {
+                throw new InvalidOperationException($"Database {targetDatabaseName} already exists");
+            }
+            // Create database if needed
+            await domainDbFactory.EnsureDatabaseExistsAsync(targetDatabaseName);
+        } else if (!databaseExists) {
             throw new InvalidOperationException($"Database {targetDatabaseName} does not exist");
-        }
-
-        // Create database if needed
-        if (createDatabase || !databaseExists) {
-            await _domainDbFactory.EnsureDatabaseExistsAsync(targetDatabaseName);
         }
 
         // Register in global database
@@ -69,25 +55,25 @@ public class DomainRegistryService : IDomainRegistryService {
             Name = normalizedDomain,
             DatabaseName = targetDatabaseName,
             IsActive = true,
-            CreatedAt = _nowProvider.UtcNow
+            CreatedAt = nowProvider.UtcNow
         };
 
-        _globalContext.DomainRegistry.Add(registry);
-        await _globalContext.SaveChangesAsync();
+        globalContext.DomainRegistry.Add(registry);
+        await globalContext.SaveChangesAsync();
 
-        _logger.LogInformation("Domain {DomainName} registered successfully with database {DatabaseName}",
+        logger.LogInformation("Domain {DomainName} registered successfully with database {DatabaseName}",
             domainName, targetDatabaseName);
         return registry;
     }
 
     public async Task<DomainRegistry> GetDomainRegistryAsync(string domainName) {
         var normalizedDomain = domainName.ToLower();
-        return await _globalContext.DomainRegistry
+        return await globalContext.DomainRegistry
             .FirstOrDefaultAsync(d => d.Name == normalizedDomain);
     }
 
     public async Task<List<DomainRegistry>> GetAllDomainsAsync() {
-        return await _globalContext.DomainRegistry
+        return await globalContext.DomainRegistry
             .Where(d => d.IsActive)
             .OrderBy(d => d.Name)
             .ToListAsync();
@@ -95,27 +81,27 @@ public class DomainRegistryService : IDomainRegistryService {
 
     public async Task<bool> DomainExistsAsync(string domainName) {
         var normalizedDomain = domainName.ToLower();
-        return await _globalContext.DomainRegistry
+        return await globalContext.DomainRegistry
             .AnyAsync(d => d.Name == normalizedDomain && d.IsActive);
     }
 
     public async Task SetDomainActiveAsync(string domainName, bool isActive) {
         var normalizedDomain = domainName.ToLower();
-        var registry = await _globalContext.DomainRegistry
+        var registry = await globalContext.DomainRegistry
             .FirstOrDefaultAsync(d => d.Name == normalizedDomain);
 
         if (registry != null) {
             registry.IsActive = isActive;
 
-            await _globalContext.SaveChangesAsync();
+            await globalContext.SaveChangesAsync();
 
-            _logger.LogInformation("Domain {DomainName} set to {Status}",
+            logger.LogInformation("Domain {DomainName} set to {Status}",
                 domainName, isActive ? "active" : "inactive");
         }
     }
 
     private async Task<bool> DatabaseExistsAsync(string databaseName) {
-        return await _globalContext.DomainRegistry
+        return await globalContext.DomainRegistry
             .AnyAsync(d => d.DatabaseName == databaseName);
     }
 }

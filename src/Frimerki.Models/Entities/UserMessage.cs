@@ -16,7 +16,7 @@ public class UserMessage {
     public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public User User { get; set; } = null!;
-    public Message Message { get; set; } = null!;
-    public Folder Folder { get; set; } = null!;
+    public User User { get; set; }
+    public Message Message { get; set; }
+    public Folder Folder { get; set; }
 }

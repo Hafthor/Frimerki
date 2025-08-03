@@ -22,5 +22,5 @@ public class DkimKey {
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public DomainSettings Domain { get; set; } = null!;
+    public DomainSettings Domain { get; set; }
 }

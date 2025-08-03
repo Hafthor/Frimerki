@@ -1,16 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
-
 using Frimerki.Data;
 using Frimerki.Protocols;
 using Frimerki.Server;
+using Frimerki.Server.Hubs;
 using Frimerki.Server.Middleware;
 using Frimerki.Services;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);

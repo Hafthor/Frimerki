@@ -11,40 +11,32 @@ namespace Frimerki.Protocols.Smtp;
 /// <summary>
 /// SMTP server implementation following RFC 5321
 /// </summary>
-public class SmtpServer : BackgroundService, IDisposable {
-    private readonly ILogger<SmtpServer> _logger;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly int _port;
-    private TcpListener? _listener;
+public class SmtpServer(ILogger<SmtpServer> logger, IServiceProvider serviceProvider, int port = 25)
+    : BackgroundService, IDisposable {
+    private TcpListener _listener;
     private readonly List<Task> _clientTasks = [];
     private readonly object _lock = new();
 
-    public SmtpServer(ILogger<SmtpServer> logger, IServiceProvider serviceProvider, int port = 25) {
-        _logger = logger;
-        _serviceProvider = serviceProvider;
-        _port = port;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
         try {
-            _listener = new TcpListener(IPAddress.Any, _port);
+            _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
-            _logger.LogInformation("SMTP server started on port {Port}", _port);
+            logger.LogInformation("SMTP server started on port {Port}", port);
 
             while (!stoppingToken.IsCancellationRequested) {
                 try {
                     var tcpClient = await _listener.AcceptTcpClientAsync(stoppingToken);
 
                     var clientTask = Task.Run(async () => {
-                        using var scope = _serviceProvider.CreateScope();
+                        using var scope = serviceProvider.CreateScope();
                         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
                         var emailDeliveryService = scope.ServiceProvider.GetRequiredService<EmailDeliveryService>();
-                        var session = new SmtpSession(tcpClient, userService, emailDeliveryService, _logger);
+                        var session = new SmtpSession(tcpClient, userService, emailDeliveryService, logger);
 
                         try {
                             await session.HandleAsync(stoppingToken);
                         } catch (Exception ex) {
-                            _logger.LogError(ex, "Error in SMTP session");
+                            logger.LogError(ex, "Error in SMTP session");
                         }
                     }, stoppingToken);
 
@@ -58,17 +50,17 @@ public class SmtpServer : BackgroundService, IDisposable {
                     // Server is shutting down
                     break;
                 } catch (Exception ex) {
-                    _logger.LogError(ex, "SMTP server error");
+                    logger.LogError(ex, "SMTP server error");
                     await Task.Delay(1000, stoppingToken); // Brief pause before retrying
                 }
             }
         } catch (Exception ex) {
-            _logger.LogError(ex, "SMTP server failed to start");
+            logger.LogError(ex, "SMTP server failed to start");
         }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken) {
-        _logger.LogInformation("Stopping SMTP server...");
+        logger.LogInformation("Stopping SMTP server...");
 
         _listener?.Stop();
 
@@ -82,12 +74,12 @@ public class SmtpServer : BackgroundService, IDisposable {
             try {
                 await Task.WhenAll(tasksToWait).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             } catch (TimeoutException) {
-                _logger.LogWarning("Some SMTP client sessions did not complete within timeout");
+                logger.LogWarning("Some SMTP client sessions did not complete within timeout");
             }
         }
 
         await base.StopAsync(cancellationToken);
-        _logger.LogInformation("SMTP server stopped");
+        logger.LogInformation("SMTP server stopped");
     }
 
     public new void Dispose() {

@@ -1,5 +1,5 @@
 using Frimerki.Data;
-using Frimerki.Models.DTOs.Folder;
+using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Services.Folder;
 using Microsoft.EntityFrameworkCore;

@@ -20,7 +20,7 @@ public class SmtpSessionTests : IDisposable {
     private readonly TcpClient _client;
     private readonly NetworkStream _stream;
     private readonly EmailDbContext _context;
-    private SmtpSession? _session;
+    private SmtpSession _session;
 
     public SmtpSessionTests() {
         _mockUserService = new Mock<IUserService>();
@@ -68,20 +68,21 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting
-        var greeting = await reader.ReadLineAsync();
+        var greeting = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("220 frimerki.local ESMTP Frimerki Mail Server", greeting);
 
         // Send QUIT to end session gracefully
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
 
         await handleTask;
     }
@@ -95,7 +96,8 @@ public class SmtpSessionTests : IDisposable {
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
         using var reader = new StreamReader(_stream, Encoding.UTF8);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
@@ -115,7 +117,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -126,26 +128,27 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send EHLO command
         await writer.WriteLineAsync("EHLO test.example.com");
 
         // Read full EHLO response (multiple lines)
-        var responses = new List<string?>();
-        string? response;
+        var responses = new List<string>();
+        string response;
         do {
-            response = await reader.ReadLineAsync();
+            response = await reader.ReadLineAsync(cts.Token);
             if (response != null) {
                 responses.Add(response);
             }
-        } while (response != null && response.Length > 3 && response[3] == '-');
+        } while (response is { Length: > 3 } && response[3] == '-');
 
         var fullResponse = string.Join("\n", responses);
 
@@ -157,7 +160,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -172,36 +175,37 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send EHLO command
         await writer.WriteLineAsync("EHLO test.example.com");
 
         // Read EHLO response (multiple lines - skip until we get the final line)
-        string? response;
+        string response;
         do {
-            response = await reader.ReadLineAsync();
-        } while (response != null && response.Length > 3 && response[3] == '-');
+            response = await reader.ReadLineAsync(cts.Token);
+        } while (response is { Length: > 3 } && response[3] == '-');
 
         // Send AUTH PLAIN with credentials (format: \0username\0password)
         var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes("\0test@example.com\0password"));
         await writer.WriteLineAsync($"AUTH PLAIN {credentials}");
 
         // Read response
-        response = await reader.ReadLineAsync();
+        response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("235 Authentication successful", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -209,42 +213,43 @@ public class SmtpSessionTests : IDisposable {
     public async Task HandleAuthPlain_WithInvalidCredentials_ReturnsFailure() {
         // Arrange
         _mockUserService.Setup(x => x.AuthenticateUserEntityAsync(It.IsAny<string>(), It.IsAny<string>()))
-                       .ReturnsAsync((User?)null);
+                       .ReturnsAsync((User)null);
 
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send EHLO command
         await writer.WriteLineAsync("EHLO test.example.com");
 
         // Read EHLO response (multiple lines - skip until we get the final line)
-        string? response;
+        string response;
         do {
-            response = await reader.ReadLineAsync();
-        } while (response != null && response.Length > 3 && response[3] == '-');
+            response = await reader.ReadLineAsync(cts.Token);
+        } while (response is { Length: > 3 } && response[3] == '-');
 
         // Send AUTH PLAIN with invalid credentials
         var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes("\0invalid@example.com\0wrongpassword"));
         await writer.WriteLineAsync($"AUTH PLAIN {credentials}");
 
         // Read response
-        response = await reader.ReadLineAsync();
+        response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("535 Authentication failed", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -259,28 +264,29 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send EHLO command
         await writer.WriteLineAsync("EHLO test.example.com");
 
         // Read EHLO response (multiple lines - skip until we get the final line)
-        string? response;
+        string response;
         do {
-            response = await reader.ReadLineAsync();
-        } while (response != null && response.Length > 3 && response[3] == '-');
+            response = await reader.ReadLineAsync(cts.Token);
+        } while (response is { Length: > 3 } && response[3] == '-');
 
         // Send AUTH LOGIN
         await writer.WriteLineAsync("AUTH LOGIN");
 
         // Read "Username:" prompt
-        var prompt = await reader.ReadLineAsync();
+        var prompt = await reader.ReadLineAsync(cts.Token);
         Assert.Contains("334 VXNlcm5hbWU6", prompt); // "Username:" in base64
 
         // Send username (base64 encoded)
@@ -288,7 +294,7 @@ public class SmtpSessionTests : IDisposable {
         await writer.WriteLineAsync(username);
 
         // Read "Password:" prompt
-        prompt = await reader.ReadLineAsync();
+        prompt = await reader.ReadLineAsync(cts.Token);
         Assert.Contains("334 UGFzc3dvcmQ6", prompt); // "Password:" in base64
 
         // Send password (base64 encoded)
@@ -296,14 +302,14 @@ public class SmtpSessionTests : IDisposable {
         await writer.WriteLineAsync(password);
 
         // Read response
-        response = await reader.ReadLineAsync();
+        response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("235 Authentication successful", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -314,35 +320,36 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send EHLO command
         await writer.WriteLineAsync("EHLO test.example.com");
 
         // Read EHLO response (multiple lines - skip until we get the final line)
-        string? response;
+        string response;
         do {
-            response = await reader.ReadLineAsync();
-        } while (response != null && response.Length > 3 && response[3] == '-');
+            response = await reader.ReadLineAsync(cts.Token);
+        } while (response is { Length: > 3 } && response[3] == '-');
 
         // Send MAIL FROM command
         await writer.WriteLineAsync("MAIL FROM:<sender@example.com>");
 
         // Read response
-        response = await reader.ReadLineAsync();
+        response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("250 OK", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -353,39 +360,40 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send EHLO command
         await writer.WriteLineAsync("EHLO test.example.com");
 
         // Read EHLO response (multiple lines - skip until we get the final line)
-        string? response;
+        string response;
         do {
-            response = await reader.ReadLineAsync();
-        } while (response != null && response.Length > 3 && response[3] == '-');
+            response = await reader.ReadLineAsync(cts.Token);
+        } while (response is { Length: > 3 } && response[3] == '-');
 
         // Send MAIL FROM command
         await writer.WriteLineAsync("MAIL FROM:<sender@example.com>");
-        await reader.ReadLineAsync(); // Read MAIL FROM response
+        await reader.ReadLineAsync(cts.Token); // Read MAIL FROM response
 
         // Send RCPT TO command
         await writer.WriteLineAsync("RCPT TO:<recipient@example.com>");
 
         // Read response
-        response = await reader.ReadLineAsync();
+        response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("250 OK", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -396,26 +404,27 @@ public class SmtpSessionTests : IDisposable {
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
 
         // Read greeting and discard
-        await reader.ReadLineAsync();
+        await reader.ReadLineAsync(cts.Token);
 
         // Send unknown command
         await writer.WriteLineAsync("UNKNOWN");
 
         // Read response
-        var response = await reader.ReadLineAsync();
+        var response = await reader.ReadLineAsync(cts.Token);
 
         // Assert
         Assert.Contains("500 Syntax error, command unrecognized", response);
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -428,7 +437,8 @@ public class SmtpSessionTests : IDisposable {
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
         using var reader = new StreamReader(_stream, Encoding.UTF8);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
@@ -448,7 +458,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -461,7 +471,8 @@ public class SmtpSessionTests : IDisposable {
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
         using var reader = new StreamReader(_stream, Encoding.UTF8);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
@@ -481,7 +492,7 @@ public class SmtpSessionTests : IDisposable {
 
         // End session
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
         await handleTask;
     }
 
@@ -494,7 +505,8 @@ public class SmtpSessionTests : IDisposable {
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
         using var reader = new StreamReader(_stream, Encoding.UTF8);
-        using var writer = new StreamWriter(_stream, Encoding.UTF8) { AutoFlush = true };
+        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        writer.AutoFlush = true;
 
         // Act
         var handleTask = _session.HandleAsync(cts.Token);
@@ -520,7 +532,7 @@ public class SmtpSessionTests : IDisposable {
 
         // Send QUIT to end session gracefully
         await writer.WriteLineAsync("QUIT");
-        await writer.FlushAsync();
+        await writer.FlushAsync(cts.Token);
 
         await handleTask;
     }

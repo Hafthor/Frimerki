@@ -23,17 +23,17 @@ public class Folder {
 
     public int UidValidity { get; set; } = 1;
 
-    public int Exists { get; set; } = 0;
+    public int Exists { get; set; }
 
-    public int Recent { get; set; } = 0;
+    public int Recent { get; set; }
 
-    public int Unseen { get; set; } = 0;
+    public int Unseen { get; set; }
 
     public bool Subscribed { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public User User { get; set; } = null!;
-    public ICollection<UserMessage> UserMessages { get; set; } = new List<UserMessage>();
+    public User User { get; set; }
+    public ICollection<UserMessage> UserMessages { get; set; } = [];
 }

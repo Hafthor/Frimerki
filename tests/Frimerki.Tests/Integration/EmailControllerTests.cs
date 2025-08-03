@@ -25,7 +25,7 @@ public class EmailControllerTests {
 
         // Add configuration
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> {
+            .AddInMemoryCollection(new Dictionary<string, string> {
                 ["Smtp:Host"] = "localhost",
                 ["Smtp:Port"] = "587",
                 ["Smtp:Username"] = "test@example.com",

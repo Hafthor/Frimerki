@@ -15,15 +15,7 @@ public interface IJwtService {
     DateTime GetTokenExpiration(bool rememberMe = false);
 }
 
-public class JwtService : IJwtService {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<JwtService> _logger;
-
-    public JwtService(IConfiguration configuration, ILogger<JwtService> logger) {
-        _configuration = configuration;
-        _logger = logger;
-    }
-
+public class JwtService(IConfiguration configuration, ILogger<JwtService> logger) : IJwtService {
     public string GenerateAccessToken(UserSessionInfo user) {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetJwtSecret()));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -44,8 +36,8 @@ public class JwtService : IJwtService {
         }
 
         var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"] ?? "Frimerki",
-            audience: _configuration["Jwt:Audience"] ?? "Frimerki",
+            issuer: configuration["Jwt:Issuer"] ?? "Frimerki",
+            audience: configuration["Jwt:Audience"] ?? "Frimerki",
             claims: claims,
             expires: GetTokenExpiration(),
             signingCredentials: credentials
@@ -68,11 +60,11 @@ public class JwtService : IJwtService {
     }
 
     private string GetJwtSecret() {
-        var secret = _configuration["Jwt:Secret"];
+        var secret = configuration["Jwt:Secret"];
         if (string.IsNullOrEmpty(secret)) {
             // Generate a random secret for development
             secret = GenerateRefreshToken();
-            _logger.LogWarning("JWT secret not configured, using generated secret. This should be set in production.");
+            logger.LogWarning("JWT secret not configured, using generated secret. This should be set in production.");
         }
         return secret;
     }

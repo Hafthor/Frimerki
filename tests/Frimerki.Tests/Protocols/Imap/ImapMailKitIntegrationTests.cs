@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Imap;
@@ -9,7 +7,6 @@ using Frimerki.Services.User;
 using Frimerki.Tests.Utilities;
 using MailKit;
 using MailKit.Net.Imap;
-using MailKit.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -53,7 +50,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
 
         mockUserService
             .Setup(x => x.AuthenticateUserEntityAsync("testuser", "wrongpass"))
-            .ReturnsAsync((User?)null);
+            .ReturnsAsync((User)null);
 
         // Setup mock message service for APPEND tests
         mockMessageService
@@ -334,7 +331,7 @@ public class ImapMailKitIntegrationTests : IAsyncDisposable {
     }
 
     public async ValueTask DisposeAsync() {
-        _cancellationTokenSource.Cancel();
+        await _cancellationTokenSource.CancelAsync();
 
         try {
             await _serverTask.WaitAsync(TimeSpan.FromSeconds(5));

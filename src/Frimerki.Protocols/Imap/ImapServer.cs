@@ -17,7 +17,7 @@ public class ImapServer : BackgroundService {
     private readonly ILogger<ImapServer> _logger;
     private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
-    private TcpListener? _listener;
+    private TcpListener _listener;
     private readonly int _port;
 
     public ImapServer(
@@ -38,7 +38,7 @@ public class ImapServer : BackgroundService {
         IServiceProvider serviceProvider,
         int port) {
         _logger = logger;
-        _configuration = null!;
+        _configuration = null;
         _serviceProvider = serviceProvider;
         _port = port;
     }

@@ -3,10 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Frimerki.Data;
 
-public class EmailDbContext : DbContext {
-    public EmailDbContext(DbContextOptions<EmailDbContext> options) : base(options) {
-    }
-
+public class EmailDbContext(DbContextOptions<EmailDbContext> options) : DbContext(options) {
     public DbSet<User> Users { get; set; }
     public DbSet<DomainSettings> Domains { get; set; }
     public DbSet<Message> Messages { get; set; }

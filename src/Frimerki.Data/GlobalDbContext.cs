@@ -6,10 +6,7 @@ namespace Frimerki.Data;
 /// <summary>
 /// Global database context for server-wide data including domain registry and host admin authentication
 /// </summary>
-public class GlobalDbContext : DbContext {
-    public GlobalDbContext(DbContextOptions<GlobalDbContext> options) : base(options) {
-    }
-
+public class GlobalDbContext(DbContextOptions<GlobalDbContext> options) : DbContext(options) {
     public DbSet<DomainRegistry> DomainRegistry { get; set; }
     public DbSet<HostAdmin> HostAdmins { get; set; }
     public DbSet<ServerConfiguration> ServerConfiguration { get; set; }

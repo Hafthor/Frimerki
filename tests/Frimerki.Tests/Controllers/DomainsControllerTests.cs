@@ -270,51 +270,51 @@ public class MockDomainServiceForController : IDomainService {
     public bool ShouldThrowGenericException { get; set; }
     public bool DeleteShouldSucceed { get; set; }
 
-    private DomainListResponse? _domainsResponse;
-    private DomainResponse? _domainResponse;
-    private CreateDomainResponse? _createDomainResponse;
-    private DkimKeyResponse? _dkimKeyResponse;
+    private DomainListResponse _domainsResponse;
+    private DomainResponse _domainResponse;
+    private CreateDomainResponse _createDomainResponse;
+    private DkimKeyResponse _dkimKeyResponse;
 
     public void SetDomainsResponse(DomainListResponse response) => _domainsResponse = response;
     public void SetDomainResponse(DomainResponse response) => _domainResponse = response;
     public void SetCreateDomainResponse(CreateDomainResponse response) => _createDomainResponse = response;
     public void SetDkimKeyResponse(DkimKeyResponse response) => _dkimKeyResponse = response;
 
-    public Task<DomainListResponse> GetDomainsAsync(string userRole = "", int userDomainId = 0) {
+    public async Task<DomainListResponse> GetDomainsAsync(string userRole = "", int userDomainId = 0) {
         if (ShouldThrowOnGetDomains) {
             throw new Exception("Service error");
         }
-        return Task.FromResult(_domainsResponse ?? new DomainListResponse { Domains = [] });
+        return _domainsResponse ?? new DomainListResponse { Domains = [] };
     }
 
-    public Task<DomainResponse> GetDomainByNameAsync(string domainName) {
+    public async Task<DomainResponse> GetDomainByNameAsync(string domainName) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException($"Domain '{domainName}' not found");
         }
         if (ShouldThrowGenericException) {
             throw new Exception("Service error");
         }
-        return Task.FromResult(_domainResponse ?? new DomainResponse { Name = domainName });
+        return _domainResponse ?? new DomainResponse { Name = domainName };
     }
 
-    public Task<CreateDomainResponse> CreateDomainAsync(DomainRequest request) {
+    public async Task<CreateDomainResponse> CreateDomainAsync(DomainRequest request) {
         if (ShouldThrowInvalidOperationException) {
             throw new InvalidOperationException($"Domain '{request.Name}' already exists");
         }
         if (ShouldThrowArgumentException) {
             throw new ArgumentException("Invalid request");
         }
-        return Task.FromResult(_createDomainResponse ?? new CreateDomainResponse { Name = request.Name });
+        return _createDomainResponse ?? new CreateDomainResponse { Name = request.Name };
     }
 
-    public Task<DomainResponse> UpdateDomainAsync(string domainName, DomainUpdateRequest request) {
+    public async Task<DomainResponse> UpdateDomainAsync(string domainName, DomainUpdateRequest request) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException($"Domain '{domainName}' not found");
         }
-        return Task.FromResult(_domainResponse ?? new DomainResponse { Name = domainName });
+        return _domainResponse ?? new DomainResponse { Name = domainName };
     }
 
-    public Task DeleteDomainAsync(string domainName) {
+    public async Task DeleteDomainAsync(string domainName) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException($"Domain '{domainName}' not found");
         }
@@ -324,23 +324,22 @@ public class MockDomainServiceForController : IDomainService {
         if (!DeleteShouldSucceed) {
             throw new Exception("Service error");
         }
-        return Task.CompletedTask;
     }
 
-    public Task<DkimKeyResponse> GetDkimKeyAsync(string domainName) {
+    public async Task<DkimKeyResponse> GetDkimKeyAsync(string domainName) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException($"No DKIM key found for domain '{domainName}'");
         }
-        return Task.FromResult(_dkimKeyResponse ?? new DkimKeyResponse { Selector = "default" });
+        return _dkimKeyResponse ?? new DkimKeyResponse { Selector = "default" };
     }
 
-    public Task<DkimKeyResponse> GenerateDkimKeyAsync(string domainName, GenerateDkimKeyRequest request) {
+    public async Task<DkimKeyResponse> GenerateDkimKeyAsync(string domainName, GenerateDkimKeyRequest request) {
         if (ShouldThrowArgumentException) {
             throw new ArgumentException($"Domain '{domainName}' not found");
         }
         if (ShouldThrowInvalidOperationException) {
             throw new InvalidOperationException("DKIM key already exists");
         }
-        return Task.FromResult(_dkimKeyResponse ?? new DkimKeyResponse { Selector = request.Selector });
+        return _dkimKeyResponse ?? new DkimKeyResponse { Selector = request.Selector };
     }
 }

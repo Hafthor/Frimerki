@@ -7,8 +7,8 @@ public class MessageRequest {
     [Required, EmailAddress]
     public string ToAddress { get; set; } = "";
 
-    public string? CcAddress { get; set; }
-    public string? BccAddress { get; set; }
+    public string CcAddress { get; set; }
+    public string BccAddress { get; set; }
 
     [Required, StringLength(998)]
     public string Subject { get; set; } = "";
@@ -16,11 +16,11 @@ public class MessageRequest {
     [Required]
     public string Body { get; set; } = "";
 
-    public string? BodyHtml { get; set; }
-    public bool IsHtml { get; set; } = false;
-    public string? InReplyTo { get; set; }
-    public string? References { get; set; }
-    public List<MessageAttachmentRequest>? Attachments { get; set; }
+    public string BodyHtml { get; set; }
+    public bool IsHtml { get; set; }
+    public string InReplyTo { get; set; }
+    public string References { get; set; }
+    public List<MessageAttachmentRequest> Attachments { get; set; }
 }
 
 public class MessageAttachmentRequest {
@@ -46,11 +46,11 @@ public class SimpleEmailRequest {
 }
 
 public class MessageUpdateRequest {
-    public MessageFlagsRequest? Flags { get; set; }
+    public MessageFlagsRequest Flags { get; set; }
     public int? FolderId { get; set; }
-    public string? Subject { get; set; }
-    public string? Body { get; set; }
-    public string? BodyHtml { get; set; }
+    public string Subject { get; set; }
+    public string Body { get; set; }
+    public string BodyHtml { get; set; }
 }
 
 public class MessageFlagsRequest {
@@ -59,21 +59,21 @@ public class MessageFlagsRequest {
     public bool? Flagged { get; set; }
     public bool? Deleted { get; set; }
     public bool? Draft { get; set; }
-    public List<string>? CustomFlags { get; set; }
+    public List<string> CustomFlags { get; set; }
 }
 
 public class MessageFilterRequest {
-    public string? Q { get; set; }
-    public string? Folder { get; set; }
+    public string Q { get; set; }
+    public string Folder { get; set; }
     public int? FolderId { get; set; }
-    public string? Flags { get; set; }
-    public string? From { get; set; }
-    public string? To { get; set; }
+    public string Flags { get; set; }
+    public string From { get; set; }
+    public string To { get; set; }
     public DateTime? Since { get; set; }
     public DateTime? Before { get; set; }
     public int? MinSize { get; set; }
     public int? MaxSize { get; set; }
-    public int Skip { get; set; } = 0;
+    public int Skip { get; set; }
     public int Take { get; set; } = 50;
     public string SortBy { get; set; } = "date";
     public string SortOrder { get; set; } = "desc";

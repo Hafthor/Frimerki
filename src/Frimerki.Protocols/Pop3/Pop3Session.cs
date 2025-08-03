@@ -8,26 +8,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Frimerki.Protocols.Pop3;
 
-public partial class Pop3Session {
-    private readonly ISessionService _sessionService;
-    private readonly IMessageService _messageService;
-    private readonly ILogger<Pop3Session> _logger;
-    private NetworkStream? _stream;
-    private StreamReader? _reader;
-    private StreamWriter? _writer;
-    private string? _username;
+public partial class Pop3Session(
+    ISessionService sessionService,
+    IMessageService messageService,
+    ILogger<Pop3Session> logger) {
+    private NetworkStream _stream;
+    private StreamReader _reader;
+    private StreamWriter _writer;
+    private string _username;
     private int? _userId;
     private List<MessageInfo> _messages = [];
     private readonly HashSet<int> _deletedMessages = [];
 
     [GeneratedRegex(@"^(\w+)(?:\s+(.+))?$")]
     private static partial Regex CommandRegex();
-
-    public Pop3Session(ISessionService sessionService, IMessageService messageService, ILogger<Pop3Session> logger) {
-        _sessionService = sessionService;
-        _messageService = messageService;
-        _logger = logger;
-    }
 
     public async Task HandleAsync(TcpClient client, CancellationToken cancellationToken) {
         try {
@@ -43,13 +37,13 @@ public partial class Pop3Session {
                     break;
                 }
 
-                _logger.LogDebug("POP3 Command: {Command}", line);
+                logger.LogDebug("POP3 Command: {Command}", line);
                 await ProcessCommandAsync(line, cancellationToken);
             }
         } catch (OperationCanceledException) {
             // Expected when cancellation token is triggered
         } catch (Exception ex) {
-            _logger.LogError(ex, "POP3 session error");
+            logger.LogError(ex, "POP3 session error");
         } finally {
             // Clean up resources
             try {
@@ -104,7 +98,7 @@ public partial class Pop3Session {
                 _ => SendResponseAsync("-ERR Unknown command", cancellationToken)
             });
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error processing POP3 command: {Command}", cmd);
+            logger.LogError(ex, "Error processing POP3 command: {Command}", cmd);
             await SendResponseAsync("-ERR Server error", cancellationToken);
         }
     }
@@ -141,7 +135,7 @@ public partial class Pop3Session {
         }
 
         try {
-            var loginResult = await _sessionService.LoginAsync(new LoginRequest {
+            var loginResult = await sessionService.LoginAsync(new LoginRequest {
                 Email = _username,
                 Password = password
             });
@@ -157,9 +151,9 @@ public partial class Pop3Session {
             var totalSize = _messages.Sum(m => m.Size);
 
             await SendResponseAsync($"+OK {messageCount} messages ({totalSize} octets)", cancellationToken);
-            _logger.LogInformation("POP3 user {Username} authenticated successfully", _username);
+            logger.LogInformation("POP3 user {Username} authenticated successfully", _username);
         } catch (Exception ex) {
-            _logger.LogError(ex, "POP3 authentication error for user {Username}", _username);
+            logger.LogError(ex, "POP3 authentication error for user {Username}", _username);
             await SendResponseAsync("-ERR Authentication failed", cancellationToken);
         }
     }
@@ -175,7 +169,7 @@ public partial class Pop3Session {
             Take = 1000 // POP3 typically loads all messages
         };
 
-        var result = await _messageService.GetMessagesAsync(_userId.Value, request);
+        var result = await messageService.GetMessagesAsync(_userId.Value, request);
         _messages = result.Items.Select((msg, index) => new MessageInfo(
             Index: index + 1,
             MessageId: msg.Id,
@@ -251,7 +245,7 @@ public partial class Pop3Session {
         }
 
         try {
-            var messageResponse = await _messageService.GetMessageAsync(_userId!.Value, message.MessageId);
+            var messageResponse = await messageService.GetMessageAsync(_userId!.Value, message.MessageId);
             if (messageResponse == null) {
                 await SendResponseAsync("-ERR Message not found", cancellationToken);
                 return;
@@ -272,7 +266,7 @@ public partial class Pop3Session {
 
             await SendResponseAsync(".", cancellationToken);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving message {MessageId}", message.MessageId);
+            logger.LogError(ex, "Error retrieving message {MessageId}", message.MessageId);
             await SendResponseAsync("-ERR Error retrieving message", cancellationToken);
         }
     }
@@ -327,12 +321,12 @@ public partial class Pop3Session {
             var deletedCount = 0;
             foreach (var messageId in _deletedMessages) {
                 try {
-                    var deleted = await _messageService.DeleteMessageAsync(_userId.Value, messageId);
+                    var deleted = await messageService.DeleteMessageAsync(_userId.Value, messageId);
                     if (deleted) {
                         deletedCount++;
                     }
                 } catch (Exception ex) {
-                    _logger.LogError(ex, "Error deleting message {MessageId} for user {UserId}", messageId, _userId);
+                    logger.LogError(ex, "Error deleting message {MessageId} for user {UserId}", messageId, _userId);
                 }
             }
 
@@ -400,7 +394,7 @@ public partial class Pop3Session {
         }
 
         try {
-            var messageResponse = await _messageService.GetMessageAsync(_userId!.Value, message.MessageId);
+            var messageResponse = await messageService.GetMessageAsync(_userId!.Value, message.MessageId);
             if (messageResponse == null) {
                 await SendResponseAsync("-ERR Message not found", cancellationToken);
                 return;
@@ -423,7 +417,7 @@ public partial class Pop3Session {
 
             await SendResponseAsync(".", cancellationToken);
         } catch (Exception ex) {
-            _logger.LogError(ex, "Error retrieving message top {MessageId}", message.MessageId);
+            logger.LogError(ex, "Error retrieving message top {MessageId}", message.MessageId);
             await SendResponseAsync("-ERR Error retrieving message", cancellationToken);
         }
     }
@@ -432,7 +426,7 @@ public partial class Pop3Session {
         if (_writer != null) {
             await _writer.WriteLineAsync(response.AsMemory(), cancellationToken);
             await _writer.FlushAsync(cancellationToken);
-            _logger.LogDebug("POP3 Response: {Response}", response);
+            logger.LogDebug("POP3 Response: {Response}", response);
         }
     }
 

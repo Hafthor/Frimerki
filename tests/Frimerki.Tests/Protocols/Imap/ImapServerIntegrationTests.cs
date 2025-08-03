@@ -1,6 +1,4 @@
-using Frimerki.Data;
 using Frimerki.Models.DTOs;
-using Frimerki.Models.DTOs.Folder;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Imap;
 using Frimerki.Services.Folder;
@@ -10,7 +8,6 @@ using Frimerki.Tests.Utilities;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Security;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -21,16 +18,8 @@ namespace Frimerki.Tests.Protocols.Imap;
 /// <summary>
 /// Simple XUnit logger provider for test output
 /// </summary>
-public class XUnitLoggerProvider : ILoggerProvider {
-    private readonly ITestOutputHelper _output;
-
-    public XUnitLoggerProvider(ITestOutputHelper output) {
-        _output = output;
-    }
-
-    public ILogger CreateLogger(string categoryName) {
-        return new XUnitLogger(_output, categoryName);
-    }
+public sealed class XUnitLoggerProvider(ITestOutputHelper output) : ILoggerProvider {
+    public ILogger CreateLogger(string categoryName) => new XUnitLogger(output, categoryName);
 
     public void Dispose() { }
 }
@@ -38,29 +27,21 @@ public class XUnitLoggerProvider : ILoggerProvider {
 /// <summary>
 /// Simple XUnit logger implementation
 /// </summary>
-public class XUnitLogger : ILogger {
-    private readonly ITestOutputHelper _output;
-    private readonly string _categoryName;
-
-    public XUnitLogger(ITestOutputHelper output, string categoryName) {
-        _output = output;
-        _categoryName = categoryName;
-    }
-
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => NullDisposable.Instance;
+public class XUnitLogger(ITestOutputHelper output, string categoryName) : ILogger {
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullDisposable.Instance;
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) {
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
         try {
-            _output.WriteLine($"[{logLevel}] {_categoryName}: {formatter(state, exception)}");
+            output.WriteLine($"[{logLevel}] {categoryName}: {formatter(state, exception)}");
         } catch {
             // Ignore logging failures in tests
         }
     }
 
-    private class NullDisposable : IDisposable {
-        public static NullDisposable Instance = new();
+    private sealed class NullDisposable : IDisposable {
+        public static readonly NullDisposable Instance = new();
         public void Dispose() { }
     }
 }
@@ -101,7 +82,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
 
         mockUserService
             .Setup(x => x.AuthenticateUserEntityAsync("testuser", "wrongpass"))
-            .ReturnsAsync((User?)null);
+            .ReturnsAsync((User)null);
 
         // Setup test services
         var services = new ServiceCollection();
@@ -332,53 +313,53 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
 /// Test implementation of IUserService for testing
 /// </summary>
 public class TestUserService : IUserService {
-    public Task<User?> AuthenticateUserEntityAsync(string username, string password) {
+    public async Task<User> AuthenticateUserEntityAsync(string username, string password) {
         // Simple test authentication
         if (username == "testuser" && password == "testpass") {
-            return Task.FromResult<User?>(new User {
+            return new User {
                 Id = 1,
                 Username = "testuser",
                 DomainId = 1,
                 CanLogin = true
-            });
+            };
         }
-        return Task.FromResult<User?>(null);
+        return null;
     }
 
-    public Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string? domainFilter = null) =>
+    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string domainFilter = null) =>
         throw new NotImplementedException();
 
-    public Task<UserResponse?> GetUserByEmailAsync(string email) =>
+    public async Task<UserResponse> GetUserByEmailAsync(string email) =>
         throw new NotImplementedException();
 
-    public Task<UserResponse> CreateUserAsync(CreateUserRequest request) =>
+    public async Task<UserResponse> CreateUserAsync(CreateUserRequest request) =>
         throw new NotImplementedException();
 
-    public Task<UserResponse?> UpdateUserAsync(string email, UserUpdateRequest request) =>
+    public async Task<UserResponse> UpdateUserAsync(string email, UserUpdateRequest request) =>
         throw new NotImplementedException();
 
-    public Task<bool> UpdateUserPasswordAsync(string email, UserPasswordUpdateRequest request) =>
+    public async Task<bool> UpdateUserPasswordAsync(string email, UserPasswordUpdateRequest request) =>
         throw new NotImplementedException();
 
-    public Task<bool> DeleteUserAsync(string email) =>
+    public async Task<bool> DeleteUserAsync(string email) =>
         throw new NotImplementedException();
 
-    public Task<UserStatsResponse> GetUserStatsAsync(string email) =>
+    public async Task<UserStatsResponse> GetUserStatsAsync(string email) =>
         throw new NotImplementedException();
 
-    public Task<bool> UserExistsAsync(string email) =>
+    public async Task<bool> UserExistsAsync(string email) =>
         throw new NotImplementedException();
 
-    public Task<UserResponse?> AuthenticateUserAsync(string email, string password) =>
+    public async Task<UserResponse> AuthenticateUserAsync(string email, string password) =>
         throw new NotImplementedException();
 
-    public Task<User?> GetUserEntityByEmailAsync(string email) =>
+    public async Task<User> GetUserEntityByEmailAsync(string email) =>
         throw new NotImplementedException();
 
-    public Task<bool> ValidateEmailFormatAsync(string email) =>
+    public async Task<bool> ValidateEmailFormatAsync(string email) =>
         throw new NotImplementedException();
 
-    public Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) =>
+    public async Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) =>
         throw new NotImplementedException();
 }
 
@@ -386,19 +367,19 @@ public class TestUserService : IUserService {
 /// Test implementation of IFolderService for testing
 /// </summary>
 public class TestFolderService : IFolderService {
-    public Task<List<FolderListResponse>> GetFoldersAsync(int userId) =>
+    public async Task<List<FolderListResponse>> GetFoldersAsync(int userId) =>
         throw new NotImplementedException();
 
-    public Task<FolderResponse?> GetFolderAsync(int userId, string folderName) =>
+    public async Task<FolderResponse> GetFolderAsync(int userId, string folderName) =>
         throw new NotImplementedException();
 
-    public Task<FolderResponse> CreateFolderAsync(int userId, FolderRequest request) =>
+    public async Task<FolderResponse> CreateFolderAsync(int userId, FolderRequest request) =>
         throw new NotImplementedException();
 
-    public Task<FolderResponse?> UpdateFolderAsync(int userId, string folderName, FolderUpdateRequest request) =>
+    public async Task<FolderResponse> UpdateFolderAsync(int userId, string folderName, FolderUpdateRequest request) =>
         throw new NotImplementedException();
 
-    public Task<bool> DeleteFolderAsync(int userId, string folderName) =>
+    public async Task<bool> DeleteFolderAsync(int userId, string folderName) =>
         throw new NotImplementedException();
 }
 
@@ -406,18 +387,18 @@ public class TestFolderService : IFolderService {
 /// Test implementation of IMessageService for testing
 /// </summary>
 public class TestMessageService : IMessageService {
-    public Task<PaginatedInfo<MessageListItemResponse>> GetMessagesAsync(int userId, MessageFilterRequest request) =>
+    public async Task<PaginatedInfo<MessageListItemResponse>> GetMessagesAsync(int userId, MessageFilterRequest request) =>
         throw new NotImplementedException();
 
-    public Task<MessageResponse?> GetMessageAsync(int userId, int messageId) =>
+    public async Task<MessageResponse> GetMessageAsync(int userId, int messageId) =>
         throw new NotImplementedException();
 
-    public Task<MessageResponse> CreateMessageAsync(int userId, MessageRequest request) =>
+    public async Task<MessageResponse> CreateMessageAsync(int userId, MessageRequest request) =>
         throw new NotImplementedException();
 
-    public Task<MessageResponse?> UpdateMessageAsync(int userId, int messageId, MessageUpdateRequest request) =>
+    public async Task<MessageResponse> UpdateMessageAsync(int userId, int messageId, MessageUpdateRequest request) =>
         throw new NotImplementedException();
 
-    public Task<bool> DeleteMessageAsync(int userId, int messageId) =>
+    public async Task<bool> DeleteMessageAsync(int userId, int messageId) =>
         throw new NotImplementedException();
 }
