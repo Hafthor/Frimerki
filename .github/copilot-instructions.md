@@ -31,6 +31,7 @@ public class Example {
 - **Prefer "" over string.Empty** - Use `""` for empty strings
 - **Prefer ++ and -- over += 1 and -= 1** - Use `counter++` instead of `counter += 1`
 - **Do NOT "optimize" async methods by removing `async` and doing `return Task.FromResult(...)`**
+- **Do NOT use the `<Nullable>enable</Nullable>` project setting or the `#nullable` directive**
 
 ### Formatting Examples
 ```csharp
