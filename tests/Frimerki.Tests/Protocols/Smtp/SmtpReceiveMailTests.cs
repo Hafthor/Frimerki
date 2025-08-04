@@ -140,8 +140,7 @@ public sealed class SmtpReceiveMailTests : IAsyncDisposable {
         Assert.StartsWith("250", ehloResponse);
 
         // Skip additional EHLO responses
-        string line;
-        while ((line = await reader.ReadLineAsync()) != null && line.StartsWith("250-")) {
+        while (await reader.ReadLineAsync() is { } line && line.StartsWith("250-")) {
             // Read remaining EHLO responses
         }
 
@@ -229,8 +228,7 @@ public sealed class SmtpReceiveMailTests : IAsyncDisposable {
         await reader.ReadLineAsync();
 
         // Skip additional EHLO responses
-        string line;
-        while ((line = await reader.ReadLineAsync()) != null && line.StartsWith("250-")) {
+        while (await reader.ReadLineAsync() is { } line && line.StartsWith("250-")) {
             // Read remaining EHLO responses
         }
 

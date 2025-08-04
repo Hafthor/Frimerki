@@ -53,8 +53,8 @@ public record ImapResponse(string Tag = "",
 /// Parsed IMAP command from client
 /// </summary>
 public record ImapCommand {
-    public string Tag { get; set; } = "";
-    public string Name { get; set; } = "";
-    public List<string> Arguments { get; set; } = [];
-    public string RawCommand { get; set; } = "";
+    public string Tag { get; init; } = "";
+    public string Name { get; init; } = "";
+    public List<string> Arguments { get; init; } = [];
+    public string RawCommand { get; init; } = "";
 }

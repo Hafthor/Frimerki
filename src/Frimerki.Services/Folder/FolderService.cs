@@ -34,7 +34,6 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
             .Where(f => f.UserId == userId && f.Name == decodedFolderName)
             .Select(f => new FolderResponse {
                 Name = f.Name,
-                Delimiter = f.Delimiter,
                 SystemFolderType = f.SystemFolderType,
                 Attributes = f.Attributes,
                 UidNext = f.UidNext,
@@ -57,8 +56,8 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
         }
 
         // Validate parent folder exists for hierarchical folders
-        if (request.Name.Contains(request.Delimiter)) {
-            var parentPath = request.Name[..request.Name.LastIndexOf(request.Delimiter)];
+        if (request.Name.Contains('/')) {
+            var parentPath = request.Name[..request.Name.LastIndexOf('/')];
             if (!await context.Folders.AnyAsync(f => f.UserId == userId && f.Name == parentPath)) {
                 throw new InvalidOperationException($"Parent folder '{parentPath}' does not exist");
             }
@@ -67,7 +66,6 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
         var folder = new Models.Entities.Folder {
             UserId = userId,
             Name = request.Name,
-            Delimiter = request.Delimiter,
             Attributes = request.Attributes,
             Subscribed = request.Subscribed,
             UidNext = 1,
@@ -85,7 +83,6 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
 
         return new FolderResponse {
             Name = folder.Name,
-            Delimiter = folder.Delimiter,
             SystemFolderType = folder.SystemFolderType,
             Attributes = folder.Attributes,
             UidNext = folder.UidNext,
@@ -122,7 +119,7 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
 
             // Update child folder names if this is a parent folder
             var childFolders = await context.Folders
-                .Where(f => f.UserId == userId && f.Name.StartsWith(folder.Name + folder.Delimiter))
+                .Where(f => f.UserId == userId && f.Name.StartsWith(folder.Name + '/'))
                 .ToListAsync();
 
             foreach (var child in childFolders) {
@@ -133,14 +130,6 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
         }
 
         // Update other properties
-        if (!string.IsNullOrEmpty(request.Delimiter)) {
-            folder.Delimiter = request.Delimiter;
-        }
-
-        if (request.Attributes != null) {
-            folder.Attributes = request.Attributes;
-        }
-
         if (request.Subscribed.HasValue) {
             folder.Subscribed = request.Subscribed.Value;
         }
@@ -151,7 +140,6 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
 
         return new FolderResponse {
             Name = folder.Name,
-            Delimiter = folder.Delimiter,
             SystemFolderType = folder.SystemFolderType,
             Attributes = folder.Attributes,
             UidNext = folder.UidNext,
@@ -189,7 +177,7 @@ public class FolderService(EmailDbContext context, ILogger<FolderService> logger
 
         // Delete child folders recursively
         var childFolders = await context.Folders
-            .Where(f => f.UserId == userId && f.Name.StartsWith(folder.Name + folder.Delimiter))
+            .Where(f => f.UserId == userId && f.Name.StartsWith(folder.Name + '/'))
             .ToListAsync();
 
         foreach (var child in childFolders) {

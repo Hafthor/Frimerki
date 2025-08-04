@@ -186,7 +186,7 @@ public class ServerController(IServerService serverService, ILogger<ServerContro
     [HttpGet("backup/{backupId}/download")]
     public async Task<IActionResult> DownloadBackup(string backupId) {
         try {
-            // In a real implementation, validate backupId and stream the file
+            // TODO: In a real implementation, validate backupId and stream the file
             logger.LogInformation("Backup download requested: {BackupId}", backupId);
 
             // For now, return not found since we don't have actual backup files
@@ -203,7 +203,7 @@ public class ServerController(IServerService serverService, ILogger<ServerContro
     [HttpGet("backups")]
     public async Task<ActionResult<List<BackupResponse>>> ListBackups() {
         try {
-            // In a real implementation, list actual backup files
+            // TODO: In a real implementation, list actual backup files
             List<BackupResponse> backups = [];
 
             return Ok(backups);
@@ -219,7 +219,7 @@ public class ServerController(IServerService serverService, ILogger<ServerContro
     [HttpDelete("backup/{backupId}")]
     public async Task<IActionResult> DeleteBackup(string backupId) {
         try {
-            // In a real implementation, delete the backup file
+            // TODO: In a real implementation, delete the backup file
             logger.LogInformation("Backup deletion requested: {BackupId}", backupId);
 
             return Ok(new { message = "Backup deleted successfully" });
@@ -237,7 +237,7 @@ public class ServerController(IServerService serverService, ILogger<ServerContro
         try {
             logger.LogWarning("Server restart requested by admin. Service: {Service}", service ?? "all");
 
-            // In a real implementation, restart the specified service or all services
+            // TODO: In a real implementation, restart the specified service or all services
             return Ok(new {
                 message = service != null
                     ? $"Service {service} restart initiated"

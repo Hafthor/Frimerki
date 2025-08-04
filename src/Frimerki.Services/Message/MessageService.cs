@@ -704,13 +704,11 @@ public class MessageService(EmailDbContext context, INowProvider nowProvider, IL
             From = [new() { Email = fromEmail }],
             ReplyTo = [new() { Email = fromEmail }],
             To = [new() { Email = request.ToAddress }],
-            MessageId = $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>"
+            MessageId = $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>",
+            Cc = string.IsNullOrEmpty(request.CcAddress) ? null :
+                [.. request.CcAddress.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(email => new MessageAddressResponse { Email = email.Trim() })]
         };
-
-        if (!string.IsNullOrEmpty(request.CcAddress)) {
-            envelope.Cc = [.. request.CcAddress.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(email => new MessageAddressResponse { Email = email.Trim() })];
-        }
 
         return JsonSerializer.Serialize(envelope);
     }

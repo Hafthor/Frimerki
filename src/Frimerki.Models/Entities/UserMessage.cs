@@ -1,22 +1,22 @@
 namespace Frimerki.Models.Entities;
 
-public class UserMessage {
-    public int Id { get; set; }
+public record UserMessage {
+    public int Id { get; init; }
 
-    public int UserId { get; set; }
+    public int UserId { get; init; }
 
-    public int MessageId { get; set; }
+    public int MessageId { get; init; }
 
     public int FolderId { get; set; }
 
     public int Uid { get; set; }
 
-    public int SequenceNumber { get; set; }
+    public int SequenceNumber { get; init; }
 
-    public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ReceivedAt { get; init; } = DateTime.UtcNow;
 
     // Navigation properties
-    public User User { get; set; }
-    public Message Message { get; set; }
-    public Folder Folder { get; set; }
+    public User User { get; init; }
+    public Message Message { get; init; }
+    public Folder Folder { get; init; }
 }

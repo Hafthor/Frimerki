@@ -2,25 +2,25 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.Entities;
 
-public class DkimKey {
-    public int Id { get; set; }
+public record DkimKey {
+    public int Id { get; init; }
 
-    public int DomainId { get; set; }
+    public int DomainId { get; init; }
 
     [Required]
     [MaxLength(50)]
-    public string Selector { get; set; } = "";
+    public string Selector { get; init; } = "";
 
     [Required]
-    public string PrivateKey { get; set; } = "";
+    public string PrivateKey { get; init; } = "";
 
     [Required]
-    public string PublicKey { get; set; } = "";
+    public string PublicKey { get; init; } = "";
 
     public bool IsActive { get; set; } = true;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     // Navigation properties
-    public DomainSettings Domain { get; set; }
+    public DomainSettings Domain { get; init; }
 }

@@ -182,21 +182,6 @@ public class DomainService(
 
         var hasChanges = false;
 
-        // Update Name if provided
-        if (!string.IsNullOrEmpty(request.Name) && domain.Name != request.Name) {
-            // Check if new name already exists
-            var existingDomain = await dbContext.Domains
-                .FirstOrDefaultAsync(d => d.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase) && d.Id != domain.Id);
-
-            if (existingDomain != null) {
-                throw new InvalidOperationException($"Domain '{request.Name}' already exists");
-            }
-
-            domain.Name = request.Name;
-            hasChanges = true;
-            logger.LogInformation("Domain '{DomainName}' name changed to '{NewName}'", domainName, request.Name);
-        }
-
         // Update IsActive if provided - this updates the global registry, not domain settings
         if (request.IsActive.HasValue) {
             await domainRegistryService.SetDomainActiveAsync(domainName, request.IsActive.Value);

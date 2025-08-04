@@ -2,136 +2,136 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.DTOs;
 
-public class ServerStatusResponse {
-    public string Status { get; set; } = "";
-    public string Version { get; set; } = "";
-    public DateTime Uptime { get; set; }
-    public ServerStatistics Statistics { get; set; } = new();
-    public ServerServices Services { get; set; } = new();
+public record ServerStatusResponse {
+    public string Status { get; init; } = "";
+    public string Version { get; init; } = "";
+    public DateTime Uptime { get; init; }
+    public ServerStatistics Statistics { get; init; } = new();
+    public ServerServices Services { get; init; } = new();
 }
 
-public class ServerStatistics {
-    public int TotalUsers { get; set; }
-    public int TotalDomains { get; set; }
-    public int TotalMessages { get; set; }
-    public long StorageUsed { get; set; }
-    public long StorageAvailable { get; set; }
-    public int ActiveConnections { get; set; }
-    public int MessagesProcessedToday { get; set; }
-    public double CpuUsage { get; set; }
-    public double MemoryUsage { get; set; }
+public record ServerStatistics {
+    public int TotalUsers { get; init; }
+    public int TotalDomains { get; init; }
+    public int TotalMessages { get; init; }
+    public long StorageUsed { get; init; }
+    public long StorageAvailable { get; init; }
+    public int ActiveConnections { get; init; }
+    public int MessagesProcessedToday { get; init; }
+    public double CpuUsage { get; init; }
+    public double MemoryUsage { get; init; }
 }
 
-public class ServerServices {
-    public ServiceStatus Smtp { get; set; } = new();
-    public ServiceStatus Imap { get; set; } = new();
-    public ServiceStatus Pop3 { get; set; } = new();
-    public ServiceStatus WebApi { get; set; } = new();
+public record ServerServices {
+    public ServiceStatus Smtp { get; init; } = new();
+    public ServiceStatus Imap { get; init; } = new();
+    public ServiceStatus Pop3 { get; init; } = new();
+    public ServiceStatus WebApi { get; init; } = new();
 }
 
-public class ServiceStatus {
-    public bool IsRunning { get; set; }
-    public int Port { get; set; }
-    public bool SslEnabled { get; set; }
-    public int ActiveConnections { get; set; }
-    public DateTime LastStarted { get; set; }
+public record ServiceStatus {
+    public bool IsRunning { get; init; }
+    public int Port { get; init; }
+    public bool SslEnabled { get; init; }
+    public int ActiveConnections { get; init; }
+    public DateTime LastStarted { get; init; }
 }
 
-public class ServerHealthResponse {
-    public string Status { get; set; } = "";
-    public string Message { get; set; } = "";
-    public List<HealthCheck> Checks { get; set; } = [];
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+public record ServerHealthResponse {
+    public string Status { get; init; } = "";
+    public string Message { get; init; } = "";
+    public List<HealthCheck> Checks { get; init; } = [];
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }
 
-public class HealthCheck {
-    public string Name { get; set; } = "";
-    public string Status { get; set; } = "";
-    public string Message { get; set; }
-    public long ResponseTimeMs { get; set; }
+public record HealthCheck {
+    public string Name { get; init; } = "";
+    public string Status { get; init; } = "";
+    public string Message { get; init; }
+    public long ResponseTimeMs { get; init; }
 }
 
-public class ServerMetricsResponse {
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    public SystemMetrics System { get; set; } = new();
-    public EmailMetrics Email { get; set; } = new();
-    public DatabaseMetrics Database { get; set; } = new();
+public record ServerMetricsResponse {
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public SystemMetrics System { get; init; } = new();
+    public EmailMetrics Email { get; init; } = new();
+    public DatabaseMetrics Database { get; init; } = new();
 }
 
-public class SystemMetrics {
-    public double CpuUsagePercent { get; set; }
-    public double MemoryUsagePercent { get; set; }
-    public long MemoryUsedBytes { get; set; }
-    public long MemoryTotalBytes { get; set; }
-    public double? DiskUsagePercent { get; set; }
-    public long? DiskUsedBytes { get; set; }
-    public long? DiskTotalBytes { get; set; }
-    public int ActiveThreads { get; set; }
+public record SystemMetrics {
+    public double CpuUsagePercent { get; init; }
+    public double MemoryUsagePercent { get; init; }
+    public long MemoryUsedBytes { get; init; }
+    public long MemoryTotalBytes { get; init; }
+    public double? DiskUsagePercent { get; init; }
+    public long? DiskUsedBytes { get; init; }
+    public long? DiskTotalBytes { get; init; }
+    public int ActiveThreads { get; init; }
 }
 
-public class EmailMetrics {
-    public int MessagesReceivedToday { get; set; }
-    public int MessagesSentToday { get; set; }
-    public int QueuedMessages { get; set; }
-    public int FailedMessages { get; set; }
-    public double AverageProcessingTimeMs { get; set; }
-    public int SpamMessagesBlocked { get; set; }
+public record EmailMetrics {
+    public int MessagesReceivedToday { get; init; }
+    public int MessagesSentToday { get; init; }
+    public int QueuedMessages { get; init; }
+    public int FailedMessages { get; init; }
+    public double AverageProcessingTimeMs { get; init; }
+    public int SpamMessagesBlocked { get; init; }
 }
 
-public class DatabaseMetrics {
-    public long SizeBytes { get; set; }
-    public int ConnectionCount { get; set; }
-    public double AverageQueryTimeMs { get; set; }
-    public int TotalQueries { get; set; }
-    public int SlowQueries { get; set; }
+public record DatabaseMetrics {
+    public long SizeBytes { get; init; }
+    public int ConnectionCount { get; init; }
+    public double AverageQueryTimeMs { get; init; }
+    public int TotalQueries { get; init; }
+    public int SlowQueries { get; init; }
 }
 
-public class ServerLogEntry {
-    public DateTime Timestamp { get; set; }
-    public string Level { get; set; } = "";
-    public string Logger { get; set; } = "";
-    public string Message { get; set; } = "";
-    public string Exception { get; set; }
-    public Dictionary<string, object> Properties { get; set; }
+public record ServerLogEntry {
+    public DateTime Timestamp { get; init; }
+    public string Level { get; init; } = "";
+    public string Logger { get; init; } = "";
+    public string Message { get; init; } = "";
+    public string Exception { get; init; }
+    public Dictionary<string, object> Properties { get; init; }
 }
 
-public class ServerSettingsRequest {
+public record ServerSettingsRequest {
     [Required]
-    public Dictionary<string, object> Settings { get; set; } = new();
+    public Dictionary<string, object> Settings { get; init; } = new();
 }
 
-public class ServerSettingsResponse {
-    public Dictionary<string, object> Settings { get; set; } = new();
-    public DateTime LastModified { get; set; }
+public record ServerSettingsResponse {
+    public Dictionary<string, object> Settings { get; init; } = new();
+    public DateTime LastModified { get; init; }
 }
 
-public class BackupRequest {
-    public bool IncludeAttachments { get; set; } = true;
-    public bool IncludeLogs { get; set; } = false;
-    public string Description { get; set; }
+public record BackupRequest {
+    public bool IncludeAttachments { get; init; } = true;
+    public bool IncludeLogs { get; init; } = false;
+    public string Description { get; init; }
 }
 
-public class BackupResponse {
-    public string BackupId { get; set; } = "";
-    public string FileName { get; set; } = "";
-    public long SizeBytes { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public string Status { get; set; } = "";
-    public string DownloadUrl { get; set; }
+public record BackupResponse {
+    public string BackupId { get; init; } = "";
+    public string FileName { get; init; } = "";
+    public long SizeBytes { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string Status { get; init; } = "";
+    public string DownloadUrl { get; init; }
 }
 
-public class RestoreRequest {
+public record RestoreRequest {
     [Required]
-    public string BackupId { get; set; } = "";
-    public bool RestoreSettings { get; set; } = true;
-    public bool RestoreUsers { get; set; } = true;
-    public bool RestoreMessages { get; set; } = true;
-    public bool RestoreAttachments { get; set; } = true;
+    public string BackupId { get; init; } = "";
+    public bool RestoreSettings { get; init; } = true;
+    public bool RestoreUsers { get; init; } = true;
+    public bool RestoreMessages { get; init; } = true;
+    public bool RestoreAttachments { get; init; } = true;
 }
 
-public class RestoreResponse {
-    public string Status { get; set; } = "";
-    public string Message { get; set; } = "";
-    public DateTime StartedAt { get; set; }
-    public DateTime CompletedAt { get; set; }
+public record RestoreResponse {
+    public string Status { get; init; } = "";
+    public string Message { get; init; } = "";
+    public DateTime StartedAt { get; init; }
+    public DateTime CompletedAt { get; init; }
 }

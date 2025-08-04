@@ -195,12 +195,9 @@ public class EmailDeliveryService(
             From = [.. mimeMessage.From.Select(addr => new MessageAddressResponse(addr))],
             ReplyTo = [.. mimeMessage.ReplyTo.Select(addr => new MessageAddressResponse(addr))],
             To = [.. mimeMessage.To.Select(addr => new MessageAddressResponse(addr))],
-            MessageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>"
+            MessageId = mimeMessage.MessageId ?? $"<{Guid.NewGuid()}@{nowProvider.UtcNow:yyyyMMddHHmmss}>",
+            Cc = mimeMessage.Cc?.Count > 0 ? [.. mimeMessage.Cc.Select(addr => new MessageAddressResponse(addr))] : null
         };
-
-        if (mimeMessage.Cc?.Count > 0) {
-            envelope.Cc = [.. mimeMessage.Cc.Select(addr => new MessageAddressResponse(addr))];
-        }
 
         return JsonSerializer.Serialize(envelope);
     }

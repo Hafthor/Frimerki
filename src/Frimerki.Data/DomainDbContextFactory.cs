@@ -14,16 +14,14 @@ public interface IDomainDbContextFactory {
 }
 
 public class DomainDbContextFactory : IDomainDbContextFactory {
-    private readonly IConfiguration _configuration;
     private readonly ILogger<DomainDbContextFactory> _logger;
     private readonly string _databaseDirectory;
 
     public DomainDbContextFactory(IConfiguration configuration, ILogger<DomainDbContextFactory> logger) {
-        _configuration = configuration;
         _logger = logger;
 
         // Get the base directory for domain databases
-        var baseDir = _configuration.GetConnectionString("DatabaseDirectory") ?? "Data";
+        var baseDir = configuration.GetConnectionString("DatabaseDirectory") ?? "Data";
         _databaseDirectory = Path.GetFullPath(baseDir);
 
         // Ensure the directory exists

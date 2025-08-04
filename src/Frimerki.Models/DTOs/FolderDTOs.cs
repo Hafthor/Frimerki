@@ -2,47 +2,37 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.DTOs;
 
-public class FolderRequest {
+public record FolderRequest {
     [Required, StringLength(255)]
-    public string Name { get; set; } = "";
-
-    [StringLength(1)]
-    public string Delimiter { get; set; } = "/";
-
+    public string Name { get; init; } = "";
     public string Attributes { get; set; }
-    public bool Subscribed { get; set; } = true;
+    public bool Subscribed { get; init; } = true;
 }
 
 public class FolderUpdateRequest {
     [StringLength(255)]
-    public string Name { get; set; }
-
-    [StringLength(1)]
-    public string Delimiter { get; set; }
-
-    public string Attributes { get; set; }
-    public bool? Subscribed { get; set; }
+    public string Name { get; init; }
+    public bool? Subscribed { get; init; }
 }
 
 public class FolderResponse {
-    public string Name { get; set; } = "";
-    public string Delimiter { get; set; } = "/";
-    public string SystemFolderType { get; set; }
-    public string Attributes { get; set; }
-    public int UidNext { get; set; }
-    public int UidValidity { get; set; }
-    public int Exists { get; set; }
-    public int Recent { get; set; }
-    public int Unseen { get; set; }
-    public bool Subscribed { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public string Name { get; init; } = "";
+    public string SystemFolderType { get; init; }
+    public string Attributes { get; init; }
+    public int UidNext { get; init; }
+    public int UidValidity { get; init; }
+    public int Exists { get; init; }
+    public int Recent { get; init; }
+    public int Unseen { get; init; }
+    public bool Subscribed { get; init; }
+    public DateTime CreatedAt { get; init; }
 }
 
 public class FolderListResponse {
-    public string Name { get; set; } = "";
-    public string SystemFolderType { get; set; }
+    public string Name { get; init; } = "";
+    public string SystemFolderType { get; init; }
     public string Attributes { get; set; }
-    public bool Subscribed { get; set; }
-    public int MessageCount { get; set; }
-    public int UnseenCount { get; set; }
+    public bool Subscribed { get; init; }
+    public int MessageCount { get; init; }
+    public int UnseenCount { get; init; }
 }

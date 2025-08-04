@@ -2,51 +2,51 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.DTOs;
 
-public class LoginRequest {
+public record LoginRequest {
     [Required]
     [EmailAddress]
-    public string Email { get; set; } = "";
+    public string Email { get; init; } = "";
 
     [Required]
     [StringLength(100, MinimumLength = 1)]
-    public string Password { get; set; } = "";
+    public string Password { get; init; } = "";
 
-    public bool RememberMe { get; set; } = false;
+    public bool RememberMe { get; init; }
 }
 
-public class LoginResponse {
-    public string Token { get; set; } = "";
-    public DateTime ExpiresAt { get; set; }
-    public UserSessionInfo User { get; set; } = new();
-    public string RefreshToken { get; set; } = "";
+public record LoginResponse {
+    public string Token { get; init; } = "";
+    public DateTime ExpiresAt { get; init; }
+    public UserSessionInfo User { get; init; } = new();
+    public string RefreshToken { get; init; } = "";
 }
 
-public class UserSessionInfo {
-    public int Id { get; set; }
-    public string Username { get; set; } = "";
-    public string Email { get; set; } = "";
-    public string FullName { get; set; }
-    public string Role { get; set; } = "";
-    public bool CanReceive { get; set; }
-    public bool CanLogin { get; set; }
-    public string DomainName { get; set; } = "";
-    public int DomainId { get; set; }
-    public DateTime LastLogin { get; set; }
+public record UserSessionInfo {
+    public int Id { get; init; }
+    public string Username { get; init; } = "";
+    public string Email { get; init; } = "";
+    public string FullName { get; init; }
+    public string Role { get; init; } = "";
+    public bool CanReceive { get; init; }
+    public bool CanLogin { get; init; }
+    public string DomainName { get; init; } = "";
+    public int DomainId { get; init; }
+    public DateTime LastLogin { get; init; }
 }
 
-public class SessionResponse {
-    public bool IsAuthenticated { get; set; }
-    public UserSessionInfo User { get; set; }
-    public DateTime ExpiresAt { get; set; }
-    public string Token { get; set; }
+public record SessionResponse {
+    public bool IsAuthenticated { get; init; }
+    public UserSessionInfo User { get; init; }
+    public DateTime ExpiresAt { get; init; }
+    public string Token { get; init; }
 }
 
-public class RefreshTokenRequest {
+public record RefreshTokenRequest {
     [Required]
-    public string RefreshToken { get; set; } = "";
+    public string RefreshToken { get; init; } = "";
 }
 
-public class LogoutResponse {
-    public string Message { get; set; } = "";
-    public bool Success { get; set; }
+public record LogoutResponse {
+    public string Message { get; init; } = "";
+    public bool Success { get; init; }
 }

@@ -261,8 +261,7 @@ public partial class SmtpSession : IDisposable {
         await SendResponseAsync("354 Start mail input; end with <CRLF>.<CRLF>");
         _state = SmtpSessionState.Data;
 
-        string line;
-        while ((line = await _reader.ReadLineAsync(cancellationToken)) != null) {
+        while (await _reader.ReadLineAsync(cancellationToken) is { } line) {
             if (line == ".") {
                 // End of message
                 await ProcessMessageAsync();

@@ -3,36 +3,36 @@ namespace Frimerki.Models.Entities;
 /// <summary>
 /// Registry of all domains in the system with their database names
 /// </summary>
-public class DomainRegistry {
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public string DatabaseName { get; set; } = "";
+public record DomainRegistry {
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string DatabaseName { get; init; } = "";
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; init; }
 }
 
 /// <summary>
 /// Host administrators who can manage the entire email server
 /// </summary>
-public class HostAdmin {
-    public int Id { get; set; }
-    public string Username { get; set; } = "";
-    public string PasswordHash { get; set; } = "";
-    public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; }
-    public DateTime LastLoginAt { get; set; }
-    public string Email { get; set; }
-    public string DisplayName { get; set; }
+public record HostAdmin {
+    public int Id { get; init; }
+    public string Username { get; init; } = "";
+    public string PasswordHash { get; init; } = "";
+    public bool IsActive { get; init; } = true;
+    public DateTime CreatedAt { get; init; }
+    public DateTime LastLoginAt { get; init; }
+    public string Email { get; init; }
+    public string DisplayName { get; init; }
 }
 
 /// <summary>
 /// Server-wide configuration settings
 /// </summary>
-public class ServerConfiguration {
-    public int Id { get; set; }
-    public string Key { get; set; } = "";
-    public string Value { get; set; }
-    public string Description { get; set; }
-    public DateTime ModifiedAt { get; set; }
-    public string ModifiedBy { get; set; }
+public record ServerConfiguration {
+    public int Id { get; init; }
+    public string Key { get; init; } = "";
+    public string Value { get; init; }
+    public string Description { get; init; }
+    public DateTime ModifiedAt { get; init; }
+    public string ModifiedBy { get; init; }
 }

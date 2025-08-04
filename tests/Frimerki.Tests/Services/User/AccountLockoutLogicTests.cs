@@ -6,7 +6,6 @@ namespace Frimerki.Tests.Services.User;
 
 public class AccountLockoutLogicTests {
     private readonly AccountLockoutOptions _lockoutOptions;
-    private readonly Mock<INowProvider> _mockNowProvider;
     private readonly DateTime _testTime = new(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
     public AccountLockoutLogicTests() {
@@ -17,8 +16,8 @@ public class AccountLockoutLogicTests {
             ResetWindowMinutes = 60
         };
 
-        _mockNowProvider = new Mock<INowProvider>();
-        _mockNowProvider.Setup(x => x.UtcNow).Returns(_testTime);
+        var mockNowProvider = new Mock<INowProvider>();
+        mockNowProvider.Setup(x => x.UtcNow).Returns(_testTime);
     }
 
     [Fact]

@@ -7,12 +7,14 @@ namespace Frimerki.Server.Middleware;
 /// <summary>
 /// Middleware to extract and validate domain context from incoming requests
 /// </summary>
-public class DomainContextMiddleware(
+public partial class DomainContextMiddleware(
     RequestDelegate next,
     ILogger<DomainContextMiddleware> logger) {
     // Regex to extract email addresses from various contexts
-    private static readonly Regex EmailRegex = new(Constants.ValidEmailRegex,
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EmailRegex = EmailRegexGen();
+
+    [GeneratedRegex(Constants.ValidEmailRegexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled, "en")]
+    private static partial Regex EmailRegexGen();
 
     public async Task InvokeAsync(HttpContext context) {
         var domain = await ExtractDomainFromRequestAsync(context);
@@ -99,9 +101,7 @@ public class DomainContextMiddleware(
         return null;
     }
 
-    private static bool IsIpAddress(string host) {
-        return System.Net.IPAddress.TryParse(host, out _);
-    }
+    private static bool IsIpAddress(string host) => System.Net.IPAddress.TryParse(host, out _);
 }
 
 /// <summary>

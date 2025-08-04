@@ -2,28 +2,28 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.Entities;
 
-public class Message {
-    public int Id { get; set; }
+public record Message {
+    public int Id { get; init; }
 
     [Required]
     [MaxLength(255)]
-    public string HeaderMessageId { get; set; } = "";
+    public string HeaderMessageId { get; init; } = "";
 
     [Required]
     [MaxLength(255)]
-    public string FromAddress { get; set; } = "";
+    public string FromAddress { get; init; } = "";
 
     [MaxLength(255)]
-    public string ToAddress { get; set; }
+    public string ToAddress { get; init; }
 
-    public string CcAddress { get; set; }
+    public string CcAddress { get; init; }
 
-    public string BccAddress { get; set; }
+    public string BccAddress { get; init; }
 
     public string Subject { get; set; }
 
     [Required]
-    public string Headers { get; set; } = "";
+    public string Headers { get; init; } = "";
 
     public string Body { get; set; }
 
@@ -31,25 +31,25 @@ public class Message {
 
     public int MessageSize { get; set; }
 
-    public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ReceivedAt { get; init; } = DateTime.UtcNow;
 
-    public DateTime? SentDate { get; set; }
+    public DateTime? SentDate { get; init; }
 
-    public string InReplyTo { get; set; }
+    public string InReplyTo { get; init; }
 
-    public string References { get; set; }
+    public string References { get; init; }
 
-    public string BodyStructure { get; set; }
+    public string BodyStructure { get; init; }
 
-    public string Envelope { get; set; }
+    public string Envelope { get; init; }
 
-    public int Uid { get; set; }
+    public int Uid { get; init; }
 
-    public int UidValidity { get; set; } = 1;
+    public int UidValidity { get; init; } = 1;
 
     // Navigation properties
-    public UidValiditySequence UidValiditySequence { get; set; }
-    public ICollection<UserMessage> UserMessages { get; set; } = [];
-    public ICollection<MessageFlag> MessageFlags { get; set; } = [];
-    public ICollection<Attachment> Attachments { get; set; } = [];
+    public UidValiditySequence UidValiditySequence { get; init; }
+    public ICollection<UserMessage> UserMessages { get; init; } = [];
+    public ICollection<MessageFlag> MessageFlags { get; init; } = [];
+    public ICollection<Attachment> Attachments { get; init; } = [];
 }

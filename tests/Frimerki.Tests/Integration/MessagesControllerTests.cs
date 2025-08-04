@@ -15,12 +15,10 @@ namespace Frimerki.Tests.Integration;
 public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly string _jwtToken;
-    private readonly string _globalDatabaseName;
     private readonly string _domainDatabaseName;
 
     public MessagesControllerTests(WebApplicationFactory<Program> factory) {
-        _globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
+        var globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
         _domainDatabaseName = "DomainTestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
@@ -45,7 +43,7 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
 
                 // Add in-memory databases for testing
                 services.AddDbContext<GlobalDbContext>(options => {
-                    options.UseInMemoryDatabase(_globalDatabaseName);
+                    options.UseInMemoryDatabase(globalDatabaseName);
                 });
 
                 services.AddDbContext<EmailDbContext>(options => {
@@ -61,11 +59,11 @@ public class MessagesControllerTests : IClassFixture<WebApplicationFactory<Progr
 
         // Seed test data and get JWT token
         SeedTestData();
-        _jwtToken = GetValidJwtTokenAsync().Result;
+        var jwtToken = GetValidJwtTokenAsync().Result;
 
         // Set authorization header
         _client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", jwtToken);
     }
 
     private void SeedTestData() {

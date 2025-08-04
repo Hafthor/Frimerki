@@ -12,8 +12,6 @@ public class DomainServiceTests : IDisposable {
     private readonly EmailDbContext _context;
     private readonly DomainService _domainService;
     private readonly MockDomainRegistryService _mockDomainRegistryService;
-    private readonly MockDomainDbContextFactory _mockDomainDbFactory;
-    private readonly ILogger<DomainService> _logger;
 
     public DomainServiceTests() {
         var options = new DbContextOptionsBuilder<EmailDbContext>()
@@ -22,14 +20,14 @@ public class DomainServiceTests : IDisposable {
 
         _context = new EmailDbContext(options);
         _mockDomainRegistryService = new MockDomainRegistryService();
-        _mockDomainDbFactory = new MockDomainDbContextFactory();
-        _logger = NullLogger<DomainService>.Instance;
+        var mockDomainDbFactory = new MockDomainDbContextFactory();
+        ILogger<DomainService> logger = NullLogger<DomainService>.Instance;
 
         _domainService = new DomainService(
             _context,
             _mockDomainRegistryService,
-            _mockDomainDbFactory,
-            _logger);
+            mockDomainDbFactory,
+            logger);
     }
 
     public void Dispose() => _context.Dispose();
@@ -126,27 +124,9 @@ public class DomainServiceTests : IDisposable {
     }
 
     [Fact]
-    public async Task UpdateDomainAsync_ValidRequest_UpdatesDomainSuccessfully() {
-        // Arrange
-        await SeedTestDomains();
-        var request = new DomainUpdateRequest {
-            Name = "updated-example.com",
-            IsActive = false
-        };
-
-        // Act
-        var result = await _domainService.UpdateDomainAsync("example.com", request);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("updated-example.com", result.Name);
-        Assert.False(result.IsActive);
-    }
-
-    [Fact]
     public async Task UpdateDomainAsync_NonExistentDomain_ThrowsArgumentException() {
         // Arrange
-        var request = new DomainUpdateRequest { Name = "updated.com" };
+        var request = new DomainUpdateRequest();
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
@@ -287,37 +267,6 @@ public class DomainServiceTests : IDisposable {
         Assert.False(result.InitialSetup.AdminUserCreated);
         Assert.True(result.InitialSetup.DefaultFoldersCreated);
         Assert.False(result.InitialSetup.DkimKeysGenerated);
-    }
-
-    [Fact]
-    public async Task UpdateDomainAsync_WithNewName_UpdatesSuccessfully() {
-        // Arrange
-        await SeedTestDomains();
-        var request = new DomainUpdateRequest {
-            Name = "new-example.com"
-        };
-
-        // Act
-        var result = await _domainService.UpdateDomainAsync("example.com", request);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("new-example.com", result.Name);
-    }
-
-    [Fact]
-    public async Task UpdateDomainAsync_WithExistingName_ThrowsInvalidOperationException() {
-        // Arrange
-        await SeedTestDomains();
-        var request = new DomainUpdateRequest {
-            Name = "test.org" // Already exists
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _domainService.UpdateDomainAsync("example.com", request));
-
-        Assert.Contains("Domain 'test.org' already exists", exception.Message);
     }
 
     [Fact]

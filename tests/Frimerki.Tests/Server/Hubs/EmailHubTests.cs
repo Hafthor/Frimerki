@@ -1,4 +1,3 @@
-using Frimerki.Server;
 using Frimerki.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Moq;
@@ -8,27 +7,25 @@ namespace Frimerki.Tests.Server.Hubs;
 public class EmailHubTests {
     private readonly EmailHub _hub;
     private readonly Mock<IGroupManager> _mockGroups;
-    private readonly Mock<HubCallerContext> _mockContext;
-    private readonly Mock<IHubCallerClients> _mockClients;
 
     public EmailHubTests() {
         _hub = new EmailHub();
         _mockGroups = new Mock<IGroupManager>();
-        _mockContext = new Mock<HubCallerContext>();
-        _mockClients = new Mock<IHubCallerClients>();
+        var mockContext = new Mock<HubCallerContext>();
+        var mockClients = new Mock<IHubCallerClients>();
 
         // Setup the hub context
-        _mockContext.Setup(x => x.ConnectionId).Returns("test-connection-id");
+        mockContext.Setup(x => x.ConnectionId).Returns("test-connection-id");
 
         // Setup the hub properties using reflection since they're protected
         var contextProperty = typeof(Hub).GetProperty("Context");
-        contextProperty?.SetValue(_hub, _mockContext.Object);
+        contextProperty?.SetValue(_hub, mockContext.Object);
 
         var groupsProperty = typeof(Hub).GetProperty("Groups");
         groupsProperty?.SetValue(_hub, _mockGroups.Object);
 
         var clientsProperty = typeof(Hub).GetProperty("Clients");
-        clientsProperty?.SetValue(_hub, _mockClients.Object);
+        clientsProperty?.SetValue(_hub, mockClients.Object);
     }
 
     [Fact]

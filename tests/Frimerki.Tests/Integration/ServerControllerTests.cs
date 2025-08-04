@@ -7,21 +7,20 @@ using Microsoft.Extensions.Hosting;
 namespace Frimerki.Tests.Integration;
 
 public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program>> {
-    private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
     public ServerControllerTests(WebApplicationFactory<Program> factory) {
-        _factory = factory.WithWebHostBuilder(builder => {
+        var factory1 = factory.WithWebHostBuilder(builder => {
             builder.ConfigureServices(services => {
                 // Remove default email server hosted services to prevent port conflicts
                 var hostedServices = services.Where(d => d.ServiceType == typeof(IHostedService) &&
-                    (d.ImplementationType?.Name.Contains("Server") == true)).ToList();
+                                                         (d.ImplementationType?.Name.Contains("Server") == true)).ToList();
                 foreach (var service in hostedServices) {
                     services.Remove(service);
                 }
             });
         });
-        _client = _factory.CreateClient();
+        _client = factory1.CreateClient();
     }
 
     [Fact]

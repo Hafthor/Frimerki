@@ -15,7 +15,6 @@ public class UserServiceTimeTests {
     private readonly EmailDbContext _context;
     private readonly MockNowProvider _nowProvider;
     private readonly UserService _userService;
-    private readonly Mock<ILogger<UserService>> _mockLogger;
 
     public UserServiceTimeTests() {
         var options = new DbContextOptionsBuilder<EmailDbContext>()
@@ -23,14 +22,14 @@ public class UserServiceTimeTests {
             .Options;
 
         _context = new EmailDbContext(options);
-        _mockLogger = new Mock<ILogger<UserService>>();
+        var mockLogger = new Mock<ILogger<UserService>>();
         _nowProvider = new MockNowProvider();
 
         var lockoutOptions = new AccountLockoutOptions();
         var mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();
         mockLockoutOptions.Setup(x => x.Value).Returns(lockoutOptions);
 
-        _userService = new UserService(_context, _nowProvider, _mockLogger.Object, mockLockoutOptions.Object);
+        _userService = new UserService(_context, _nowProvider, mockLogger.Object, mockLockoutOptions.Object);
 
         SeedTestData();
     }

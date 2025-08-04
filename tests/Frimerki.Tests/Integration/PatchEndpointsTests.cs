@@ -14,11 +14,10 @@ namespace Frimerki.Tests.Integration;
 public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly string _globalDatabaseName;
     private readonly string _domainDatabaseName;
 
     public PatchEndpointsTests(WebApplicationFactory<Program> factory) {
-        _globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
+        var globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
         _domainDatabaseName = "DomainTestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
@@ -43,7 +42,7 @@ public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 
                 // Add in-memory databases for testing
                 services.AddDbContext<GlobalDbContext>(options => {
-                    options.UseInMemoryDatabase(_globalDatabaseName);
+                    options.UseInMemoryDatabase(globalDatabaseName);
                 });
 
                 services.AddDbContext<EmailDbContext>(options => {
@@ -126,7 +125,7 @@ public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(getResponse.IsSuccessStatusCode, $"Domain not found for GET request. Status: {getResponse.StatusCode}, Content: {getContent}");
 
         var patchRequest = new DomainUpdateRequest {
-            Name = "newexample.com"
+            IsActive = false
         };
 
         // Act
@@ -146,7 +145,7 @@ public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         });
 
         Assert.NotNull(result);
-        Assert.Equal("newexample.com", result.Name);
+        Assert.False(result.IsActive);
     }
 
     [Fact]

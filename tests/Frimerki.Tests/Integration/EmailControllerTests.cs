@@ -3,7 +3,6 @@ using Frimerki.Services.Email;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Xunit.Abstractions;
 
 namespace Frimerki.Tests.Integration;
 
@@ -11,17 +10,12 @@ namespace Frimerki.Tests.Integration;
 /// Integration tests for Email functionality
 /// </summary>
 public class EmailControllerTests {
-    private readonly ITestOutputHelper _output;
     private readonly IServiceProvider _serviceProvider;
 
-    public EmailControllerTests(ITestOutputHelper output) {
-        _output = output;
-
+    public EmailControllerTests() {
         // Setup test services
         var services = new ServiceCollection();
-        services.AddLogging(builder => {
-            builder.AddConsole();
-        });
+        services.AddLogging(builder => builder.AddConsole());
 
         // Add configuration
         var configuration = new ConfigurationBuilder()

@@ -13,13 +13,12 @@ namespace Frimerki.Tests.Controllers;
 public class EmailControllerTests {
     private readonly EmailController _controller;
     private readonly MockUserServiceForEmailController _mockUserService;
-    private readonly SmtpClientService _smtpClientService;
 
     public EmailControllerTests() {
-        _smtpClientService = CreateTestSmtpClientService();
+        var smtpClientService = CreateTestSmtpClientService();
         _mockUserService = new MockUserServiceForEmailController();
         var logger = NullLogger<EmailController>.Instance;
-        _controller = new EmailController(_smtpClientService, _mockUserService, logger);
+        _controller = new EmailController(smtpClientService, _mockUserService, logger);
 
         // Setup authenticated user context
         SetupAuthenticatedUser("testuser@example.com");
@@ -94,7 +93,6 @@ public class EmailControllerTests {
 
         // Debug the response structure
         var responseType = response.GetType();
-        var properties = responseType.GetProperties();
 
         // If response is string, check that directly
         if (response is string stringResponse) {

@@ -2,32 +2,32 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.Entities;
 
-public class Attachment {
-    public int Id { get; set; }
+public record Attachment {
+    public int Id { get; init; }
 
-    public int MessageId { get; set; }
+    public int MessageId { get; init; }
 
     [Required]
     [MaxLength(255)]
-    public string FileName { get; set; } = "";
+    public string FileName { get; init; } = "";
 
     [MaxLength(100)]
-    public string ContentType { get; set; }
+    public string ContentType { get; init; }
 
-    public int Size { get; set; }
+    public int Size { get; init; }
 
     [Required]
     [MaxLength(36)]
-    public string FileGuid { get; set; } = "";
+    public string FileGuid { get; init; } = "";
 
     [MaxLength(10)]
-    public string FileExtension { get; set; }
+    public string FileExtension { get; init; }
 
     [MaxLength(500)]
-    public string FilePath { get; set; }
+    public string FilePath { get; init; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     // Navigation properties
-    public Message Message { get; set; }
+    public Message Message { get; init; }
 }

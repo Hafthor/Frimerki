@@ -1,4 +1,3 @@
-using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Imap;
 using Frimerki.Services.Folder;
@@ -290,7 +289,7 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
     }
 
     public async ValueTask DisposeAsync() {
-        _cancellationTokenSource.Cancel();
+        await _cancellationTokenSource.CancelAsync();
 
         try {
             await _serverTask.WaitAsync(TimeSpan.FromSeconds(5));
@@ -307,98 +306,4 @@ public class ImapServerIntegrationTests : IAsyncDisposable {
             disposable.Dispose();
         }
     }
-}
-
-/// <summary>
-/// Test implementation of IUserService for testing
-/// </summary>
-public class TestUserService : IUserService {
-    public async Task<User> AuthenticateUserEntityAsync(string username, string password) {
-        // Simple test authentication
-        if (username == "testuser" && password == "testpass") {
-            return new User {
-                Id = 1,
-                Username = "testuser",
-                DomainId = 1,
-                CanLogin = true
-            };
-        }
-        return null;
-    }
-
-    public async Task<PaginatedInfo<UserResponse>> GetUsersAsync(int skip = 1, int take = 50, string domainFilter = null) =>
-        throw new NotImplementedException();
-
-    public async Task<UserResponse> GetUserByEmailAsync(string email) =>
-        throw new NotImplementedException();
-
-    public async Task<UserResponse> CreateUserAsync(CreateUserRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<UserResponse> UpdateUserAsync(string email, UserUpdateRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<bool> UpdateUserPasswordAsync(string email, UserPasswordUpdateRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<bool> DeleteUserAsync(string email) =>
-        throw new NotImplementedException();
-
-    public async Task<UserStatsResponse> GetUserStatsAsync(string email) =>
-        throw new NotImplementedException();
-
-    public async Task<bool> UserExistsAsync(string email) =>
-        throw new NotImplementedException();
-
-    public async Task<UserResponse> AuthenticateUserAsync(string email, string password) =>
-        throw new NotImplementedException();
-
-    public async Task<User> GetUserEntityByEmailAsync(string email) =>
-        throw new NotImplementedException();
-
-    public async Task<bool> ValidateEmailFormatAsync(string email) =>
-        throw new NotImplementedException();
-
-    public async Task<(bool IsLocked, DateTime? LockoutEnd)> GetAccountLockoutStatusAsync(string email) =>
-        throw new NotImplementedException();
-}
-
-/// <summary>
-/// Test implementation of IFolderService for testing
-/// </summary>
-public class TestFolderService : IFolderService {
-    public async Task<List<FolderListResponse>> GetFoldersAsync(int userId) =>
-        throw new NotImplementedException();
-
-    public async Task<FolderResponse> GetFolderAsync(int userId, string folderName) =>
-        throw new NotImplementedException();
-
-    public async Task<FolderResponse> CreateFolderAsync(int userId, FolderRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<FolderResponse> UpdateFolderAsync(int userId, string folderName, FolderUpdateRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<bool> DeleteFolderAsync(int userId, string folderName) =>
-        throw new NotImplementedException();
-}
-
-/// <summary>
-/// Test implementation of IMessageService for testing
-/// </summary>
-public class TestMessageService : IMessageService {
-    public async Task<PaginatedInfo<MessageListItemResponse>> GetMessagesAsync(int userId, MessageFilterRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<MessageResponse> GetMessageAsync(int userId, int messageId) =>
-        throw new NotImplementedException();
-
-    public async Task<MessageResponse> CreateMessageAsync(int userId, MessageRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<MessageResponse> UpdateMessageAsync(int userId, int messageId, MessageUpdateRequest request) =>
-        throw new NotImplementedException();
-
-    public async Task<bool> DeleteMessageAsync(int userId, int messageId) =>
-        throw new NotImplementedException();
 }

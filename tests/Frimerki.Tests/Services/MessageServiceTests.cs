@@ -12,8 +12,6 @@ namespace Frimerki.Tests.Services;
 public sealed class MessageServiceTests : IDisposable {
     private readonly EmailDbContext _context;
     private readonly MessageService _messageService;
-    private readonly Mock<ILogger<MessageService>> _mockLogger;
-    private readonly MockNowProvider _nowProvider;
 
     public MessageServiceTests() {
         var options = new DbContextOptionsBuilder<EmailDbContext>()
@@ -21,9 +19,9 @@ public sealed class MessageServiceTests : IDisposable {
             .Options;
 
         _context = new EmailDbContext(options);
-        _mockLogger = new Mock<ILogger<MessageService>>();
-        _nowProvider = new MockNowProvider();
-        _messageService = new MessageService(_context, _nowProvider, _mockLogger.Object);
+        var mockLogger = new Mock<ILogger<MessageService>>();
+        var nowProvider = new MockNowProvider();
+        _messageService = new MessageService(_context, nowProvider, mockLogger.Object);
 
         SeedTestData();
     }

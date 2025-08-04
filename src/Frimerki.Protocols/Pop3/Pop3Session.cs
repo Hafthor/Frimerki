@@ -145,7 +145,7 @@ public partial class Pop3Session(
             }
 
             _userId = loginResult.User.Id;
-            await LoadMessagesAsync(cancellationToken);
+            await LoadMessagesAsync();
 
             var messageCount = _messages.Count;
             var totalSize = _messages.Sum(m => m.Size);
@@ -158,7 +158,7 @@ public partial class Pop3Session(
         }
     }
 
-    private async Task LoadMessagesAsync(CancellationToken cancellationToken) {
+    private async Task LoadMessagesAsync() {
         if (_userId == null) {
             return;
         }

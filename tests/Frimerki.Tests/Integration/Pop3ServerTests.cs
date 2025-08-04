@@ -175,7 +175,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
             Assert.True(pop3Client.IsConnected);
 
             // Try to authenticate with invalid credentials
-            var exception = await Assert.ThrowsAsync<MailKit.Security.AuthenticationException>(
+            await Assert.ThrowsAsync<MailKit.Security.AuthenticationException>(
                 () => pop3Client.AuthenticateAsync("invalid@example.com", "wrongpassword", cancellationTokenSource.Token));
 
             Assert.False(pop3Client.IsAuthenticated);

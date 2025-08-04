@@ -2,14 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.Entities;
 
-public class User {
-    public int Id { get; set; }
+public record User {
+    public int Id { get; init; }
 
     [Required]
     [MaxLength(255)]
-    public string Username { get; set; } = "";
+    public string Username { get; init; } = "";
 
-    public int DomainId { get; set; }
+    public int DomainId { get; init; }
 
     [Required]
     public string PasswordHash { get; set; } = "";
@@ -28,7 +28,7 @@ public class User {
 
     public bool CanLogin { get; set; } = true;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     public DateTime? LastLogin { get; set; }
 
@@ -38,8 +38,8 @@ public class User {
     public DateTime? LastFailedLogin { get; set; }
 
     // Navigation properties
-    public DomainSettings Domain { get; set; }
-    public ICollection<Folder> Folders { get; set; } = [];
-    public ICollection<UserMessage> UserMessages { get; set; } = [];
-    public ICollection<MessageFlag> MessageFlags { get; set; } = [];
+    public DomainSettings Domain { get; init; }
+    public ICollection<Folder> Folders { get; init; } = [];
+    public ICollection<UserMessage> UserMessages { get; init; } = [];
+    public ICollection<MessageFlag> MessageFlags { get; init; } = [];
 }

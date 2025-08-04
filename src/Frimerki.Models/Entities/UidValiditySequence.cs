@@ -1,15 +1,15 @@
 namespace Frimerki.Models.Entities;
 
-public class UidValiditySequence {
-    public int Id { get; set; }
+public record UidValiditySequence {
+    public int Id { get; init; }
 
-    public int DomainId { get; set; }
+    public int DomainId { get; init; }
 
-    public int Value { get; set; } = 1;
+    public int Value { get; init; } = 1;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     // Navigation properties
-    public DomainSettings Domain { get; set; }
-    public ICollection<Message> Messages { get; set; } = [];
+    public DomainSettings Domain { get; init; }
+    public ICollection<Message> Messages { get; init; } = [];
 }

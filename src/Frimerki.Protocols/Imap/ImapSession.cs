@@ -2,7 +2,6 @@ using System.Net.Sockets;
 using System.Text;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
-using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
 using Frimerki.Services.User;
 using Microsoft.Extensions.Logging;
@@ -16,17 +15,14 @@ public partial class ImapSession(
     TcpClient client,
     ILogger<ImapSession> logger,
     IUserService userService,
-    IFolderService folderService,
     IMessageService messageService) {
     private TcpClient _client = client;
     private readonly NetworkStream _stream = client.GetStream();
-    private readonly IFolderService _folderService = folderService;
 
     // UTF-8 encoding without BOM for IMAP protocol compliance
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
     public ImapConnectionState State { get; private set; } = ImapConnectionState.NotAuthenticated;
-    public string AuthenticatedUser { get; private set; }
     public User CurrentUser { get; private set; }
     public string SelectedFolder { get; private set; }
     public bool IsReadOnly { get; private set; }
@@ -145,7 +141,6 @@ public partial class ImapSession(
         try {
             var user = await userService.AuthenticateUserEntityAsync(username, password);
             if (user != null) {
-                AuthenticatedUser = username;
                 CurrentUser = user;
                 State = ImapConnectionState.Authenticated;
 
@@ -215,7 +210,6 @@ public partial class ImapSession(
                 // Use the user service to authenticate
                 var user = await userService.AuthenticateUserEntityAsync(username, password);
                 if (user != null) {
-                    AuthenticatedUser = username;
                     CurrentUser = user;
                     State = ImapConnectionState.Authenticated;
 
@@ -372,7 +366,6 @@ public partial class ImapSession(
             }
 
             var tag = parts[0];
-            var commandName = parts[1];
             var mailbox = parts[2].Trim('"');
 
             // Find the literal size at the end
@@ -759,9 +752,9 @@ public partial class ImapSession(
 
     private string ExtractBodyFromMessage(string messageContent) {
         // Find the empty line that separates headers from body
-        var emptyLineIndex = messageContent.IndexOf("\n\n");
+        var emptyLineIndex = messageContent.IndexOf("\n\n", StringComparison.Ordinal);
         if (emptyLineIndex == -1) {
-            emptyLineIndex = messageContent.IndexOf("\r\n\r\n");
+            emptyLineIndex = messageContent.IndexOf("\r\n\r\n", StringComparison.Ordinal);
         }
 
         if (emptyLineIndex >= 0) {
@@ -887,8 +880,7 @@ public partial class ImapSession(
         // For now, we'll use a simplified approach where we generate sequence numbers
         // In a full implementation, these would come from the database
         return result.Items.Select((msg, index) => new MessageWithSequenceInfo(
-            Id: msg.Id,
-            Uid: 0,  // Simplified - UID not needed for deletion, only message ID
+            Id: msg.Id,  // Simplified - UID not needed for deletion, only message ID
             SequenceNumber: index + 1  // Simplified - should be actual sequence number from folder
         )).ToList();
     }
@@ -896,7 +888,7 @@ public partial class ImapSession(
     /// <summary>
     /// Gets the count of messages in the current folder (excluding deleted messages)
     /// </summary>
-    private async Task<int> GetMessageCountInCurrentFolderAsync() {
+    private async Task<int?> GetMessageCountInCurrentFolderAsync() {
         if (CurrentUser == null || SelectedFolder == null) {
             return 0;
         }
@@ -913,7 +905,7 @@ public partial class ImapSession(
     /// <summary>
     /// Internal structure for tracking message sequence information
     /// </summary>
-    private record MessageWithSequenceInfo(int Id, int Uid, int SequenceNumber);
+    private record MessageWithSequenceInfo(int Id, int SequenceNumber);
 
     [System.Text.RegularExpressions.GeneratedRegex(@"\(([^)]*)\)")]
     private static partial System.Text.RegularExpressions.Regex FlagMatchRegex();

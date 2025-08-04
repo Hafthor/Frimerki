@@ -2,7 +2,6 @@ using System.Net.Sockets;
 using System.Text;
 using Frimerki.Models.Entities;
 using Frimerki.Protocols.Imap;
-using Frimerki.Services.Folder;
 using Frimerki.Services.Message;
 using Frimerki.Services.User;
 using Microsoft.Extensions.Logging;
@@ -232,7 +231,6 @@ public sealed class ImapStreamBasedTests : IDisposable {
 
     private readonly Mock<ILogger<ImapSession>> _mockLogger = new();
     private readonly Mock<IUserService> _mockUserService = new();
-    private readonly Mock<IFolderService> _mockFolderService = new();
     private readonly Mock<IMessageService> _mockMessageService = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
 
@@ -258,7 +256,6 @@ public sealed class ImapStreamBasedTests : IDisposable {
             serverClient,
             _mockLogger.Object,
             _mockUserService.Object,
-            _mockFolderService.Object,
             _mockMessageService.Object);
 
         var sessionTask = session.HandleSessionAsync();

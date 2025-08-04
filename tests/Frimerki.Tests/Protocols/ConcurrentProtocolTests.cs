@@ -64,10 +64,8 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
         var server = CreateImapServer(port);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var serverTask = server.StartAsync(cts.Token);
-
-        // Wait for server to start
-        await Task.Delay(500);
+        await server.StartAsync(cts.Token);
+        var cancellationToken = cts.Token;
 
         // Act - Create multiple concurrent connections
         var tasks = new List<Task>();
@@ -76,14 +74,14 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
             tasks.Add(Task.Run(async () => {
                 try {
                     using var client = new TcpClient();
-                    await client.ConnectAsync("127.0.0.1", port, cts.Token);
+                    await client.ConnectAsync("127.0.0.1", port, cancellationToken);
                     await using var stream = client.GetStream();
                     using var reader = new StreamReader(stream, Encoding.ASCII);
                     await using var writer = new StreamWriter(stream, Encoding.ASCII);
                     writer.AutoFlush = true;
 
                     // Read greeting
-                    var greeting = await reader.ReadLineAsync(cts.Token);
+                    var greeting = await reader.ReadLineAsync(cancellationToken);
                     output.WriteLine($"Connection {connectionId}: {greeting}");
 
                     // Send unique capability request with connection ID
@@ -92,7 +90,7 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
                     // Read capability response
                     var response = new StringBuilder();
                     string line;
-                    while ((line = await reader.ReadLineAsync(cts.Token)) != null && !line.StartsWith($"A{connectionId:D3} OK")) {
+                    while ((line = await reader.ReadLineAsync(cancellationToken)) != null && !line.StartsWith($"A{connectionId:D3} OK")) {
                         response.AppendLine(line);
                     }
                     response.AppendLine(line); // Include the OK line
@@ -102,7 +100,7 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
 
                     // Logout
                     await writer.WriteLineAsync($"A{connectionId:D3} LOGOUT");
-                    await reader.ReadLineAsync(); // Read logout response
+                    await reader.ReadLineAsync(cancellationToken); // Read logout response
                 } catch (Exception ex) {
                     output.WriteLine($"Connection {connectionId} failed: {ex.Message}");
                 }
@@ -110,7 +108,7 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
         }
 
         await Task.WhenAll(tasks);
-        cts.Cancel();
+        await cts.CancelAsync();
 
         // Assert
         Assert.Equal(connectionCount, results.Count);
@@ -363,10 +361,8 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
         return (reader, writer, handleTask, cleanup);
     }
 
-    private class DisposableAction : IDisposable {
-        private readonly Action _action;
-        public DisposableAction(Action action) => _action = action;
-        public void Dispose() => _action();
+    private class DisposableAction(Action action) : IDisposable {
+        public void Dispose() => action();
     }
 }
 

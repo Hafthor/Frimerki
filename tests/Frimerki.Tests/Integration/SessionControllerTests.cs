@@ -22,19 +22,16 @@ public class TestDomainDbContextFactory(string databaseName) : IDomainDbContextF
 
     public async Task<DomainDbContext> CreateDbContextAsync(string domainName) => CreateDbContext(domainName);
 
-    public string GetDatabasePath(string domainName) => databaseName;
-
     public async Task EnsureDatabaseExistsAsync(string domainName) { }
 }
 
 public class SessionControllerTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
-    private readonly string _globalDatabaseName;
     private readonly string _domainDatabaseName;
 
     public SessionControllerTests(WebApplicationFactory<Program> factory) {
-        _globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
+        var globalDatabaseName = "GlobalTestDatabase_" + Guid.NewGuid();
         _domainDatabaseName = "DomainTestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
@@ -59,7 +56,7 @@ public class SessionControllerTests : IClassFixture<WebApplicationFactory<Progra
 
                 // Add test databases
                 services.AddDbContext<GlobalDbContext>(options => {
-                    options.UseInMemoryDatabase(_globalDatabaseName);
+                    options.UseInMemoryDatabase(globalDatabaseName);
                 });
 
                 // Add legacy EmailDbContext for services that still use it

@@ -11,7 +11,6 @@ namespace Frimerki.Protocols.Pop3;
 
 public class Pop3Server : BackgroundService {
     private readonly ILogger<Pop3Server> _logger;
-    private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
     private TcpListener _listener;
     private readonly int _port;
@@ -21,9 +20,8 @@ public class Pop3Server : BackgroundService {
         IConfiguration configuration,
         IServiceProvider serviceProvider) {
         _logger = logger;
-        _configuration = configuration;
         _serviceProvider = serviceProvider;
-        _port = _configuration.GetValue("Ports:POP3", 110);
+        _port = configuration.GetValue("Ports:POP3", 110);
     }
 
     /// <summary>
@@ -31,7 +29,6 @@ public class Pop3Server : BackgroundService {
     /// </summary>
     public Pop3Server(ILogger<Pop3Server> logger, IServiceProvider serviceProvider, int port) {
         _logger = logger;
-        _configuration = null;
         _serviceProvider = serviceProvider;
         _port = port;
     }

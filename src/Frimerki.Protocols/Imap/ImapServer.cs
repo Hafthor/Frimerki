@@ -15,7 +15,6 @@ namespace Frimerki.Protocols.Imap;
 /// </summary>
 public class ImapServer : BackgroundService {
     private readonly ILogger<ImapServer> _logger;
-    private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
     private TcpListener _listener;
     private readonly int _port;
@@ -25,9 +24,8 @@ public class ImapServer : BackgroundService {
         IConfiguration configuration,
         IServiceProvider serviceProvider) {
         _logger = logger;
-        _configuration = configuration;
         _serviceProvider = serviceProvider;
-        _port = _configuration.GetValue("Ports:IMAP", 143);
+        _port = configuration.GetValue("Ports:IMAP", 143);
     }
 
     /// <summary>
@@ -38,7 +36,6 @@ public class ImapServer : BackgroundService {
         IServiceProvider serviceProvider,
         int port) {
         _logger = logger;
-        _configuration = null;
         _serviceProvider = serviceProvider;
         _port = port;
     }
@@ -79,7 +76,7 @@ public class ImapServer : BackgroundService {
                             var messageService = scope.ServiceProvider.GetRequiredService<IMessageService>();
                             _logger.LogInformation("IMAP: Retrieved message service");
 
-                            var session = new ImapSession(client, sessionLogger, userService, folderService, messageService);
+                            var session = new ImapSession(client, sessionLogger, userService, messageService);
                             _logger.LogInformation("IMAP: Created session, starting session handling");
 
                             await session.HandleSessionAsync();

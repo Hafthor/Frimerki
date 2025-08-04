@@ -33,14 +33,4 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IHostedService, SmtpServer>();
         return services;
     }
-
-    /// <summary>
-    /// Adds all email protocol services
-    /// </summary>
-    public static IServiceCollection AddEmailProtocols(this IServiceCollection services) {
-        return services
-            .AddImapServer()
-            .AddPop3Server()
-            .AddSmtpServer();
-    }
 }

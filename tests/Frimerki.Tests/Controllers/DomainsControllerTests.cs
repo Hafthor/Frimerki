@@ -94,7 +94,6 @@ public class DomainsControllerTests {
     public async Task CreateDomain_ValidRequest_ReturnsCreated() {
         // Arrange
         var request = new DomainRequest { Name = "newdomain.com" };
-        var expectedResponse = new DomainResponse { Name = "newdomain.com", IsActive = true };
         _mockDomainService.SetCreateDomainResponse(new CreateDomainResponse {
             Name = "newdomain.com",
             IsActive = true
@@ -135,36 +134,6 @@ public class DomainsControllerTests {
         // Assert
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.NotNull(badRequestResult.Value);
-    }
-
-    [Fact]
-    public async Task UpdateDomain_ValidRequest_ReturnsOk() {
-        // Arrange
-        var request = new DomainUpdateRequest { Name = "updated.com" };
-        var expectedResponse = new DomainResponse { Name = "updated.com", IsActive = true };
-        _mockDomainService.SetDomainResponse(expectedResponse);
-
-        // Act
-        var result = await _controller.UpdateDomain("example.com", request);
-
-        // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var domain = Assert.IsType<DomainResponse>(okResult.Value);
-        Assert.Equal("updated.com", domain.Name);
-    }
-
-    [Fact]
-    public async Task UpdateDomain_NonExistentDomain_ReturnsNotFound() {
-        // Arrange
-        var request = new DomainUpdateRequest { Name = "updated.com" };
-        _mockDomainService.ShouldThrowArgumentException = true;
-
-        // Act
-        var result = await _controller.UpdateDomain("nonexistent.com", request);
-
-        // Assert
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
-        Assert.NotNull(notFoundResult.Value);
     }
 
     [Fact]

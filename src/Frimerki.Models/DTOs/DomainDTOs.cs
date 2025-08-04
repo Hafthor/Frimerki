@@ -2,65 +2,57 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Frimerki.Models.DTOs;
 
-public class DomainResponse {
-    public string Name { get; set; } = "";
-    public string DatabaseName { get; set; } = "";
-    public bool IsActive { get; set; }
-    public bool IsDedicated { get; set; }
-    public string CatchAllUser { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public int UserCount { get; set; }
-    public long StorageUsed { get; set; }
-    public DkimKeyInfo DkimKey { get; set; }
-    public bool HasDkim { get; set; }
+public record DomainResponse(string Name = "", string DatabaseName = "") {
+    public bool IsActive { get; init; }
+    public bool IsDedicated { get; init; }
+    public string CatchAllUser { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public int UserCount { get; init; }
+    public long StorageUsed { get; init; }
+    public DkimKeyInfo DkimKey { get; init; }
+    public bool HasDkim { get; init; }
 }
 
-public class DomainRequest {
+public record DomainRequest {
     [Required]
     [StringLength(255)]
-    [RegularExpression(Constants.ValidDomainRegex, ErrorMessage = "Invalid domain name format")]
-    public string Name { get; set; } = "";
+    [RegularExpression(Constants.ValidDomainRegexPattern, ErrorMessage = "Invalid domain name format")]
+    public string Name { get; init; } = "";
 
     [StringLength(255)]
-    public string DatabaseName { get; set; }
+    public string DatabaseName { get; init; }
 
-    public bool CreateDatabase { get; set; }
-
-    public bool IsActive { get; set; } = true;
+    public bool CreateDatabase { get; init; }
 
     [EmailAddress]
-    public string CatchAllUser { get; set; }
+    public string CatchAllUser { get; init; }
 }
 
-public class DomainUpdateRequest {
-    [StringLength(255)]
-    [RegularExpression(Constants.ValidDomainRegex, ErrorMessage = "Invalid domain name format")]
-    public string Name { get; set; }
-
-    public bool? IsActive { get; set; }
+public record DomainUpdateRequest {
+    public bool? IsActive { get; init; }
 
     [EmailAddress]
-    public string CatchAllUser { get; set; }
+    public string CatchAllUser { get; init; }
 }
 
-public class DkimKeyInfo {
-    public string Selector { get; set; } = "";
-    public string PublicKey { get; set; } = "";
-    public bool IsActive { get; set; }
-    public DateTime CreatedAt { get; set; }
+public record DkimKeyInfo {
+    public string Selector { get; init; } = "";
+    public string PublicKey { get; init; } = "";
+    public bool IsActive { get; init; }
+    public DateTime CreatedAt { get; init; }
 }
 
-public class DkimKeyResponse {
-    public string Selector { get; set; } = "";
-    public string PublicKey { get; set; } = "";
-    public string DnsRecord { get; set; } = "";
-    public bool IsActive { get; set; }
+public record DkimKeyResponse {
+    public string Selector { get; init; } = "";
+    public string PublicKey { get; init; } = "";
+    public string DnsRecord { get; init; } = "";
+    public bool IsActive { get; init; }
     public DateTime CreatedAt { get; set; }
 }
 
 public class GenerateDkimKeyRequest {
     [StringLength(63)]
-    [RegularExpression(Constants.ValidDkimRegex, ErrorMessage = "Invalid DKIM selector format")]
+    [RegularExpression(Constants.ValidDkimRegexPattern, ErrorMessage = "Invalid DKIM selector format")]
     public string Selector { get; set; } = "default";
 
     [Range(1024, 4096)]

@@ -8,10 +8,9 @@ namespace Frimerki.Tests.Services.Authentication;
 
 public class JwtServiceTests {
     private readonly JwtService _jwtService;
-    private readonly Mock<ILogger<JwtService>> _mockLogger;
 
     public JwtServiceTests() {
-        _mockLogger = new Mock<ILogger<JwtService>>();
+        var mockLogger = new Mock<ILogger<JwtService>>();
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string> {
@@ -21,7 +20,7 @@ public class JwtServiceTests {
             })
             .Build();
 
-        _jwtService = new JwtService(configuration, _mockLogger.Object);
+        _jwtService = new JwtService(configuration, mockLogger.Object);
     }
 
     [Fact]
@@ -64,7 +63,7 @@ public class JwtServiceTests {
     [Fact]
     public void GetTokenExpiration_WithoutRememberMe_Returns8Hours() {
         // Act
-        var expiration = _jwtService.GetTokenExpiration(false);
+        var expiration = _jwtService.GetTokenExpiration();
 
         // Assert
         var expectedExpiration = DateTime.UtcNow.AddHours(8);
