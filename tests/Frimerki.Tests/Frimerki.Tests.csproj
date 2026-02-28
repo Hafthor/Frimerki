@@ -38,6 +38,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Frimerki.Server\Frimerki.Server.csproj" />
+    <ProjectReference Include="..\..\src\Frimerki.Protocols\Frimerki.Protocols.csproj" />
     <ProjectReference Include="..\..\src\Frimerki.Data\Frimerki.Data.csproj" />
     <ProjectReference Include="..\..\src\Frimerki.Models\Frimerki.Models.csproj" />
     <ProjectReference Include="..\..\src\Frimerki.Services\Frimerki.Services.csproj" />
