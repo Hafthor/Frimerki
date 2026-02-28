@@ -26,7 +26,7 @@ public class HealthController(ILogger<HealthController> logger, INowProvider now
             Server = "Frimerki Email Server",
             Version,
             Timestamp = nowProvider.UtcNow,
-            Framework = ".NET 8"
+            Framework = ".NET 10"
         };
 
         logger.LogInformation("Health check requested");
@@ -39,7 +39,7 @@ public class HealthController(ILogger<HealthController> logger, INowProvider now
             Name = ProductName,
             Description,
             Version,
-            Framework = ".NET 8",
+            Framework = ".NET 10",
             Database = "SQLite",
             Protocols = new {
                 SMTP = new { Enabled = true, Ports = new[] { 25, 587, 465 } },

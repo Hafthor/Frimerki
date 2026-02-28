@@ -4,6 +4,7 @@ using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
 using Frimerki.Services.User;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public class PatchEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         _domainDatabaseName = "DomainTestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
+            builder.UseSetting(WebHostDefaults.EnvironmentKey, "Testing");
             builder.ConfigureServices(services => {
                 // Remove existing DbContext registrations
                 var emailDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));

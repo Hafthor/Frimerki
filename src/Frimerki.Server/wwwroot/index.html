@@ -17,7 +17,7 @@
             justify-content: center;
             color: white;
         }
-        
+
         .container {
             text-align: center;
             padding: 2rem;
@@ -29,52 +29,52 @@
             max-width: 600px;
             margin: 2rem;
         }
-        
+
         .logo {
             font-size: 4rem;
             margin-bottom: 1rem;
         }
-        
+
         h1 {
             font-size: 2.5rem;
             margin-bottom: 1rem;
             font-weight: 300;
         }
-        
+
         .accent {
             color: #ffd700;
             font-weight: 600;
         }
-        
+
         .subtitle {
             font-size: 1.2rem;
             margin-bottom: 2rem;
             opacity: 0.9;
         }
-        
+
         .info {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             padding: 1.5rem;
             margin-top: 2rem;
         }
-        
+
         .info h3 {
             margin-top: 0;
             color: #ffd700;
         }
-        
+
         .endpoints {
             text-align: left;
             margin: 1rem 0;
         }
-        
+
         .endpoints li {
             margin: 0.5rem 0;
             font-family: 'Courier New', monospace;
             font-size: 0.9rem;
         }
-        
+
         .status {
             display: inline-block;
             background: #4ade80;
@@ -85,17 +85,17 @@
             font-weight: bold;
             margin-top: 1rem;
         }
-        
+
         @media (max-width: 768px) {
             .container {
                 margin: 1rem;
                 padding: 1.5rem;
             }
-            
+
             h1 {
                 font-size: 2rem;
             }
-            
+
             .logo {
                 font-size: 3rem;
             }
@@ -107,15 +107,15 @@
         <div class="logo">📮</div>
         <h1>Welcome to <span class="accent">Frímerki</span></h1>
         <p class="subtitle">Lightweight Email Server</p>
-        
+
         <div class="status">Server Running</div>
-        
+
         <div class="info">
             <h3>🚀 Server Information</h3>
             <p><strong>Version:</strong> 1.0.0-alpha</p>
-            <p><strong>Framework:</strong> .NET 8</p>
+            <p><strong>Framework:</strong> .NET 10</p>
             <p><strong>Database:</strong> SQLite</p>
-            
+
             <h3>📡 Available Endpoints</h3>
             <ul class="endpoints">
                 <li>🌐 Web API: <code>/api/*</code></li>
@@ -125,17 +125,17 @@
                 <li>📬 IMAP: Port 143, 993</li>
                 <li>📪 POP3: Port 110, 995</li>
             </ul>
-            
+
             <h3>📝 Next Steps</h3>
             <p>This is the basic setup. The email protocols and full API will be implemented in the following development phases.</p>
         </div>
     </div>
-    
+
     <script>
         // Simple script to show server is responsive
         console.log('🎉 Frímerki Email Server is running!');
         console.log('📮 Icelandic for "postage stamp" - delivering your emails with care');
-        
+
         // Check if server is responding
         fetch('/api/health')
             .then(response => {

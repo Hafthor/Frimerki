@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Frimerki.Models.DTOs;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Hosting;
 
@@ -11,6 +12,7 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
 
     public ServerControllerTests(WebApplicationFactory<Program> factory) {
         var factory1 = factory.WithWebHostBuilder(builder => {
+            builder.UseSetting(WebHostDefaults.EnvironmentKey, "Testing");
             builder.ConfigureServices(services => {
                 // Remove default email server hosted services to prevent port conflicts
                 var hostedServices = services.Where(d => d.ServiceType == typeof(IHostedService) &&

@@ -105,17 +105,21 @@ try {
 
     Log.Information("Starting Frímerki Email Server");
 
-    // Ensure databases are created
-    using (var scope = app.Services.CreateScope()) {
-        // Initialize global database
-        var globalContext = scope.ServiceProvider.GetRequiredService<GlobalDbContext>();
-        await globalContext.Database.EnsureCreatedAsync();
-        Log.Information("Global database initialized successfully");
+    var isTestEnvironment = app.Environment.IsEnvironment("Testing");
 
-        // Keep legacy database for migration period
-        var emailContext = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
-        emailContext.Database.EnsureCreated();
-        Log.Information("Legacy email database initialized successfully");
+    // Ensure databases are created
+    if (!isTestEnvironment) {
+        using (var scope = app.Services.CreateScope()) {
+            // Initialize global database
+            var globalContext = scope.ServiceProvider.GetRequiredService<GlobalDbContext>();
+            await globalContext.Database.EnsureCreatedAsync();
+            Log.Information("Global database initialized successfully");
+
+            // Keep legacy database for migration period
+            var emailContext = scope.ServiceProvider.GetRequiredService<EmailDbContext>();
+            emailContext.Database.EnsureCreated();
+            Log.Information("Legacy email database initialized successfully");
+        }
     }
 
     for (; ; ) {

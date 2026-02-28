@@ -1,18 +1,18 @@
 # Frímerki Email Server Installation Guide
 
-**Frímerki** is a lightweight, self-contained email server built with C# and .NET 8. This guide covers installation, configuration, and security setup, with special emphasis on SSL/TLS encryption support.
+**Frímerki** is a lightweight, self-contained email server built with C# and .NET 10. This guide covers installation, configuration, and security setup, with special emphasis on SSL/TLS encryption support.
 
 ## 📋 Prerequisites
 
 ### System Requirements
 - **Operating System**: Linux, Windows, or macOS
-- **Runtime**: .NET 8 SDK or Runtime
+- **Runtime**: .NET 10 SDK or Runtime
 - **Memory**: Minimum 512MB RAM (1GB+ recommended)
 - **Storage**: 1GB+ available disk space
 - **Network**: Access to standard email ports (25, 143, 110, 587, 993, 995)
 
 ### Dependencies
-- .NET 8 SDK (for building from source)
+- .NET 10 SDK (for building from source)
 - SQLite (included with .NET)
 - Optional: Reverse proxy (nginx, Apache) for production SSL termination
 

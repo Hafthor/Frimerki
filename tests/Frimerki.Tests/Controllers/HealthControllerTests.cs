@@ -44,7 +44,7 @@ public class HealthControllerTests {
 
         Assert.Equal("Healthy", statusProperty.GetValue(response));
         Assert.Equal("Frimerki Email Server", serverProperty.GetValue(response));
-        Assert.Equal(".NET 8", frameworkProperty.GetValue(response));
+        Assert.Equal(".NET 10", frameworkProperty.GetValue(response));
         Assert.Equal(testTime, timestampProperty.GetValue(response));
     }
 
@@ -92,8 +92,8 @@ public class HealthControllerTests {
         Assert.NotNull(protocolsProperty);
         Assert.NotNull(featuresProperty);
 
-        Assert.Equal(".NET 8", frameworkProperty.GetValue(response));
-        Assert.Equal("SQLite", databaseProperty.GetValue(response));
+        Assert.Equal("Frimerki", nameProperty.GetValue(response));
+        Assert.Equal(".NET 10", frameworkProperty.GetValue(response));
     }
 
     [Fact]

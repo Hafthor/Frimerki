@@ -5,6 +5,7 @@ using Frimerki.Models.Entities;
 using Frimerki.Protocols.Pop3;
 using Frimerki.Tests.Utilities;
 using MailKit.Net.Pop3;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
         _databaseName = "TestDatabase_" + Guid.NewGuid();
 
         _factory = factory.WithWebHostBuilder(builder => {
+            builder.UseSetting(WebHostDefaults.EnvironmentKey, "Testing");
             builder.ConfigureServices(services => {
                 // Remove the existing DbContext registration
                 var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<EmailDbContext>));
@@ -61,11 +63,8 @@ public class Pop3ServerTests : IClassFixture<WebApplicationFactory<Program>>, ID
 
         // Create password hash for "TestPassword123!"
         var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        string passwordHash;
-        using (var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes("TestPassword123!", Convert.FromBase64String(salt), 10000, System.Security.Cryptography.HashAlgorithmName.SHA256)) {
-            var hash = pbkdf2.GetBytes(32);
-            passwordHash = Convert.ToBase64String(hash);
-        }
+        var hash = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2("TestPassword123!", Convert.FromBase64String(salt), 10000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
+        var passwordHash = Convert.ToBase64String(hash);
 
         var user = new User {
             Id = 1,

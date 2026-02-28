@@ -1,11 +1,11 @@
 # Frímerki Email Server
 
-**Frímerki** is a lightweight, self-contained email server built with C# and .NET 8. Designed for minimal hardware requirements and maximum efficiency.
+**Frímerki** is a lightweight, self-contained email server built with C# and .NET 10. Designed for minimal hardware requirements and maximum efficiency.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- .NET 8 SDK
+- .NET 10 SDK
 - Visual Studio Code, Visual Studio or JetBrains Rider
 
 ### Running the Server
@@ -107,7 +107,7 @@ Frimerki/
 
 ## 🛠️ Technology Stack
 
-- **.NET 8** - Modern, cross-platform framework with C# 12 features
+- **.NET 10** - Modern, cross-platform framework with C# 14 features
 - **ASP.NET Core** - Web API with JWT authentication
 - **Entity Framework Core** - Database ORM with SQLite
 - **SQLite** - Embedded database with in-memory testing
@@ -206,7 +206,7 @@ dotnet watch test
 - **Production Ready**: Complete email server with SMTP, POP3 and IMAP support
 - **Lightweight**: Minimal dependencies, runs on modest hardware
 - **Self-contained**: Single binary deployment with embedded SQLite database
-- **Modern**: Built with .NET 8 and latest C# 12 features
+- **Modern**: Built with .NET 10 and latest C# 14 features
 - **Fast**: Performance-optimized with source-generated regex and immutable collections
 - **Reliable**: Comprehensive test suite ensures stability and correctness
 - **Compliant**: Full RFC compliance for email protocols

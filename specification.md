@@ -1134,7 +1134,7 @@ All list endpoints use skip/take pagination with next URLs for efficient navigat
 ## Technology Stack
 
 ### Backend
-- **.NET 8**: Latest LTS version
+- **.NET 10**: Latest LTS version
 - **ASP.NET Core**: Web API framework
 - **Entity Framework Core**: ORM for SQLite
 - **SignalR**: Real-time communication
@@ -1330,7 +1330,7 @@ Support for all IMAP SEARCH criteria:
 - **Network**: Stable internet connection with static IP
 
 ### Software Requirements
-- **.NET 8 Runtime**
+- **.NET 10 Runtime**
 - **Operating System**: Windows, Linux, or macOS
 - **Reverse Proxy**: Nginx or Apache (recommended for production)
 
