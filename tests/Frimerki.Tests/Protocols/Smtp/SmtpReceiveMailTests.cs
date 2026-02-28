@@ -124,8 +124,8 @@ public sealed class SmtpReceiveMailTests : IAsyncDisposable {
         await client.ConnectAsync("localhost", _testPort);
 
         await using var stream = client.GetStream();
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        await using var writer = new StreamWriter(stream, Encoding.UTF8);
+        using var reader = new StreamReader(stream, new UTF8Encoding(false));
+        await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
         writer.AutoFlush = true;
 
         // Read greeting
@@ -216,8 +216,8 @@ public sealed class SmtpReceiveMailTests : IAsyncDisposable {
         await client.ConnectAsync("localhost", _testPort);
 
         await using var stream = client.GetStream();
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        await using var writer = new StreamWriter(stream, Encoding.UTF8);
+        using var reader = new StreamReader(stream, new UTF8Encoding(false));
+        await using var writer = new StreamWriter(stream, new UTF8Encoding(false));
         writer.AutoFlush = true;
 
         // Read greeting

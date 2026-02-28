@@ -42,7 +42,7 @@ public class DomainService(
         List<DomainResponse> domainResponses = [];
 
         foreach (var domain in domains) {
-            var userCount = domain.Users?.Count ?? 0;
+            var userCount = (domain.Users?.Count).GetValueOrDefault();
             var storageUsed = await CalculateDomainStorageAsync(domain.Id);
             var activeDkimKey = domain.DkimKeys?.FirstOrDefault(k => k.IsActive);
 
@@ -96,7 +96,7 @@ public class DomainService(
             CatchAllUser = domain.CatchAllUser == null ? null :
                 $"{domain.CatchAllUser.Username}@{domain.Name}",
             CreatedAt = domain.CreatedAt,
-            UserCount = domain.Users?.Count ?? 0,
+            UserCount = (domain.Users?.Count).GetValueOrDefault(),
             StorageUsed = storageUsed,
             HasDkim = activeDkimKey != null,
             DkimKey = activeDkimKey == null ? null : new DkimKeyInfo {

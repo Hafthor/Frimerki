@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using Frimerki.Models.DTOs;
+using Frimerki.Protocols.Common;
 using Frimerki.Services.Message;
 using Frimerki.Services.Session;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ public partial class Pop3Session(
     IMessageService messageService,
     ILogger<Pop3Session> logger) {
     private NetworkStream _stream;
-    private StreamReader _reader;
+    private PooledLineReader _reader;
     private StreamWriter _writer;
     private string _username;
     private int? _userId;
@@ -26,7 +27,7 @@ public partial class Pop3Session(
     public async Task HandleAsync(TcpClient client, CancellationToken cancellationToken) {
         try {
             _stream = client.GetStream();
-            _reader = new StreamReader(_stream, Encoding.ASCII);
+            _reader = new PooledLineReader(_stream, Encoding.ASCII);
             _writer = new StreamWriter(_stream, Encoding.ASCII) { AutoFlush = true };
 
             await SendResponseAsync("+OK Frimerki POP3 Server Ready", cancellationToken);
@@ -258,10 +259,36 @@ public partial class Pop3Session(
             await SendResponseAsync("", cancellationToken); // Empty line between headers and body
 
             // Send body with dot-stuffing
-            var bodyLines = messageResponse.Body.Split('\n');
-            foreach (var line in bodyLines) {
-                var lineToSend = line.StartsWith('.') ? "." + line : line;
-                await SendResponseAsync(lineToSend, cancellationToken);
+            // Note: We can't use Span across await, so we process line by line
+            var body = messageResponse.Body;
+            var start = 0;
+
+            for (int i = 0; i < body.Length; i++) {
+                if (body[i] == '\n') {
+                    var line = body.AsSpan(start, i - start);
+                    if (line.Length > 0 && line[^1] == '\r') {
+                        line = line[..^1];
+                    }
+
+                    var lineStr = line.Length > 0 && line[0] == '.'
+                        ? $".{line.ToString()}"
+                        : line.ToString();
+                    await SendResponseAsync(lineStr, cancellationToken);
+                    start = i + 1;
+                }
+            }
+
+            // Handle last line if no trailing newline
+            if (start < body.Length) {
+                var line = body.AsSpan(start);
+                if (line.Length > 0 && line[^1] == '\r') {
+                    line = line[..^1];
+                }
+
+                var lineStr = line.Length > 0 && line[0] == '.'
+                    ? $".{line.ToString()}"
+                    : line.ToString();
+                await SendResponseAsync(lineStr, cancellationToken);
             }
 
             await SendResponseAsync(".", cancellationToken);
@@ -407,12 +434,37 @@ public partial class Pop3Session(
             await SendResponseAsync("", cancellationToken); // Empty line between headers and body
 
             // Send specified number of body lines
-            var bodyLines = messageResponse.Body.Split('\n');
-            var linesToSend = Math.Min(lineCount, bodyLines.Length);
+            var body = messageResponse.Body;
+            var linesSent = 0;
+            var start = 0;
 
-            for (int i = 0; i < linesToSend; i++) {
-                var lineToSend = bodyLines[i].StartsWith('.') ? "." + bodyLines[i] : bodyLines[i];
-                await SendResponseAsync(lineToSend, cancellationToken);
+            for (int i = 0; i < body.Length && linesSent < lineCount; i++) {
+                if (body[i] == '\n') {
+                    var line = body.AsSpan(start, i - start);
+                    if (line.Length > 0 && line[^1] == '\r') {
+                        line = line[..^1];
+                    }
+
+                    var lineStr = line.Length > 0 && line[0] == '.'
+                        ? $".{line.ToString()}"
+                        : line.ToString();
+                    await SendResponseAsync(lineStr, cancellationToken);
+                    start = i + 1;
+                    linesSent++;
+                }
+            }
+
+            // Handle last line if no trailing newline and we haven't sent enough
+            if (start < body.Length && linesSent < lineCount) {
+                var line = body.AsSpan(start);
+                if (line.Length > 0 && line[^1] == '\r') {
+                    line = line[..^1];
+                }
+
+                var lineStr = line.Length > 0 && line[0] == '.'
+                    ? $".{line.ToString()}"
+                    : line.ToString();
+                await SendResponseAsync(lineStr, cancellationToken);
             }
 
             await SendResponseAsync(".", cancellationToken);

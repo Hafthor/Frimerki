@@ -11,7 +11,7 @@ public static class ImapCommandParser {
             return null;
         }
 
-        var trimmed = commandLine.Trim();
+        var trimmed = commandLine.AsSpan().Trim();
         List<string> parts = [];
         StringBuilder currentPart = new();
         var inQuotes = false;
@@ -34,9 +34,9 @@ public static class ImapCommandParser {
                 }
             } else if (ch == '{') {
                 // Handle literal syntax {length}
-                var closeBrace = trimmed.IndexOf('}', i);
-                if (closeBrace > i && int.TryParse(trimmed[(i + 1)..closeBrace], out literalLength)) {
-                    i = closeBrace;
+                var closeBrace = trimmed[(i + 1)..].IndexOf('}');
+                if (closeBrace >= 0 && int.TryParse(trimmed.Slice(i + 1, closeBrace), out literalLength)) {
+                    i += closeBrace + 1;
                 } else {
                     currentPart.Append(ch);
                 }

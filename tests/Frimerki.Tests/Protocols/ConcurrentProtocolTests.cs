@@ -65,6 +65,7 @@ public class ConcurrentProtocolTests(ITestOutputHelper output) {
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await server.StartAsync(cts.Token);
+        await Task.Delay(500, cts.Token); // Wait for server listener to start
         var cancellationToken = cts.Token;
 
         // Act - Create multiple concurrent connections

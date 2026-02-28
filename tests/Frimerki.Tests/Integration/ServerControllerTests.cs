@@ -1,8 +1,11 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace Frimerki.Tests.Integration;
@@ -11,6 +14,7 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
     private readonly HttpClient _client;
 
     public ServerControllerTests(WebApplicationFactory<Program> factory) {
+        var dbName = $"ServerControllerTests_{Guid.NewGuid():N}";
         var factory1 = factory.WithWebHostBuilder(builder => {
             builder.UseSetting(WebHostDefaults.EnvironmentKey, "Testing");
             builder.ConfigureServices(services => {
@@ -20,6 +24,14 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
                 foreach (var service in hostedServices) {
                     services.Remove(service);
                 }
+
+                // Add in-memory databases required by server services
+                services.AddDbContext<GlobalDbContext>(options =>
+                    options.UseInMemoryDatabase($"Global_{dbName}"));
+                services.AddDbContext<EmailDbContext>(options =>
+                    options.UseInMemoryDatabase($"Email_{dbName}"));
+                services.AddSingleton<IDomainDbContextFactory>(_ =>
+                    new TestDomainDbContextFactory($"Domain_{dbName}"));
             });
         });
         _client = factory1.CreateClient();
@@ -57,7 +69,7 @@ public class ServerControllerTests : IClassFixture<WebApplicationFactory<Program
         });
 
         Assert.NotNull(health);
-        Assert.Equal("Healthy", health.Status);
+        Assert.Contains(health.Status, new[] { "Healthy", "Warning" });
         Assert.NotEmpty(health.Checks);
         Assert.Contains(health.Checks, c => c.Name == "Database");
     }

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using Frimerki.Data;
@@ -60,8 +61,15 @@ public class EmailDeliveryService(
 
     private async Task<MimeMessage> ParseMimeMessageAsync(string messageData) {
         try {
-            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(messageData));
-            return await MimeMessage.LoadAsync(stream);
+            var byteCount = Encoding.UTF8.GetByteCount(messageData);
+            var buffer = ArrayPool<byte>.Shared.Rent(byteCount);
+            try {
+                var written = Encoding.UTF8.GetBytes(messageData, buffer);
+                using var stream = new MemoryStream(buffer, 0, written, writable: false);
+                return await MimeMessage.LoadAsync(stream);
+            } finally {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         } catch (Exception ex) {
             logger.LogError(ex, "Error parsing MIME message");
             return null;
@@ -173,12 +181,37 @@ public class EmailDeliveryService(
 
     private string ExtractHeaders(string rawMessageData) {
         // Extract headers from raw message data (everything before first empty line)
-        var headerLines = rawMessageData.Split('\n')
-            .TakeWhile(line => !string.IsNullOrWhiteSpace(line.TrimEnd('\r')))
-            .Select(line => line.TrimEnd('\r'))
-            .ToList();
+        var span = rawMessageData.AsSpan();
+        var searchFrom = 0;
 
-        return string.Join("\r\n", headerLines) + "\r\n";
+        while (searchFrom < span.Length) {
+            var newlineIndex = span[searchFrom..].IndexOf('\n');
+            if (newlineIndex < 0) {
+                break;
+            }
+
+            var lineEnd = newlineIndex;
+            // Check if the line (excluding \r\n) is empty
+            if (lineEnd == 0 || (lineEnd == 1 && span[searchFrom] == '\r')) {
+                // Empty line found — headers end here
+                var headers = span[..searchFrom];
+                // Trim trailing \r\n if present
+                if (headers.Length > 0 && headers[^1] == '\n') {
+                    headers = headers[..^1];
+                }
+
+                if (headers.Length > 0 && headers[^1] == '\r') {
+                    headers = headers[..^1];
+                }
+
+                return headers.ToString() + "\r\n";
+            }
+
+            searchFrom += newlineIndex + 1;
+        }
+
+        // No empty line found — entire content is headers
+        return rawMessageData.TrimEnd('\r', '\n') + "\r\n";
     }
 
     private string ExtractAddresses(InternetAddressList addressList) {
@@ -208,7 +241,7 @@ public class EmailDeliveryService(
             Subtype = !string.IsNullOrEmpty(mimeMessage.HtmlBody) ? "html" : "plain",
             Parameters = new Dictionary<string, string> { { "charset", "utf-8" } },
             ContentTransferEncoding = "8bit",
-            Size = (mimeMessage.TextBody?.Length ?? 0) + (mimeMessage.HtmlBody?.Length ?? 0)
+            Size = (mimeMessage.TextBody?.Length).GetValueOrDefault() + (mimeMessage.HtmlBody?.Length).GetValueOrDefault()
         };
 
         return JsonSerializer.Serialize(bodyStructure);

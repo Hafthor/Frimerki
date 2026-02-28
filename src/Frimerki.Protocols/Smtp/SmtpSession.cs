@@ -1,7 +1,9 @@
+using System.Buffers;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using Frimerki.Models.Entities;
+using Frimerki.Protocols.Common;
 using Frimerki.Services.Email;
 using Frimerki.Services.User;
 using Microsoft.Extensions.Logging;
@@ -16,7 +18,6 @@ public partial class SmtpSession : IDisposable {
 
     private TcpClient _client;
     private NetworkStream _stream;
-    private StreamReader _reader;
     private StreamWriter _writer;
     private readonly IUserService _userService;
     private readonly EmailDeliveryService _emailDeliveryService;
@@ -27,6 +28,7 @@ public partial class SmtpSession : IDisposable {
     private string _mailFrom;
     private readonly List<string> _rcptTo = [];
     private readonly StringBuilder _messageData = new();
+    private PooledLineReader _reader;
 
     [GeneratedRegex(@"FROM:\s*<(.*)>", RegexOptions.IgnoreCase)]
     private static partial Regex MailFromRegex();
@@ -37,7 +39,7 @@ public partial class SmtpSession : IDisposable {
     public SmtpSession(TcpClient client, IUserService userService, EmailDeliveryService emailDeliveryService, ILogger logger) {
         _client = client;
         _stream = client.GetStream();
-        _reader = new StreamReader(_stream, Utf8NoBom);
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
         _writer = new StreamWriter(_stream, Utf8NoBom) { AutoFlush = true };
         _userService = userService;
         _emailDeliveryService = emailDeliveryService;
@@ -54,8 +56,13 @@ public partial class SmtpSession : IDisposable {
             while (!cancellationToken.IsCancellationRequested &&
                    (line = await _reader.ReadLineAsync(cancellationToken)) != null) {
 
+                var trimmedLine = line.Trim().TrimEnd('\0');
+                if (string.IsNullOrEmpty(trimmedLine)) {
+                    continue;
+                }
+
                 try {
-                    await ProcessCommandAsync(line.Trim(), cancellationToken);
+                    await ProcessCommandAsync(trimmedLine, cancellationToken);
 
                     if (_state == SmtpSessionState.Quit) {
                         break;
@@ -72,7 +79,6 @@ public partial class SmtpSession : IDisposable {
 
     private async Task ProcessCommandAsync(string command, CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(command)) {
-            await SendResponseAsync("500 Syntax error, command unrecognized");
             return;
         }
 
@@ -145,20 +151,40 @@ public partial class SmtpSession : IDisposable {
         }
 
         try {
-            var decoded = Utf8NoBom.GetString(Convert.FromBase64String(credentials));
-            var parts = decoded.Split('\0');
+            var base64Span = credentials.AsSpan();
+            var maxDecodedLength = (base64Span.Length * 3) / 4;
+            var decodedBuffer = ArrayPool<byte>.Shared.Rent(maxDecodedLength);
 
-            if (parts.Length >= 3) {
-                var username = parts[1];
-                var password = parts[2];
-
-                var user = await _userService.AuthenticateUserEntityAsync(username, password);
-                if (user != null) {
-                    _authenticatedUser = user;
-                    _state = SmtpSessionState.Authenticated;
-                    await SendResponseAsync("235 Authentication successful");
+            try {
+                if (!Convert.TryFromBase64Chars(base64Span, decodedBuffer, out var bytesWritten)) {
+                    await SendResponseAsync("535 Authentication failed");
                     return;
                 }
+
+                var decoded = Utf8NoBom.GetString(decodedBuffer, 0, bytesWritten);
+                var decodedSpan = decoded.AsSpan();
+
+                // AUTH PLAIN format: \0username\0password
+                var firstNull = decodedSpan.IndexOf('\0');
+                if (firstNull >= 0) {
+                    var afterFirst = decodedSpan[(firstNull + 1)..];
+                    var secondNull = afterFirst.IndexOf('\0');
+
+                    if (secondNull >= 0) {
+                        var username = afterFirst[..secondNull].ToString();
+                        var password = afterFirst[(secondNull + 1)..].ToString();
+
+                        var user = await _userService.AuthenticateUserEntityAsync(username, password);
+                        if (user != null) {
+                            _authenticatedUser = user;
+                            _state = SmtpSessionState.Authenticated;
+                            await SendResponseAsync("235 Authentication successful");
+                            return;
+                        }
+                    }
+                }
+            } finally {
+                ArrayPool<byte>.Shared.Return(decodedBuffer);
             }
         } catch {
             // Invalid base64 or other error

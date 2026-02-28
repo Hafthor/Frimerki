@@ -15,7 +15,7 @@ public class SmtpServer(ILogger<SmtpServer> logger, IServiceProvider serviceProv
     : BackgroundService, IDisposable {
     private TcpListener _listener;
     private readonly List<Task> _clientTasks = [];
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
         try {

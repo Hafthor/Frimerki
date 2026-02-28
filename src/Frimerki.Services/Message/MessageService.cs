@@ -683,17 +683,17 @@ public class MessageService(EmailDbContext context, INowProvider nowProvider, IL
     }
 
     private int CalculateMessageSize(MessageRequest request) {
-        var size = (request.Subject?.Length ?? 0) +
-                   (request.Body?.Length ?? 0) +
-                   (request.BodyHtml?.Length ?? 0) +
+        var size = (request.Subject?.Length).GetValueOrDefault() +
+                   (request.Body?.Length).GetValueOrDefault() +
+                   (request.BodyHtml?.Length).GetValueOrDefault() +
                    200; // Approximate header size
         return size;
     }
 
     private int CalculateMessageSize(Frimerki.Models.Entities.Message message) {
-        return (message.Subject?.Length ?? 0) +
-               (message.Body?.Length ?? 0) +
-               (message.BodyHtml?.Length ?? 0) +
+        return (message.Subject?.Length).GetValueOrDefault() +
+               (message.Body?.Length).GetValueOrDefault() +
+               (message.BodyHtml?.Length).GetValueOrDefault() +
                message.Headers.Length;
     }
 
@@ -719,7 +719,7 @@ public class MessageService(EmailDbContext context, INowProvider nowProvider, IL
             Subtype = !string.IsNullOrEmpty(request.BodyHtml) ? "html" : "plain",
             Parameters = new Dictionary<string, string> { { "charset", "utf-8" } },
             ContentTransferEncoding = "8bit",
-            Size = request.Body?.Length ?? 0
+            Size = (request.Body?.Length).GetValueOrDefault()
         };
 
         return JsonSerializer.Serialize(bodyStructure);

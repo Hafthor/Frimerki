@@ -55,14 +55,20 @@ try {
 
     builder.Services.AddAuthorization();
 
+    var isTestEnvironment = builder.Environment.IsEnvironment("Testing");
+
     // Configure Entity Framework - Global Database
-    builder.Services.AddDbContext<GlobalDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("GlobalConnection") ??
-                          "Data Source=frimerki_global.db"));
+    if (!isTestEnvironment) {
+        builder.Services.AddDbContext<GlobalDbContext>(options =>
+            options.UseSqlite(builder.Configuration.GetConnectionString("GlobalConnection") ??
+                              "Data Source=frimerki_global.db"));
+    }
 
     // Configure Entity Framework - Legacy single database (for migration period)
-    builder.Services.AddDbContext<EmailDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    if (!isTestEnvironment) {
+        builder.Services.AddDbContext<EmailDbContext>(options =>
+            options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    }
 
     // Configure Account Lockout
     builder.Services.Configure<Frimerki.Models.Configuration.AccountLockoutOptions>(
@@ -105,8 +111,6 @@ try {
 
     Log.Information("Starting Frímerki Email Server");
 
-    var isTestEnvironment = app.Environment.IsEnvironment("Testing");
-
     // Ensure databases are created
     if (!isTestEnvironment) {
         using (var scope = app.Services.CreateScope()) {
@@ -122,17 +126,7 @@ try {
         }
     }
 
-    for (; ; ) {
-        var startTime = Stopwatch.GetTimestamp();
-        try {
-            app.Run();
-        } catch (Exception ex) when (Stopwatch.GetElapsedTime(startTime) > TimeSpan.FromMilliseconds(100)) {
-            Log.Fatal(ex, "Frímerki Email Server terminated unexpectedly - restarting");
-        } catch (Exception ex) {
-            Log.Fatal(ex, "Frímerki Email Server terminated unexpectedly - failing");
-            throw;
-        }
-    }
+    app.Run();
 } finally {
     Log.CloseAndFlush();
 }

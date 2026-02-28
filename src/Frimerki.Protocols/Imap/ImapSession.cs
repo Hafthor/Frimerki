@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net.Sockets;
 using System.Text;
 using Frimerki.Models.DTOs;
@@ -27,7 +28,10 @@ public partial class ImapSession(
     public string SelectedFolder { get; private set; }
     public bool IsReadOnly { get; private set; }
 
+    private string _pendingCommandTail;
+
     public async Task HandleSessionAsync() {
+        var readBuffer = ArrayPool<byte>.Shared.Rent(8192);
         try {
             logger.LogInformation("IMAP: Starting session for client");
 
@@ -37,28 +41,82 @@ public partial class ImapSession(
             logger.LogInformation("IMAP: Greeting sent successfully");
 
             while (_client.Connected && State != ImapConnectionState.Logout) {
-                var buffer = new byte[8192];
-                var bytesRead = await _stream.ReadAsync(buffer);
+                var bytesRead = await _stream.ReadAsync(readBuffer);
 
                 if (bytesRead == 0) {
                     logger.LogInformation("IMAP: Client disconnected (no more data)");
                     break;
                 }
 
-                var commandLine = Utf8NoBom.GetString(buffer, 0, bytesRead).Trim();
+                var lineEndIndex = Array.IndexOf(readBuffer, (byte)'\n', 0, bytesRead);
+                if (lineEndIndex < 0) {
+                    // No full line yet, keep reading
+                    _pendingCommandTail = (_pendingCommandTail ?? "") + Utf8NoBom.GetString(readBuffer, 0, bytesRead);
+                    continue;
+                }
+
+                var commandLine = Utf8NoBom.GetString(readBuffer, 0, lineEndIndex).TrimEnd('\r');
+                if (!string.IsNullOrEmpty(_pendingCommandTail)) {
+                    commandLine = _pendingCommandTail + commandLine;
+                    _pendingCommandTail = null;
+                }
+
                 if (!string.IsNullOrEmpty(commandLine)) {
-                    await ProcessCommandAsync(commandLine);
+                    if (commandLine.Contains("APPEND") && commandLine.Contains('{')) {
+                        var literalStart = lineEndIndex + 1;
+                        var initialLiteral = bytesRead > literalStart
+                            ? new ReadOnlyMemory<byte>(readBuffer, literalStart, bytesRead - literalStart)
+                            : ReadOnlyMemory<byte>.Empty;
+                        await HandleAppendCommandWithLiteral(commandLine, initialLiteral);
+                    } else {
+                        await ProcessCommandAsync(commandLine);
+                        if (bytesRead > lineEndIndex + 1) {
+                            var extraBytes = new ReadOnlyMemory<byte>(readBuffer, lineEndIndex + 1, bytesRead - lineEndIndex - 1);
+                            await ProcessExtraCommandBytes(extraBytes);
+                        }
+                    }
                 }
             }
         } catch (Exception ex) {
             logger.LogError(ex, "Error in IMAP session");
         } finally {
+            ArrayPool<byte>.Shared.Return(readBuffer);
             try {
                 _client?.Dispose();
             } catch {
                 // Ignore cleanup errors
             }
             _client = null;
+        }
+    }
+
+    private async Task ProcessExtraCommandBytes(ReadOnlyMemory<byte> extraBytes) {
+        if (extraBytes.IsEmpty) {
+            return;
+        }
+
+        var extraText = Utf8NoBom.GetString(extraBytes.Span);
+        var searchFrom = 0;
+
+        while (searchFrom < extraText.Length) {
+            var newlineIndex = extraText.IndexOf('\n', searchFrom);
+            if (newlineIndex < 0) {
+                // No newline found — this is an incomplete trailing line
+                _pendingCommandTail = (_pendingCommandTail ?? "") + extraText[searchFrom..];
+                break;
+            }
+
+            var lineEnd = newlineIndex;
+            if (lineEnd > searchFrom && extraText[lineEnd - 1] == '\r') {
+                lineEnd--;
+            }
+
+            var trimmed = extraText[searchFrom..lineEnd];
+            searchFrom = newlineIndex + 1;
+
+            if (trimmed.Length > 0) {
+                await ProcessCommandAsync(trimmed);
+            }
         }
     }
 
@@ -192,33 +250,58 @@ public partial class ImapSession(
         await SendResponseAsync("+ ");
 
         // Read the authentication data from the client
-        var buffer = new byte[1024];
-        var bytesRead = await _stream.ReadAsync(buffer);
-        var authData = Utf8NoBom.GetString(buffer, 0, bytesRead).Trim();
-
+        var authBuffer = ArrayPool<byte>.Shared.Rent(1024);
+        var bytesRead = 0;
+        string authData;
         try {
-            // Decode base64 authentication data
-            var decodedBytes = Convert.FromBase64String(authData);
-            var decoded = Utf8NoBom.GetString(decodedBytes);
+            bytesRead = await _stream.ReadAsync(authBuffer);
+            authData = Utf8NoBom.GetString(authBuffer, 0, bytesRead).Trim();
+        } finally {
+            ArrayPool<byte>.Shared.Return(authBuffer);
+        }
+        try {
+            var base64Span = authData.AsSpan();
+            var maxDecodedLength = (base64Span.Length * 3) / 4;
+            var decodedBuffer = ArrayPool<byte>.Shared.Rent(maxDecodedLength);
 
-            // PLAIN format: \0username\0password
-            var parts = decoded.Split('\0');
-            if (parts.Length >= 3) {
-                var username = parts[1];
-                var password = parts[2];
-
-                // Use the user service to authenticate
-                var user = await userService.AuthenticateUserEntityAsync(username, password);
-                if (user != null) {
-                    CurrentUser = user;
-                    State = ImapConnectionState.Authenticated;
-
+            try {
+                if (!Convert.TryFromBase64Chars(base64Span, decodedBuffer, out var decodedLength)) {
                     return new ImapResponse {
                         Tag = command.Tag,
-                        Type = ImapResponseType.Ok,
-                        Message = "AUTHENTICATE completed"
+                        Type = ImapResponseType.No,
+                        Message = "Authentication failed"
                     };
                 }
+
+                var decoded = Utf8NoBom.GetString(decodedBuffer, 0, decodedLength);
+                var decodedSpan = decoded.AsSpan();
+
+                // PLAIN format: \0username\0password
+                var firstNull = decodedSpan.IndexOf('\0');
+                if (firstNull >= 0) {
+                    var afterFirst = decodedSpan[(firstNull + 1)..];
+                    var secondNull = afterFirst.IndexOf('\0');
+
+                    if (secondNull >= 0) {
+                        var username = afterFirst[..secondNull].ToString();
+                        var password = afterFirst[(secondNull + 1)..].ToString();
+
+                        // Use the user service to authenticate
+                        var user = await userService.AuthenticateUserEntityAsync(username, password);
+                        if (user != null) {
+                            CurrentUser = user;
+                            State = ImapConnectionState.Authenticated;
+
+                            return new ImapResponse {
+                                Tag = command.Tag,
+                                Type = ImapResponseType.Ok,
+                                Message = "AUTHENTICATE completed"
+                            };
+                        }
+                    }
+                }
+            } finally {
+                ArrayPool<byte>.Shared.Return(decodedBuffer);
             }
         } catch (Exception ex) {
             logger.LogWarning(ex, "Invalid authentication data");
@@ -355,6 +438,10 @@ public partial class ImapSession(
     }
 
     private async Task HandleAppendCommandWithLiteral(string commandLine) {
+        await HandleAppendCommandWithLiteral(commandLine, ReadOnlyMemory<byte>.Empty);
+    }
+
+    private async Task HandleAppendCommandWithLiteral(string commandLine, ReadOnlyMemory<byte> initialLiteral) {
         try {
             logger.LogInformation("APPEND: Starting processing for command: {Command}", commandLine);
 
@@ -372,87 +459,98 @@ public partial class ImapSession(
             var lastPart = parts[^1];
             if (lastPart.StartsWith('{') && lastPart.EndsWith('}')) {
                 var sizeString = lastPart[1..^1];
+                var isNonSync = sizeString.EndsWith('+');
+                if (isNonSync) {
+                    sizeString = sizeString[..^1];
+                }
+
                 if (int.TryParse(sizeString, out var literalSize)) {
                     logger.LogInformation("APPEND: Expecting literal of size {Size} for mailbox {Mailbox}", literalSize, mailbox);
 
-                    // Send continuation response
-                    await SendResponseAsync("+ Ready for literal data");
-
-                    // Read the literal data
-                    var buffer = new byte[literalSize];
-                    var totalRead = 0;
-                    while (totalRead < literalSize) {
-                        var bytesRead = await _stream.ReadAsync(buffer.AsMemory(totalRead, literalSize - totalRead));
-                        if (bytesRead == 0) {
-                            break;
-                        }
-                        totalRead += bytesRead;
+                    // Send continuation response only for sync literals
+                    if (!isNonSync) {
+                        await SendResponseAsync("+ Ready for literal data");
                     }
 
-                    var messageContent = Utf8NoBom.GetString(buffer, 0, totalRead);
-                    logger.LogDebug("APPEND: Received message content of length {Length}", messageContent.Length);
-
+                    // Read the literal data
+                    var buffer = ArrayPool<byte>.Shared.Rent(literalSize);
+                    var totalRead = 0;
                     try {
-                        // Create new message using message service
-                        var toRecipients = ExtractToRecipientsFromMessage(messageContent);
-                        var toAddress = toRecipients.FirstOrDefault("unknown@localhost");
-                        var subject = ExtractHeaderValue(messageContent, "Subject") ?? "No Subject";
+                        ReadOnlyMemory<byte> trailingBytes = ReadOnlyMemory<byte>.Empty;
+                        if (!initialLiteral.IsEmpty) {
+                            var toCopy = Math.Min(initialLiteral.Length, literalSize);
+                            initialLiteral.Span[..toCopy].CopyTo(buffer.AsSpan(0, toCopy));
+                            totalRead = toCopy;
 
-                        logger.LogInformation("APPEND: Creating message with subject '{Subject}' for mailbox '{Mailbox}'",
-                            subject, mailbox);
-
-                        var messageRequest = new MessageRequest {
-                            Subject = subject,
-                            Body = ExtractBodyFromMessage(messageContent),
-                            ToAddress = toAddress,
-                            CcAddress = toRecipients.Skip(1).FirstOrDefault(),
-                            InReplyTo = ExtractHeaderValue(messageContent, "In-Reply-To"),
-                            References = ExtractHeaderValue(messageContent, "References")
-                        };
-
-                        // Use folder ID 1 for INBOX, 2 for Drafts
-                        var folderId = mailbox.Equals("Drafts", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
-                        var createdMessage = await messageService.CreateMessageAsync(folderId, messageRequest);
-
-                        // Parse flags if present (look for parentheses in command parts)
-                        List<string> flags = [];
-                        for (int i = 3; i < parts.Length - 1; i++) {
-                            if (parts[i].StartsWith('(') || flags.Count != 0) {
-                                var flag = parts[i].Trim('(', ')');
-                                if (!string.IsNullOrEmpty(flag)) {
-                                    flags.Add(flag);
-                                }
-                                if (parts[i].EndsWith(')')) {
-                                    break;
-                                }
+                            if (initialLiteral.Length > toCopy) {
+                                trailingBytes = initialLiteral.Slice(toCopy);
                             }
                         }
 
-                        // If we have flags, update them after creation
-                        if (flags.Count != 0) {
-                            var flagsRequest = new MessageFlagsRequest {
-                                Seen = flags.Contains(@"\Seen"),
-                                Answered = flags.Contains(@"\Answered"),
-                                Flagged = flags.Contains(@"\Flagged"),
-                                Deleted = flags.Contains(@"\Deleted"),
-                                Draft = flags.Contains(@"\Draft") || mailbox.Equals("Drafts", StringComparison.OrdinalIgnoreCase)
-                            };
-
-                            var updateRequest = new MessageUpdateRequest {
-                                Flags = flagsRequest
-                            };
-
-                            await messageService.UpdateMessageAsync(folderId, createdMessage.Id, updateRequest);
+                        while (totalRead < literalSize) {
+                            var bytesRead = await _stream.ReadAsync(buffer.AsMemory(totalRead, literalSize - totalRead));
+                            if (bytesRead == 0) {
+                                break;
+                            }
+                            totalRead += bytesRead;
                         }
 
-                        await SendResponseAsync($"{tag} OK [APPENDUID 1 {createdMessage.Id}] APPEND completed");
-                        logger.LogInformation("APPEND: Sent response with APPENDUID 1 {MessageId}", createdMessage.Id);
-                        return;
+                        var messageContent = Encoding.UTF8.GetString(buffer, 0, totalRead);
+                        logger.LogDebug("APPEND: Received message content of length {Length}", messageContent.Length);
 
-                    } catch (Exception ex) {
-                        logger.LogError(ex, "Failed to create message via APPEND");
-                        await SendResponseAsync($"{tag} NO Failed to append message");
-                        return;
+                        try {
+                            // Create new message using message service
+                            var toRecipients = ExtractToRecipientsFromMessage(messageContent);
+                            var toAddress = toRecipients.FirstOrDefault("unknown@localhost");
+                            var subject = ExtractHeaderValue(messageContent, "Subject") ?? "No Subject";
+
+                            logger.LogInformation("APPEND: Creating message with subject '{Subject}' for mailbox '{Mailbox}'",
+                                subject, mailbox);
+
+                            var messageRequest = new MessageRequest {
+                                Subject = subject,
+                                Body = ExtractBodyFromMessage(messageContent),
+                                ToAddress = toAddress,
+                                CcAddress = toRecipients.Skip(1).FirstOrDefault(),
+                                InReplyTo = ExtractHeaderValue(messageContent, "In-Reply-To"),
+                                References = ExtractHeaderValue(messageContent, "References")
+                            };
+
+                            // Use folder ID 1 for INBOX, 2 for Drafts
+                            var folderId = mailbox.Equals("Drafts", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+                            var createdMessage = await messageService.CreateMessageAsync(folderId, messageRequest);
+
+                            // Parse flags if present (look for parentheses in command parts)
+                            List<string> flags = [];
+                            for (int i = 3; i < parts.Length - 1; i++) {
+                                if (parts[i].StartsWith('(') || flags.Count != 0) {
+                                    var flag = parts[i].Trim('(', ')');
+                                    if (!string.IsNullOrEmpty(flag)) {
+                                        flags.Add(flag);
+                                    }
+                                    if (parts[i].EndsWith(')')) {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            var appendUid = createdMessage?.Uid > 0 ? createdMessage.Uid : createdMessage?.Id ?? 0;
+                            if (appendUid > 0) {
+                                await SendResponseAsync($"{tag} OK [APPENDUID 1 {appendUid}] APPEND completed");
+                            } else {
+                                await SendResponseAsync($"{tag} OK APPEND completed");
+                            }
+                        } catch (Exception ex) {
+                            logger.LogError(ex, "Failed to create message via APPEND");
+                            await SendResponseAsync($"{tag} NO Failed to append message");
+                            return;
+                        }
+
+                        if (!trailingBytes.IsEmpty) {
+                            await ProcessExtraCommandBytes(trailingBytes);
+                        }
+                    } finally {
+                        ArrayPool<byte>.Shared.Return(buffer);
                     }
                 }
 
@@ -739,26 +837,34 @@ public partial class ImapSession(
     }
 
     private string ExtractHeaderValue(string messageContent, string headerName) {
-        var headerPrefix = $"{headerName}:";
         var span = messageContent.AsSpan();
+        var headerSpan = headerName.AsSpan();
 
         foreach (var line in span.EnumerateLines()) {
-            if (line.StartsWith(headerPrefix, StringComparison.OrdinalIgnoreCase)) {
-                return line[headerPrefix.Length..].Trim().ToString();
+            if (line.Length <= headerSpan.Length + 1) {
+                continue;
+            }
+
+            if (line.StartsWith(headerSpan, StringComparison.OrdinalIgnoreCase) && line[headerSpan.Length] == ':') {
+                return line[(headerSpan.Length + 1)..].Trim().ToString();
             }
         }
         return null;
     }
 
     private string ExtractBodyFromMessage(string messageContent) {
-        // Find the empty line that separates headers from body
-        var emptyLineIndex = messageContent.IndexOf("\n\n", StringComparison.Ordinal);
-        if (emptyLineIndex == -1) {
-            emptyLineIndex = messageContent.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-        }
-
-        if (emptyLineIndex >= 0) {
-            return messageContent[(emptyLineIndex + 2)..].Trim();
+        // Find the empty line that separates headers from body using a single scan.
+        // Handles both \r\n\r\n and \n\n line endings.
+        var span = messageContent.AsSpan();
+        for (int i = 0; i < span.Length - 1; i++) {
+            if (span[i] == '\n') {
+                if (span[i + 1] == '\n') {
+                    return span[(i + 2)..].Trim().ToString();
+                }
+                if (i + 2 < span.Length && span[i + 1] == '\r' && span[i + 2] == '\n') {
+                    return span[(i + 3)..].Trim().ToString();
+                }
+            }
         }
 
         return messageContent; // If no headers separator found, treat all as body
@@ -770,28 +876,66 @@ public partial class ImapSession(
             return [];
         }
 
-        return toHeader.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                      .Select(email => email.Trim())
-                      .ToList();
+        List<string> recipients = [];
+        var span = toHeader.AsSpan();
+        var searchFrom = 0;
+
+        while (searchFrom < span.Length) {
+            var commaIndex = span[searchFrom..].IndexOf(',');
+            var email = commaIndex >= 0
+                ? span.Slice(searchFrom, commaIndex).Trim()
+                : span[searchFrom..].Trim();
+
+            if (email.Length > 0) {
+                recipients.Add(email.ToString());
+            }
+
+            if (commaIndex < 0) {
+                break;
+            }
+
+            searchFrom += commaIndex + 1;
+        }
+
+        return recipients;
     }
 
     private async Task SendResponseAsync(string response) {
-        var bytes = Utf8NoBom.GetBytes(response + "\r\n");
-        await _stream.WriteAsync(bytes);
+        var responseLength = Encoding.UTF8.GetByteCount(response);
+        var totalLength = responseLength + 2; // +2 for \r\n
+        var buffer = ArrayPool<byte>.Shared.Rent(totalLength);
+
+        try {
+            Encoding.UTF8.GetBytes(response.AsSpan(), buffer);
+            buffer[responseLength] = (byte)'\r';
+            buffer[responseLength + 1] = (byte)'\n';
+            await _stream.WriteAsync(buffer.AsMemory(0, totalLength));
+        } finally {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+
         await _stream.FlushAsync();
         logger.LogInformation("IMAP Response: {Response}", response);
     }
 
     private async Task<List<int>> ParseSequenceSetToUidsAsync(string sequenceSet, bool isUid) {
         List<int> uids = [];
+        var span = sequenceSet.AsSpan();
 
         if (isUid) {
             // For UID commands, the sequence set contains UIDs directly
-            var parts = sequenceSet.Split(',');
-            foreach (var part in parts) {
-                if (part.Contains(':')) {
-                    var range = part.Split(':');
-                    if (range.Length == 2 && int.TryParse(range[0], out int start) && int.TryParse(range[1], out int end)) {
+            var searchFrom = 0;
+            while (searchFrom < span.Length) {
+                var commaIndex = span[searchFrom..].IndexOf(',');
+                var part = commaIndex >= 0
+                    ? span.Slice(searchFrom, commaIndex)
+                    : span[searchFrom..];
+
+                var colonIndex = part.IndexOf(':');
+                if (colonIndex >= 0) {
+                    // Range: start:end
+                    if (int.TryParse(part[..colonIndex], out int start) &&
+                        int.TryParse(part[(colonIndex + 1)..], out int end)) {
                         for (int uid = start; uid <= end; uid++) {
                             uids.Add(uid);
                         }
@@ -799,16 +943,27 @@ public partial class ImapSession(
                 } else if (int.TryParse(part, out int uid)) {
                     uids.Add(uid);
                 }
+
+                if (commaIndex < 0) {
+                    break;
+                }
+
+                searchFrom += commaIndex + 1;
             }
         } else {
             // For sequence number commands, we need to convert sequence numbers to UIDs
-            // This is a simplified implementation - in a full implementation, you'd query the database
-            // to get the actual UIDs for the given sequence numbers in the current folder
-            var parts = sequenceSet.Split(',');
-            foreach (var part in parts) {
-                if (part.Contains(':')) {
-                    var range = part.Split(':');
-                    if (range.Length == 2 && int.TryParse(range[0], out int start) && int.TryParse(range[1], out int end)) {
+            var searchFrom = 0;
+            while (searchFrom < span.Length) {
+                var commaIndex = span[searchFrom..].IndexOf(',');
+                var part = commaIndex >= 0
+                    ? span.Slice(searchFrom, commaIndex)
+                    : span[searchFrom..];
+
+                var colonIndex = part.IndexOf(':');
+                if (colonIndex >= 0) {
+                    // Range: start:end
+                    if (int.TryParse(part[..colonIndex], out int start) &&
+                        int.TryParse(part[(colonIndex + 1)..], out int end)) {
                         for (int seq = start; seq <= end; seq++) {
                             // For now, assume sequence number equals UID (simplified)
                             uids.Add(seq);
@@ -818,6 +973,12 @@ public partial class ImapSession(
                     // For now, assume sequence number equals UID (simplified)
                     uids.Add(seq);
                 }
+
+                if (commaIndex < 0) {
+                    break;
+                }
+
+                searchFrom += commaIndex + 1;
             }
         }
 

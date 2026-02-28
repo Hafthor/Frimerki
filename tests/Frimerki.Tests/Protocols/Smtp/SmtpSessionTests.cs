@@ -13,6 +13,7 @@ using Moq;
 namespace Frimerki.Tests.Protocols.Smtp;
 
 public class SmtpSessionTests : IDisposable {
+    private static readonly UTF8Encoding Utf8NoBom = new(false);
     private readonly Mock<IUserService> _mockUserService;
     private readonly EmailDeliveryService _emailDeliveryService;
     private readonly Mock<ILogger> _mockLogger;
@@ -67,8 +68,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -95,8 +96,8 @@ public class SmtpSessionTests : IDisposable {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
-        using var reader = new StreamReader(_stream, Encoding.UTF8);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        using var reader = new StreamReader(_stream, Utf8NoBom);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom);
         writer.AutoFlush = true;
 
         // Act
@@ -127,8 +128,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -174,8 +175,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -218,8 +219,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -263,8 +264,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -319,8 +320,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -359,8 +360,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -403,8 +404,8 @@ public class SmtpSessionTests : IDisposable {
         using var serverClient = await _listener.AcceptTcpClientAsync();
         _session = new SmtpSession(serverClient, _mockUserService.Object, _emailDeliveryService, _mockLogger.Object);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        using var reader = new StreamReader(_stream, Encoding.UTF8, leaveOpen: true);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8, leaveOpen: true);
+        using var reader = new StreamReader(_stream, Utf8NoBom, leaveOpen: true);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom, leaveOpen: true);
         writer.AutoFlush = true;
 
         // Act
@@ -436,8 +437,8 @@ public class SmtpSessionTests : IDisposable {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
-        using var reader = new StreamReader(_stream, Encoding.UTF8);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        using var reader = new StreamReader(_stream, Utf8NoBom);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom);
         writer.AutoFlush = true;
 
         // Act
@@ -470,8 +471,8 @@ public class SmtpSessionTests : IDisposable {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
-        using var reader = new StreamReader(_stream, Encoding.UTF8);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        using var reader = new StreamReader(_stream, Utf8NoBom);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom);
         writer.AutoFlush = true;
 
         // Act
@@ -504,8 +505,8 @@ public class SmtpSessionTests : IDisposable {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
         // Use StreamReader/StreamWriter for proper line-oriented communication
-        using var reader = new StreamReader(_stream, Encoding.UTF8);
-        await using var writer = new StreamWriter(_stream, Encoding.UTF8);
+        using var reader = new StreamReader(_stream, Utf8NoBom);
+        await using var writer = new StreamWriter(_stream, Utf8NoBom);
         writer.AutoFlush = true;
 
         // Act

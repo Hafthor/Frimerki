@@ -497,4 +497,9 @@ public class ServerService(
             return null;
         }
     }
+
+    private bool IsTestEnvironment() {
+        var environment = configuration["ASPNETCORE_ENVIRONMENT"] ?? configuration["DOTNET_ENVIRONMENT"];
+        return string.Equals(environment, "Testing", StringComparison.OrdinalIgnoreCase);
+    }
 }
