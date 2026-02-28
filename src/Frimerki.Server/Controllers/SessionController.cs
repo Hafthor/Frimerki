@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Session;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Authorization;
@@ -65,7 +65,7 @@ public class SessionController(
     [Authorize]
     public async Task<ActionResult<LogoutResponse>> Logout() {
         try {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = User.UserId;
             if (string.IsNullOrEmpty(userId)) {
                 return BadRequest(new { error = "Invalid user session" });
             }
@@ -94,7 +94,7 @@ public class SessionController(
     [Authorize]
     public async Task<ActionResult<SessionResponse>> GetSession() {
         try {
-            logger.LogInformation("Get session request for user: {Email}", User.FindFirst(ClaimTypes.Email)?.Value);
+            logger.LogInformation("Get session request for user: {Email}", User.Email);
 
             var session = await sessionService.GetCurrentSessionAsync(User);
 
@@ -191,8 +191,8 @@ public class SessionController(
     public ActionResult GetAuthStatus() {
         try {
             var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
-            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            var email = User.Email;
+            var role = User.Role;
 
             return Ok(new {
                 isAuthenticated,

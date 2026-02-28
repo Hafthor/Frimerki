@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -74,8 +74,8 @@ public class UsersController(IUserService userService, ILogger<UsersController> 
             }
 
             // Check if current user is admin or accessing their own account
-            var currentUserEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-            var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            var currentUserEmail = User.Email;
+            var currentUserRole = User.Role;
 
             bool isAdmin = currentUserRole == "HostAdmin" || currentUserRole == "DomainAdmin";
             bool isOwnAccount = currentUserEmail == email;

@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Message;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -154,8 +154,8 @@ public class MessagesController(IMessageService messageService, ILogger<Messages
     }
 
     private int GetCurrentUserId() {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId)) {
+        var userIdStr = User.UserId;
+        if (userIdStr == null || !int.TryParse(userIdStr, out var userId)) {
             throw new UnauthorizedAccessException("User ID not found in token");
         }
         return userId;

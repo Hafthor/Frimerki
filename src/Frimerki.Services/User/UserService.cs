@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Frimerki.Data;
 using Frimerki.Models.Configuration;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -374,7 +375,7 @@ public partial class UserService(
     private UserResponse MapToUserResponse(Frimerki.Models.Entities.User user, UserStatsResponse stats) {
         return new UserResponse {
             Username = user.Username,
-            Email = $"{user.Username}@{user.Domain.Name}",
+            Email = user.Email,
             FullName = user.FullName,
             Role = user.Role,
             CanReceive = user.CanReceive,
@@ -450,10 +451,10 @@ public partial class UserService(
         if (user.FailedLoginAttempts >= _lockoutOptions.MaxFailedAttempts) {
             user.LockoutEnd = now.AddMinutes(_lockoutOptions.LockoutDurationMinutes);
             logger.LogWarning("Account locked for user {Email} after {Attempts} failed attempts. Lockout ends at {LockoutEnd}",
-                $"{user.Username}@{user.Domain.Name}", user.FailedLoginAttempts, user.LockoutEnd);
+                user.Email, user.FailedLoginAttempts, user.LockoutEnd);
         } else {
             logger.LogWarning("Failed login attempt for user {Email}. Attempt {Current}/{Max}",
-                $"{user.Username}@{user.Domain.Name}", user.FailedLoginAttempts, _lockoutOptions.MaxFailedAttempts);
+                user.Email, user.FailedLoginAttempts, _lockoutOptions.MaxFailedAttempts);
         }
 
         await context.SaveChangesAsync();

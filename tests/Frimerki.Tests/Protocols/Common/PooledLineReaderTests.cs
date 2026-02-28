@@ -115,6 +115,18 @@ public class PooledLineReaderTests : IDisposable {
     }
 
     [Fact]
+    public async Task ReadLineAsync_BomWithNoTrailingNewline_StrippedOnEofPath() {
+        // BOM + content but no trailing newline — exercises the end-of-stream BOM stripping path
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF, (byte)'H', (byte)'i' };
+        _stream = new MemoryStream(bytes);
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var line = await _reader.ReadLineAsync(CancellationToken.None);
+
+        Assert.Equal("Hi", line);
+    }
+
+    [Fact]
     public async Task ReadLineAsync_NoBom_FirstLineUnchanged() {
         var reader = CreateReader("HELO localhost\r\n");
 
@@ -241,6 +253,122 @@ public class PooledLineReaderTests : IDisposable {
         Assert.Equal("Line 1", await reader.ReadLineAsync(CancellationToken.None));
         Assert.Equal("..Dot-stuffed line", await reader.ReadLineAsync(CancellationToken.None));
         Assert.Equal(".", await reader.ReadLineAsync(CancellationToken.None));
+    }
+
+    // ── ReadDotTerminatedBytesAsync ──
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_BasicMessage_ReturnsBodyWithoutTerminator() {
+        var content = "Subject: Test\r\nTo: a@b.com\r\n\r\nHello world\r\n.\r\n";
+        // No prior ReadLineAsync — go straight to dot-terminated read
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        var result = Utf8NoBom.GetString(bytes);
+
+        Assert.Contains("Subject: Test", result);
+        Assert.Contains("Hello world", result);
+        Assert.DoesNotContain("\r\n.\r\n", result);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_DotUnstuffing_RemovesExtraDot() {
+        var content = "Line 1\r\n..Dot-stuffed\r\n.\r\n";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        var result = Utf8NoBom.GetString(bytes);
+
+        Assert.Contains("Line 1", result);
+        Assert.Contains(".Dot-stuffed", result);
+        Assert.DoesNotContain("..Dot-stuffed", result);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_EmptyBody_ReturnsEmpty() {
+        var content = ".\r\n";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+
+        Assert.Empty(bytes);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_StreamEndsWithoutTerminator_ReturnsAccumulatedData() {
+        var content = "Some data\r\nMore data";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        var result = Utf8NoBom.GetString(bytes);
+
+        Assert.Contains("Some data", result);
+        Assert.Contains("More data", result);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_AfterReadLineAsync_ConsumesLeftover() {
+        // Simulate SMTP: ReadLineAsync reads commands, then ReadDotTerminatedBytesAsync reads body
+        var content = "DATA\r\nBody line 1\r\nBody line 2\r\n.\r\n";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        // Read the command line first
+        var command = await _reader.ReadLineAsync(CancellationToken.None);
+        Assert.Equal("DATA", command);
+
+        // Now read dot-terminated body
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        var result = Utf8NoBom.GetString(bytes);
+
+        Assert.Contains("Body line 1", result);
+        Assert.Contains("Body line 2", result);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_UnixLineEndings_Handled() {
+        var content = "Line 1\nLine 2\n.\n";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        var result = Utf8NoBom.GetString(bytes);
+
+        Assert.Contains("Line 1", result);
+        Assert.Contains("Line 2", result);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_SmallBuffer_StillWorksCorrectly() {
+        var content = "Hello\r\n..Stuffed\r\n.\r\n";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom, bufferSize: 4);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        var result = Utf8NoBom.GetString(bytes);
+
+        Assert.Contains("Hello", result);
+        Assert.Contains(".Stuffed", result);
+        Assert.DoesNotContain("..Stuffed", result);
+    }
+
+    [Fact]
+    public async Task ReadDotTerminatedBytes_ContinuesReadingAfterTerminator() {
+        // After dot-terminated body, we should be able to read the next line
+        var content = "Body\r\n.\r\nNEXT COMMAND\r\n";
+        _stream = new MemoryStream(Utf8NoBom.GetBytes(content));
+        _reader = new PooledLineReader(_stream, Utf8NoBom);
+
+        var bytes = await _reader.ReadDotTerminatedBytesAsync(CancellationToken.None);
+        Assert.Equal("Body", Utf8NoBom.GetString(bytes));
+
+        // The reader should be able to continue reading lines after the terminator
+        var nextLine = await _reader.ReadLineAsync(CancellationToken.None);
+        Assert.Equal("NEXT COMMAND", nextLine);
     }
 
     /// <summary>

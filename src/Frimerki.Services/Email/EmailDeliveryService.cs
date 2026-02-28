@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using Frimerki.Data;
@@ -23,13 +22,13 @@ public class EmailDeliveryService(
     /// <summary>
     /// Deliver an incoming email to the appropriate recipient(s)
     /// </summary>
-    public async Task<bool> DeliverEmailAsync(string fromAddress, List<string> toAddresses, string messageData) {
+    public async Task<bool> DeliverEmailAsync(string fromAddress, List<string> toAddresses, byte[] messageBytes) {
         try {
             logger.LogInformation("Delivering email from {FromAddress} to {ToCount} recipients",
                 fromAddress, toAddresses.Count);
 
-            // Parse the message data using MimeKit
-            var mimeMessage = await ParseMimeMessageAsync(messageData);
+            // Parse the message data using MimeKit — bytes go directly to the parser, no re-encoding
+            var mimeMessage = await ParseMimeMessageAsync(messageBytes);
             if (mimeMessage == null) {
                 logger.LogError("Failed to parse incoming message");
                 return false;
@@ -38,7 +37,7 @@ public class EmailDeliveryService(
             // Process each recipient
             var deliveryResults = new List<bool>();
             foreach (var toAddress in toAddresses) {
-                var result = await DeliverToRecipientAsync(fromAddress, toAddress, mimeMessage, messageData);
+                var result = await DeliverToRecipientAsync(fromAddress, toAddress, mimeMessage, messageBytes);
                 deliveryResults.Add(result);
             }
 
@@ -59,24 +58,17 @@ public class EmailDeliveryService(
         }
     }
 
-    private async Task<MimeMessage> ParseMimeMessageAsync(string messageData) {
+    private async Task<MimeMessage> ParseMimeMessageAsync(byte[] messageBytes) {
         try {
-            var byteCount = Encoding.UTF8.GetByteCount(messageData);
-            var buffer = ArrayPool<byte>.Shared.Rent(byteCount);
-            try {
-                var written = Encoding.UTF8.GetBytes(messageData, buffer);
-                using var stream = new MemoryStream(buffer, 0, written, writable: false);
-                return await MimeMessage.LoadAsync(stream);
-            } finally {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            using var stream = new MemoryStream(messageBytes, writable: false);
+            return await MimeMessage.LoadAsync(stream);
         } catch (Exception ex) {
             logger.LogError(ex, "Error parsing MIME message");
             return null;
         }
     }
 
-    private async Task<bool> DeliverToRecipientAsync(string fromAddress, string toAddress, MimeMessage mimeMessage, string rawMessageData) {
+    private async Task<bool> DeliverToRecipientAsync(string fromAddress, string toAddress, MimeMessage mimeMessage, byte[] rawMessageBytes) {
         try {
             // Find the recipient user
             var user = await userService.GetUserEntityByEmailAsync(toAddress);
@@ -114,8 +106,8 @@ public class EmailDeliveryService(
                 Subject = mimeMessage.Subject ?? "",
                 Body = mimeMessage.TextBody ?? "",
                 BodyHtml = mimeMessage.HtmlBody,
-                Headers = ExtractHeaders(rawMessageData),
-                MessageSize = rawMessageData.Length,
+                Headers = ExtractHeaders(rawMessageBytes),
+                MessageSize = rawMessageBytes.Length,
                 SentDate = mimeMessage.Date.DateTime,
                 ReceivedAt = nowProvider.UtcNow,
                 InReplyTo = mimeMessage.InReplyTo,
@@ -179,39 +171,45 @@ public class EmailDeliveryService(
         return currentUid;
     }
 
-    private string ExtractHeaders(string rawMessageData) {
-        // Extract headers from raw message data (everything before first empty line)
-        var span = rawMessageData.AsSpan();
+    private string ExtractHeaders(byte[] rawMessageBytes) {
+        // Extract headers from raw message bytes (everything before first empty line).
+        // Scans at the byte level — \r and \n are single-byte ASCII values in UTF-8.
+        var span = rawMessageBytes.AsSpan();
         var searchFrom = 0;
 
         while (searchFrom < span.Length) {
-            var newlineIndex = span[searchFrom..].IndexOf('\n');
+            var remaining = span[searchFrom..];
+            var newlineIndex = remaining.IndexOf((byte)'\n');
             if (newlineIndex < 0) {
                 break;
             }
 
-            var lineEnd = newlineIndex;
             // Check if the line (excluding \r\n) is empty
-            if (lineEnd == 0 || (lineEnd == 1 && span[searchFrom] == '\r')) {
+            if (newlineIndex == 0 || (newlineIndex == 1 && remaining[0] == (byte)'\r')) {
                 // Empty line found — headers end here
-                var headers = span[..searchFrom];
-                // Trim trailing \r\n if present
-                if (headers.Length > 0 && headers[^1] == '\n') {
-                    headers = headers[..^1];
+                var headerEnd = searchFrom;
+                // Trim trailing \r\n
+                if (headerEnd > 0 && span[headerEnd - 1] == (byte)'\n') {
+                    headerEnd--;
                 }
 
-                if (headers.Length > 0 && headers[^1] == '\r') {
-                    headers = headers[..^1];
+                if (headerEnd > 0 && span[headerEnd - 1] == (byte)'\r') {
+                    headerEnd--;
                 }
 
-                return headers.ToString() + "\r\n";
+                return Encoding.UTF8.GetString(span[..headerEnd]) + "\r\n";
             }
 
             searchFrom += newlineIndex + 1;
         }
 
         // No empty line found — entire content is headers
-        return rawMessageData.TrimEnd('\r', '\n') + "\r\n";
+        var len = span.Length;
+        while (len > 0 && (span[len - 1] == (byte)'\r' || span[len - 1] == (byte)'\n')) {
+            len--;
+        }
+
+        return Encoding.UTF8.GetString(span[..len]) + "\r\n";
     }
 
     private string ExtractAddresses(InternetAddressList addressList) {

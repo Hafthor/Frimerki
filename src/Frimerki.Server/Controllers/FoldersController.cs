@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Folder;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -136,8 +136,7 @@ public class FoldersController(IFolderService folderService, ILogger<FoldersCont
     }
 
     private int GetCurrentUserId() {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out var userId)) {
+        if (!int.TryParse(User.UserId, out var userId)) {
             throw new UnauthorizedAccessException("Invalid user ID in token");
         }
         return userId;

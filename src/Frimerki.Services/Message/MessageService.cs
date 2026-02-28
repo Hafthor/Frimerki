@@ -4,6 +4,7 @@ using System.Text.Json;
 using Frimerki.Data;
 using Frimerki.Models.DTOs;
 using Frimerki.Models.Entities;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -607,7 +608,7 @@ public class MessageService(EmailDbContext context, INowProvider nowProvider, IL
             .Where(u => u.Id == userId)
             .FirstOrDefaultAsync();
 
-        return user != null ? $"{user.Username}@{user.Domain.Name}" : $"unknown{userId}@localhost";
+        return user != null ? user.Email : $"unknown{userId}@localhost";
     }
 
     private async Task<int> GetNextUidAsync() {

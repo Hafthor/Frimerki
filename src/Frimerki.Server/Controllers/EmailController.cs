@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Email;
 using Frimerki.Services.User;
 using Microsoft.AspNetCore.Authorization;
@@ -22,7 +22,7 @@ public class EmailController(
     public async Task<ActionResult> SendEmail([FromBody] MessageRequest request) {
         try {
             // Get the authenticated user's email address
-            var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+            var userEmail = User.Email;
             if (string.IsNullOrEmpty(userEmail)) {
                 return BadRequest("User email not found in token");
             }
@@ -57,7 +57,7 @@ public class EmailController(
     [HttpPost("send/simple")]
     public async Task<ActionResult> SendSimpleEmail([FromBody] SimpleEmailRequest request) {
         try {
-            var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+            var userEmail = User.Email;
             if (string.IsNullOrEmpty(userEmail)) {
                 return BadRequest("User email not found in token");
             }

@@ -185,10 +185,16 @@ public partial class Pop3Session(
             return;
         }
 
-        var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
-        var totalSize = visibleMessages.Sum(m => m.Size);
+        int count = 0;
+        int totalSize = 0;
+        foreach (var m in _messages) {
+            if (!_deletedMessages.Contains(m.Index)) {
+                count++;
+                totalSize += m.Size;
+            }
+        }
 
-        await SendResponseAsync($"+OK {visibleMessages.Count} {totalSize}", cancellationToken);
+        await SendResponseAsync($"+OK {count} {totalSize}", cancellationToken);
     }
 
     private async Task HandleListAsync(string args, CancellationToken cancellationToken) {
@@ -219,11 +225,20 @@ public partial class Pop3Session(
     }
 
     private async Task ListAllMessagesAsync(CancellationToken cancellationToken) {
-        var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
-        await SendResponseAsync($"+OK {visibleMessages.Count} messages ({visibleMessages.Sum(m => m.Size)} octets)", cancellationToken);
+        int count = 0;
+        int totalSize = 0;
+        foreach (var m in _messages) {
+            if (!_deletedMessages.Contains(m.Index)) {
+                count++;
+                totalSize += m.Size;
+            }
+        }
+        await SendResponseAsync($"+OK {count} messages ({totalSize} octets)", cancellationToken);
 
-        foreach (var msg in visibleMessages) {
-            await SendResponseAsync($"{msg.Index} {msg.Size}", cancellationToken);
+        foreach (var msg in _messages) {
+            if (!_deletedMessages.Contains(msg.Index)) {
+                await SendResponseAsync($"{msg.Index} {msg.Size}", cancellationToken);
+            }
         }
         await SendResponseAsync(".", cancellationToken);
     }
@@ -392,12 +407,18 @@ public partial class Pop3Session(
     }
 
     private async Task ListAllMessageUidsAsync(CancellationToken cancellationToken) {
-        // List all message UIDs
-        var visibleMessages = _messages.Where(m => !_deletedMessages.Contains(m.Index)).ToList();
-        await SendResponseAsync($"+OK {visibleMessages.Count} messages", cancellationToken);
+        int count = 0;
+        foreach (var m in _messages) {
+            if (!_deletedMessages.Contains(m.Index)) {
+                count++;
+            }
+        }
+        await SendResponseAsync($"+OK {count} messages", cancellationToken);
 
-        foreach (var msg in visibleMessages) {
-            await SendResponseAsync($"{msg.Index} {msg.Uid}", cancellationToken);
+        foreach (var msg in _messages) {
+            if (!_deletedMessages.Contains(msg.Index)) {
+                await SendResponseAsync($"{msg.Index} {msg.Uid}", cancellationToken);
+            }
         }
         await SendResponseAsync(".", cancellationToken);
     }

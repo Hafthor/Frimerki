@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
-using Frimerki.Data;
 using Frimerki.Models.DTOs;
+using Frimerki.Models.Extensions;
 using Frimerki.Services.Authentication;
 using Frimerki.Services.Common;
 using Frimerki.Services.User;
@@ -18,7 +18,6 @@ public interface ISessionService {
 }
 
 public class SessionService(
-    EmailDbContext context,
     IUserService userService,
     IJwtService jwtService,
     INowProvider nowProvider,
@@ -44,18 +43,7 @@ public class SessionService(
             }
 
             // Create session info
-            var sessionInfo = new UserSessionInfo {
-                Id = user.Id,
-                Username = user.Username,
-                Email = $"{user.Username}@{user.Domain.Name}",
-                FullName = user.FullName,
-                Role = user.Role,
-                CanReceive = user.CanReceive,
-                CanLogin = user.CanLogin,
-                DomainName = user.Domain.Name,
-                DomainId = user.DomainId,
-                LastLogin = user.LastLogin ?? DateTime.MinValue
-            };
+            var sessionInfo = user.ToSessionInfo();
 
             // Generate tokens
             var accessToken = jwtService.GenerateAccessToken(sessionInfo);
@@ -66,7 +54,7 @@ public class SessionService(
             var now = nowProvider.UtcNow;
             RefreshTokens[refreshToken] = new RefreshTokenInfo(
                 UserId: user.Id,
-                Email: $"{user.Username}@{user.Domain.Name}",
+                Email: user.Email,
                 CreatedAt: now,
                 ExpiresAt: now.AddDays(30) // Refresh tokens expire in 30 days
             );
@@ -113,7 +101,7 @@ public class SessionService(
                 return new SessionResponse { IsAuthenticated = false };
             }
 
-            var email = user.FindFirst(ClaimTypes.Email)?.Value;
+            var email = user.Email;
             if (string.IsNullOrEmpty(email)) {
                 return new SessionResponse { IsAuthenticated = false };
             }
@@ -124,18 +112,7 @@ public class SessionService(
                 return new SessionResponse { IsAuthenticated = false };
             }
 
-            var sessionInfo = new UserSessionInfo {
-                Id = userInfo.Id,
-                Username = userInfo.Username,
-                Email = $"{userInfo.Username}@{userInfo.Domain.Name}",
-                FullName = userInfo.FullName,
-                Role = userInfo.Role,
-                CanReceive = userInfo.CanReceive,
-                CanLogin = userInfo.CanLogin,
-                DomainName = userInfo.Domain.Name,
-                DomainId = userInfo.DomainId,
-                LastLogin = userInfo.LastLogin ?? DateTime.MinValue
-            };
+            var sessionInfo = userInfo.ToSessionInfo();
 
             // Generate a fresh token (auto-refresh functionality)
             var newToken = jwtService.GenerateAccessToken(sessionInfo);
@@ -177,18 +154,7 @@ public class SessionService(
             }
 
             // Create new session info
-            var sessionInfo = new UserSessionInfo {
-                Id = user.Id,
-                Username = user.Username,
-                Email = $"{user.Username}@{user.Domain.Name}",
-                FullName = user.FullName,
-                Role = user.Role,
-                CanReceive = user.CanReceive,
-                CanLogin = user.CanLogin,
-                DomainName = user.Domain.Name,
-                DomainId = user.DomainId,
-                LastLogin = user.LastLogin ?? DateTime.MinValue
-            };
+            var sessionInfo = user.ToSessionInfo();
 
             // Generate new tokens
             var accessToken = jwtService.GenerateAccessToken(sessionInfo);
@@ -200,12 +166,12 @@ public class SessionService(
             var now = nowProvider.UtcNow;
             RefreshTokens[newRefreshToken] = new RefreshTokenInfo(
                 UserId: user.Id,
-                Email: $"{user.Username}@{user.Domain.Name}",
+                Email: user.Email,
                 CreatedAt: now,
                 ExpiresAt: now.AddDays(30)
             );
 
-            logger.LogInformation("Token refresh successful for user: {Email}", $"{user.Username}@{user.Domain.Name}");
+            logger.LogInformation("Token refresh successful for user: {Email}", user.Email);
 
             return new LoginResponse {
                 Token = accessToken,

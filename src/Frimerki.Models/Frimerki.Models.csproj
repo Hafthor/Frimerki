@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Frimerki.Models</RootNamespace>
     <AssemblyName>Frimerki.Models</AssemblyName>
+    <LangVersion>14</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

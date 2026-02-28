@@ -65,18 +65,18 @@ public record MessageFlagsRequest {
 public record MessageFilterRequest {
     public string Q { get; init; }
     public string Folder { get; init; }
-    public int? FolderId { get; set; }
+    public int? FolderId { get; init; }
     public string Flags { get; init; }
-    public string From { get; set; }
-    public string To { get; set; }
-    public DateTime? Since { get; set; }
-    public DateTime? Before { get; set; }
-    public int? MinSize { get; set; }
-    public int? MaxSize { get; set; }
+    public string From { get; init; }
+    public string To { get; init; }
+    public DateTime? Since { get; init; }
+    public DateTime? Before { get; init; }
+    public int? MinSize { get; init; }
+    public int? MaxSize { get; init; }
     public int Skip { get; init; }
     public int Take { get; init; } = 50;
-    public string SortBy { get; set; } = "date";
-    public string SortOrder { get; set; } = "desc";
+    public string SortBy { get; init; } = "date";
+    public string SortOrder { get; init; } = "desc";
 }
 
 public record MessageResponse {
@@ -114,7 +114,7 @@ public record MessageListItemResponse {
     public string Folder { get; init; } = "";
     public bool HasAttachments { get; set; }
     public int MessageSize { get; init; }
-    public string MessageSizeFormatted { get; set; } = "";
+    public string MessageSizeFormatted { get; init; } = "";
 }
 
 // MessageListResponse is now replaced by PaginatedInfo<MessageListItemResponse>

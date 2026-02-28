@@ -27,7 +27,6 @@ public partial class SmtpSession : IDisposable {
     private User _authenticatedUser;
     private string _mailFrom;
     private readonly List<string> _rcptTo = [];
-    private readonly StringBuilder _messageData = new();
     private PooledLineReader _reader;
 
     [GeneratedRegex(@"FROM:\s*<(.*)>", RegexOptions.IgnoreCase)]
@@ -246,7 +245,6 @@ public partial class SmtpSession : IDisposable {
         // TODO: Validate that authenticated user can send from this address
         _mailFrom = fromAddress;
         _rcptTo.Clear();
-        _messageData.Clear();
         _state = SmtpSessionState.MailFrom;
 
         await SendResponseAsync("250 OK");
@@ -287,31 +285,18 @@ public partial class SmtpSession : IDisposable {
         await SendResponseAsync("354 Start mail input; end with <CRLF>.<CRLF>");
         _state = SmtpSessionState.Data;
 
-        while (await _reader.ReadLineAsync(cancellationToken) is { } line) {
-            if (line == ".") {
-                // End of message
-                await ProcessMessageAsync();
-                return;
-            }
-
-            // Handle dot-stuffing (remove leading dot if line starts with ..)
-            if (line.StartsWith("..")) {
-                line = line[1..];
-            }
-
-            _messageData.AppendLine(line);
-        }
+        // Read the entire message body as raw bytes — avoids decode→string→re-encode overhead
+        var messageBytes = await _reader.ReadDotTerminatedBytesAsync(cancellationToken);
+        await ProcessMessageAsync(messageBytes);
     }
 
-    private async Task ProcessMessageAsync() {
+    private async Task ProcessMessageAsync(byte[] messageBytes) {
         try {
-            var messageData = _messageData.ToString();
-
             _logger.LogInformation("Processing message from {From} to {Recipients}",
                 _mailFrom, string.Join(", ", _rcptTo));
 
-            // Deliver the message using the email delivery service
-            var delivered = await _emailDeliveryService.DeliverEmailAsync(_mailFrom!, _rcptTo, messageData);
+            // Deliver the message using the email delivery service (raw bytes avoid re-encoding)
+            var delivered = await _emailDeliveryService.DeliverEmailAsync(_mailFrom!, _rcptTo, messageBytes);
 
             if (delivered) {
                 await SendResponseAsync("250 OK: Message accepted for delivery");
@@ -326,7 +311,6 @@ public partial class SmtpSession : IDisposable {
             // Reset for next message
             _mailFrom = null;
             _rcptTo.Clear();
-            _messageData.Clear();
             _state = _authenticatedUser != null ? SmtpSessionState.Authenticated : SmtpSessionState.Ehlo;
         } catch (Exception ex) {
             _logger.LogError(ex, "Error processing message");
@@ -337,7 +321,6 @@ public partial class SmtpSession : IDisposable {
     private async Task HandleRsetAsync() {
         _mailFrom = null;
         _rcptTo.Clear();
-        _messageData.Clear();
         _state = _authenticatedUser != null ? SmtpSessionState.Authenticated :
                  _state == SmtpSessionState.Ehlo ? SmtpSessionState.Ehlo : SmtpSessionState.Helo;
 
